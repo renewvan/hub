@@ -1,0 +1,62 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://renewvan.dev/schema/battery.schema.json",
+  "title": "battery",
+  "description": "v0.1 device-model entity: the house battery bank, bridged from Victron's native Venus OS MQTT feed. Published under van/battery/<id>/<property>.",
+  "type": "object",
+  "properties": {
+    "soc_pct": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "voltage_v": {
+      "type": "number",
+      "minimum": 0
+    },
+    "current_a": {
+      "type": "number",
+      "description": "Signed: positive = charging, negative = discharging."
+    },
+    "power_w": {
+      "type": "number",
+      "description": "Signed: positive = charging, negative = discharging."
+    },
+    "temperature_c": {
+      "type": "number"
+    },
+    "charge_state": {
+      "type": "string",
+      "description": "Sourced from Venus OS's system-wide SystemState/State, fanned out to every battery id. `unknown` is the forward-compat fallback for any code not in this enum.",
+      "enum": [
+        "off",
+        "low_power",
+        "fault",
+        "bulk",
+        "absorption",
+        "float",
+        "storage",
+        "equalize",
+        "passthru",
+        "inverting",
+        "assisting",
+        "sustain",
+        "external_control",
+        "discharging",
+        "sustain_ess",
+        "recharge",
+        "scheduled_recharge",
+        "unknown"
+      ]
+    }
+  },
+  "required": [
+    "soc_pct",
+    "voltage_v",
+    "current_a",
+    "power_w",
+    "temperature_c",
+    "charge_state"
+  ],
+  "additionalProperties": false
+}
