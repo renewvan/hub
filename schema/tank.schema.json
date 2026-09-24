@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://renewvan.dev/schema/tank.schema.json",
+  "title": "tank",
+  "description": "v0.1 device-model entity: a fluid reservoir monitored by a resistive level sensor. Published under van/tank/<id>/<property>.",
+  "type": "object",
+  "properties": {
+    "fluid_type": {
+      "type": "string",
+      "enum": ["fresh_water", "grey_water", "black_water", "fuel", "lpg"]
+    },
+    "capacity_l": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "level_pct": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "status": {
+      "type": "string",
+      "enum": ["ok", "open_circuit", "short_circuit"]
+    }
+  },
+  "required": ["fluid_type", "capacity_l", "level_pct", "status"],
+  "additionalProperties": false
+}
