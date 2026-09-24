@@ -1,0 +1,8 @@
+{
+  "soc_pct": -5,
+  "voltage_v": 13.1,
+  "current_a": 12.6,
+  "power_w": 165.1,
+  "temperature_c": 24.5,
+  "charge_state": "trickle"
+}

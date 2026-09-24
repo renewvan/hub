@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://renewvan.dev/schema/relay.schema.json",
+  "title": "relay",
+  "description": "v0.1 device-model entity: a binary on/off load switched by the ESP32 relay node. Published under van/relay/<id>/<property>. No command topic in v0.",
+  "type": "object",
+  "properties": {
+    "state": {
+      "type": "boolean"
+    }
+  },
+  "required": ["state"],
+  "additionalProperties": false
+}
