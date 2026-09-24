@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<!--
+  PROTOTYPE — throwaway, ticket 06 (dashboard scope and stack).
+  Three radically different layout variants for the read-only v0 dashboard,
+  switchable via ?variant=A|B|C and a preset-width simulator (7" kiosk /
+  laptop / phone) since we don't have the physical hardware here.
+  Mock data only — matches the v0.1 device-model schema (tank/relay/battery)
+  from ticket 01. Not production code: no framework, no real MQTT-over-WS.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Campervan Hub — Dashboard Prototype (ticket 06)</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #1a1d24;
+    --panel-2: #23272f;
+    --text: #e8eaed;
+    --muted: #9aa1ad;
+    --accent: #4ea1ff;
+    --ok: #4caf7d;
+    --warn: #e0a72c;
+    --bad: #e05c5c;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #333; color: var(--text); }
+
+  /* --- simulator chrome (not part of any variant, just prototype scaffolding) --- */
+  #proto-toolbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    display: flex; align-items: center; gap: 12px;
+    background: #000; color: #fff; padding: 8px 14px; font-size: 13px;
+    font-family: -apple-system, sans-serif;
+  }
+  #proto-toolbar button, #proto-toolbar select {
+    background: #222; color: #fff; border: 1px solid #444; border-radius: 6px;
+    padding: 5px 10px; font-size: 13px; cursor: pointer;
+  }
+  #proto-toolbar button.active { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 600; }
+  #stage-wrap {
+    padding-top: 44px; display: flex; justify-content: center; min-height: 100vh;
+    background: repeating-linear-gradient(45deg, #2b2b2b, #2b2b2b 10px, #272727 10px, #272727 20px);
+  }
+  #stage {
+    background: var(--bg); overflow: auto; box-shadow: 0 0 0 2px #444, 0 10px 40px rgba(0,0,0,.5);
+    margin: 20px; transition: width .2s, height .2s;
+  }
+
+  /* --- shared dashboard primitives --- */
+  .page { padding: 16px; min-height: 100%; }
+  .section-title { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 8px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .badge.ok { background: rgba(76,175,125,.15); color: var(--ok); }
+  .badge.warn { background: rgba(224,167,44,.15); color: var(--warn); }
+  .badge.bad { background: rgba(224,92,92,.15); color: var(--bad); }
+  .conn { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+
+  /* ===================== VARIANT A: Status board (card grid) ===================== */
+  .A .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+  .A .card { background: var(--panel); border-radius: 12px; padding: 14px; }
+  .A .card h3 { margin: 0 0 6px; font-size: 13px; color: var(--muted); font-weight: 500; }
+  .A .card .val { font-size: 28px; font-weight: 700; }
+  .A .card .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .A .bar { height: 6px; background: var(--panel-2); border-radius: 3px; margin-top: 10px; overflow: hidden; }
+  .A .bar > div { height: 100%; background: var(--accent); }
+  .A .relay-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--panel-2); }
+  .A .relay-row:last-child { border-bottom: none; }
+  .A .toggle { width: 40px; height: 22px; border-radius: 11px; background: var(--panel-2); position: relative; }
+  .A .toggle.on { background: var(--ok); }
+  .A .toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: left .15s; }
+  .A .toggle.on::after { left: 20px; }
+  .A .section { background: var(--panel); border-radius: 12px; padding: 14px; margin-top: 16px; }
+
+  /* ===================== VARIANT B: Hero gauges ===================== */
+  .B .hero-row { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; margin-bottom: 20px; }
+  .B .gauge { text-align: center; }
+  .ring { width: 120px; height: 120px; border-radius: 50%; position: relative; display: flex; align-items: center; justify-content: center; }
+  .B .ring-val { font-size: 22px; font-weight: 700; }
+  .B .ring-label { font-size: 11px; color: var(--muted); margin-top: 6px; }
+  .B .ring-sub { font-size: 11px; color: var(--muted); }
+  .B .relay-strip { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .B .chip { background: var(--panel); border-radius: 10px; padding: 10px 14px; display: flex; align-items: center; gap: 8px; font-size: 13px; min-width: 110px; justify-content: center; }
+  .B .chip .dot { background: var(--panel-2); }
+  .B .chip.on .dot { background: var(--ok); }
+
+  /* ===================== VARIANT C: Domain tabs ===================== */
+  .C .tabbar { display: flex; gap: 4px; background: var(--panel); border-radius: 10px; padding: 4px; margin-bottom: 16px; }
+  .C .tab { flex: 1; text-align: center; padding: 8px; border-radius: 8px; font-size: 13px; color: var(--muted); cursor: pointer; }
+  .C .tab.active { background: var(--accent); color: #000; font-weight: 600; }
+  .C .tabpanel { display: none; }
+  .C .tabpanel.active { display: block; }
+  .C .big-card { background: var(--panel); border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 12px; }
+  .C .big-val { font-size: 40px; font-weight: 700; }
+  .C .big-label { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .C .relay-list .relay-row { display: flex; justify-content: space-between; align-items: center; background: var(--panel); border-radius: 10px; padding: 14px; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+
+<div id="proto-toolbar">
+  <strong>ticket 06 prototype</strong>
+  <span style="opacity:.6">| variant:</span>
+  <button data-variant="A">A · Status board</button>
+  <button data-variant="B">B · Hero gauges</button>
+  <button data-variant="C">C · Domain tabs</button>
+  <span style="opacity:.6">| screen:</span>
+  <button data-screen="kiosk">7" kiosk (800×480 landscape)</button>
+  <button data-screen="laptop">Laptop web (1280×800)</button>
+  <button data-screen="phone">Phone (390×844)</button>
+  <span style="margin-left:auto; opacity:.6">← → to cycle variant</span>
+</div>
+
+<div id="stage-wrap"><div id="stage"><div class="page" id="root"></div></div></div>
+
+<script>
+const data = {
+  tanks: [
+    { id: 'fresh', fluid_type: 'fresh_water', capacity_l: 100, level_pct: 62, status: 'ok' },
+    { id: 'grey', fluid_type: 'grey_water', capacity_l: 80, level_pct: 41, status: 'ok' },
+  ],
+  battery: { id: 'house', soc_pct: 78, voltage_v: 13.1, current_a: 4.2, power_w: 55, temperature_c: 22, charge_state: 'absorption' },
+  relays: [
+    { id: 'lights_ceiling', label: 'Ceiling lights', state: true },
+    { id: 'lights_awning', label: 'Awning lights', state: false },
+    { id: 'water_pump', label: 'Water pump', state: true },
+    { id: 'fan', label: 'Roof fan', state: false },
+  ],
+};
+
+function fluidLabel(t) { return t.replace('_', ' '); }
+
+function renderA(d) {
+  return `
+    <div class="A">
+      <div class="conn"><span class="dot"></span> van bus connected</div>
+      <p class="section-title" style="margin-top:14px">Tanks</p>
+      <div class="cards">
+        ${d.tanks.map(t => `
+          <div class="card">
+            <h3>${fluidLabel(t.fluid_type)} (${t.id})</h3>
+            <div class="val">${t.level_pct}%</div>
+            <div class="sub">${Math.round(t.capacity_l * t.level_pct/100)} / ${t.capacity_l} L</div>
+            <div class="bar"><div style="width:${t.level_pct}%"></div></div>
+          </div>`).join('')}
+        <div class="card">
+          <h3>Battery (${d.battery.id})</h3>
+          <div class="val">${d.battery.soc_pct}%</div>
+          <div class="sub">${d.battery.voltage_v} V · ${d.battery.current_a > 0 ? '+' : ''}${d.battery.current_a} A · <span class="badge ok">${d.battery.charge_state}</span></div>
+          <div class="bar"><div style="width:${d.battery.soc_pct}%"></div></div>
+        </div>
+      </div>
+      <div class="section">
+        <p class="section-title">Switches</p>
+        ${d.relays.map(r => `
+          <div class="relay-row">
+            <span>${r.label}</span>
+            <div class="toggle ${r.state ? 'on' : ''}"></div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+}
+
+function ringStyle(pct, color) {
+  return `background: conic-gradient(${color} ${pct*3.6}deg, var(--panel-2) 0deg); `;
+}
+
+function renderB(d) {
+  const gauges = [
+    ...d.tanks.map(t => ({ label: `${fluidLabel(t.fluid_type)}`, val: t.level_pct, sub: `${t.id}`, color: 'var(--accent)' })),
+    { label: 'Battery', val: d.battery.soc_pct, sub: d.battery.charge_state, color: 'var(--ok)' },
+  ];
+  return `
+    <div class="B">
+      <div class="conn" style="justify-content:center; margin-bottom:14px"><span class="dot"></span> van bus connected</div>
+      <div class="hero-row">
+        ${gauges.map(g => `
+          <div class="gauge">
+            <div class="ring" style="${ringStyle(g.val, g.color)}">
+              <div style="background: var(--bg); width:92px; height:92px; border-radius:50%; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+                <div class="ring-val">${g.val}%</div>
+              </div>
+            </div>
+            <div class="ring-label">${g.label}</div>
+            <div class="ring-sub">${g.sub}</div>
+          </div>`).join('')}
+      </div>
+      <p class="section-title" style="text-align:center">Switches</p>
+      <div class="relay-strip">
+        ${d.relays.map(r => `
+          <div class="chip ${r.state ? 'on' : ''}"><span class="dot"></span>${r.label}</div>`).join('')}
+      </div>
+    </div>`;
+}
+
+function renderC(d) {
+  return `
+    <div class="C">
+      <div class="tabbar">
+        <div class="tab active" data-tab="tanks">Tanks</div>
+        <div class="tab" data-tab="power">Power</div>
+        <div class="tab" data-tab="switches">Switches</div>
+      </div>
+      <div class="tabpanel active" data-panel="tanks">
+        ${d.tanks.map(t => `
+          <div class="big-card">
+            <div class="ring" style="width:150px;height:150px;margin:0 auto 12px;${ringStyle(t.level_pct, 'var(--accent)')}">
+              <div style="background: var(--bg); width:118px; height:118px; border-radius:50%; display:flex; align-items:center; justify-content:center;">
+                <div class="big-val" style="font-size:32px">${t.level_pct}%</div>
+              </div>
+            </div>
+            <div class="big-label">${fluidLabel(t.fluid_type)} · ${t.id} · ${Math.round(t.capacity_l * t.level_pct/100)}/${t.capacity_l} L</div>
+          </div>`).join('')}
+      </div>
+      <div class="tabpanel" data-panel="power">
+        <div class="big-card">
+          <div class="ring" style="width:150px;height:150px;margin:0 auto 12px;${ringStyle(d.battery.soc_pct, 'var(--ok)')}">
+            <div style="background: var(--bg); width:118px; height:118px; border-radius:50%; display:flex; align-items:center; justify-content:center;">
+              <div class="big-val" style="font-size:32px">${d.battery.soc_pct}%</div>
+            </div>
+          </div>
+          <div class="big-label">${d.battery.voltage_v} V · ${d.battery.current_a} A · ${d.battery.power_w} W · ${d.battery.temperature_c}°C</div>
+          <div class="badge ok" style="margin-top:8px">${d.battery.charge_state}</div>
+        </div>
+      </div>
+      <div class="tabpanel" data-panel="switches">
+        <div class="relay-list">
+          ${d.relays.map(r => `
+            <div class="relay-row">
+              <span>${r.label}</span>
+              <div class="toggle ${r.state ? 'on' : ''}" style="width:40px;height:22px;border-radius:11px;background:${r.state ? 'var(--ok)' : 'var(--panel-2)'}"></div>
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+}
+
+const renderers = { A: renderA, B: renderB, C: renderC };
+const screens = {
+  kiosk:  { w: 800, h: 480 },
+  laptop: { w: 1280, h: 800 },
+  phone:  { w: 390, h: 844 },
+};
+
+function currentParams() {
+  const p = new URLSearchParams(location.search);
+  return { variant: p.get('variant') || 'A', screen: p.get('screen') || 'laptop' };
+}
+
+function paint() {
+  const { variant, screen } = currentParams();
+  document.getElementById('root').innerHTML = renderers[variant](data);
+  const stage = document.getElementById('stage');
+  const s = screens[screen] || screens.laptop;
+  stage.style.width = s.w + 'px';
+  stage.style.height = s.h + 'px';
+  document.querySelectorAll('[data-variant]').forEach(b => b.classList.toggle('active', b.dataset.variant === variant));
+  document.querySelectorAll('[data-screen]').forEach(b => b.classList.toggle('active', b.dataset.screen === screen));
+
+  // wire tab switching for variant C (rendered fresh each paint)
+  document.querySelectorAll('.C .tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.C .tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.C .tabpanel').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      document.querySelector(`.C .tabpanel[data-panel="${tab.dataset.tab}"]`).classList.add('active');
+    });
+  });
+}
+
+function setParam(key, val) {
+  const p = new URLSearchParams(location.search);
+  p.set(key, val);
+  history.replaceState(null, '', '?' + p.toString());
+  paint();
+}
+
+document.querySelectorAll('[data-variant]').forEach(b => b.addEventListener('click', () => setParam('variant', b.dataset.variant)));
+document.querySelectorAll('[data-screen]').forEach(b => b.addEventListener('click', () => setParam('screen', b.dataset.screen)));
+
+document.addEventListener('keydown', (e) => {
+  if (['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) return;
+  const order = ['A','B','C'];
+  const { variant } = currentParams();
+  if (e.key === 'ArrowRight') setParam('variant', order[(order.indexOf(variant)+1) % order.length]);
+  if (e.key === 'ArrowLeft') setParam('variant', order[(order.indexOf(variant)+order.length-1) % order.length]);
+});
+
+paint();
+</script>
+</body>
+</html>
