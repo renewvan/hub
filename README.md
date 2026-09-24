@@ -40,11 +40,12 @@ vendor-agnostic glue between them.
 
 ## Status
 
-Early / hobby-scale (v0). Currently building: broker + topic convention,
-
-device model v0.1, and the first three drivers. Not yet ready for
-
-production van use — see \[Roadmap\](#roadmap).
+Early / hobby-scale (v0). This repo (`hub`) hosts the shared device-model
+schema, the MQTT/InfluxDB/Grafana deployment (docker-compose), and
+project docs. Drivers, bridges, the logger, and the dashboard each live
+in their own repo under the `renewvan` GitHub org (`tank`, `battery`,
+`logger`) — see `.scratch/renewvan-hub-v0-build/` for the v0 build spec.
+Not yet ready for production van use — see \[Roadmap\](#roadmap).
 
 ## Architecture
 
