@@ -47,6 +47,30 @@ in their own repo under the `renewvan` GitHub org (`tank`, `battery`,
 `logger`) — see `.scratch/renewvan-hub-v0-build/` for the v0 build spec.
 Not yet ready for production van use — see \[Roadmap\](#roadmap).
 
+## Install
+
+1. **Infra already running.** `docker-compose-truenas.yml` (Mosquitto,
+   InfluxDB, Grafana) is deployed separately and stays up independent of
+   the backend services below — see the file's header for the TrueNAS
+   Custom-App YAML-editor flow, or `docker compose -f
+   docker-compose-truenas.yml up -d` for a plain Compose host.
+2. **Copy `.env.example` to `.env`** and fill in the required values
+   (Victron GX device reachability, the dashboard's browser-reachable
+   MQTT-WS URL) — see `.env.example`'s comments for what each value is
+   and where it's used.
+3. **Pull the pinned backend images and start them:**
+   `docker compose -f docker-compose-truenas.yml pull && docker compose
+   -f docker-compose-truenas.yml up -d`. This brings up `tank`,
+   `battery`, `logger`, and `dashboard` alongside the infra layer — each
+   a pinned, independently-published image (own repo, own release;
+   nothing built from source in `hub`, per
+   `docs/adr/0001-compose-services-via-pinned-images-not-git-submodules.md`).
+   Bumping a service later is a single `*_IMAGE_TAG` edit in `.env`.
+4. **Flash the ESP32 relay node**, once, per `renewvan/relay`'s own
+   README (ESPHome YAML, no custom firmware).
+5. **Install the phone app** per `renewvan/mobile`'s own README (React
+   Native — sideload or app-store build, not part of this compose flow).
+
 ## Architecture
 
 See \[`/docs/[architecture.md](http://architecture.md)`\](docs/[architecture.md](http://architecture.md)) for the full layered
