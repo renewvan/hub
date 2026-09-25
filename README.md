@@ -60,7 +60,7 @@ Not yet ready for production van use — see \[Roadmap\](#roadmap).
    release; nothing built from source in `hub`, per
    `docs/adr/0001-compose-services-via-pinned-images-not-git-submodules.md`).
    Bumping a service later is a single `*_IMAGE_TAG` edit in `.env`.
-3. **Flash the ESP32 relay node**, once, per `renewvan/relay`'s own
+3. **Flash the ESP32 relay node**, once, per `renewvan/driver-relay`'s own
    README (ESPHome YAML, no custom firmware).
 4. **Install the phone app** per `renewvan/mobile`'s own README (React
    Native — sideload or app-store build, not part of this compose flow).
