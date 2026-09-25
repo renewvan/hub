@@ -47,6 +47,29 @@ in their own repo under the `renewvan` GitHub org (`tank`, `battery`,
 `logger`) — see `.scratch/renewvan-hub-v0-build/` for the v0 build spec.
 Not yet ready for production van use — see \[Roadmap\](#roadmap).
 
+## Install
+
+1. **Copy `.env.example` to `.env`** and fill in the required values
+   (Victron GX device reachability, the dashboard's browser-reachable
+   MQTT-WS URL) — see `.env.example`'s comments for what each value is
+   and where it's used.
+2. **Pull and start everything:** `docker compose pull && docker
+   compose up -d`. This brings up the infra layer (Mosquitto, InfluxDB,
+   Grafana) alongside `tank`, `battery`, `logger`, and `dashboard` —
+   each a pinned, independently-published image (own repo, own
+   release; nothing built from source in `hub`, per
+   `docs/adr/0001-compose-services-via-pinned-images-not-git-submodules.md`).
+   Bumping a service later is a single `*_IMAGE_TAG` edit in `.env`.
+3. **Flash the ESP32 relay node**, once, per `renewvan/relay`'s own
+   README (ESPHome YAML, no custom firmware).
+4. **Install the phone app** per `renewvan/mobile`'s own README (React
+   Native — sideload or app-store build, not part of this compose flow).
+
+`docker-compose.yml` is the plain-Compose-host path (named volumes). A
+host-path/bind-mount deployment (e.g. TrueNAS's Custom App "Install via
+YAML") is a personal deployment concern, not something this repo
+tracks — keep your own compose override outside version control.
+
 ## Architecture
 
 See \[`/docs/[architecture.md](http://architecture.md)`\](docs/[architecture.md](http://architecture.md)) for the full layered
