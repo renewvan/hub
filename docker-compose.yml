@@ -69,7 +69,7 @@ services:
   # Needs I2C device passthrough for the ADS1115; layered config.ini
   # override lives on the bind-mounted host path below.
   tank:
-    image: ghcr.io/renewvan/tank:${TANK_IMAGE_TAG:-0.1.0}
+    image: ghcr.io/renewvan/driver-tank:${TANK_DRIVER_IMAGE_TAG:-v0.1.0}
     container_name: renewvan-tank
     restart: unless-stopped
     depends_on:
@@ -89,7 +89,7 @@ services:
   # compose's van bus (mosquitto). See
   # .scratch/renewvan-hub-v0-build/issues/04-victron-battery-bridge.md.
   battery:
-    image: ghcr.io/renewvan/battery:${BATTERY_IMAGE_TAG:-0.1.0}
+    image: ghcr.io/renewvan/battery-driver:${BATTERY_DRIVER_IMAGE_TAG:-0.1.0}
     container_name: renewvan-battery
     restart: unless-stopped
     depends_on:
