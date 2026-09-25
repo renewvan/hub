@@ -20,14 +20,19 @@
 #   5. `version:` is dropped — TrueNAS's Compose backend uses the
 #      Compose Spec, which no longer takes/needs it.
 #
-# v0 local dev bus: the "message bus" + "application services" layers
-# from docs/architecture.md. No drivers/dashboard/logging service yet —
-# those are separate processes (see .scratch/renewvan-hub-v0/) that
-# will connect to this bus once built.
+# The single install/setup path for the hub (see README.md's Install
+# section): infra (Mosquitto, InfluxDB, Grafana) plus the four pinned,
+# independently-published backend service images (`tank`, `battery`,
+# `logger`, `dashboard`) — per
+# docs/adr/0001-compose-services-via-pinned-images-not-git-submodules.md,
+# none of them are built from local/submodule source here. Bumping a
+# service is a single-line `_IMAGE_TAG` edit below; see `.env.example`
+# for every config value an installer needs to set.
 #
 # MQTT:      <truenas-ip>:1883 (plain), <truenas-ip>:9001 (websockets)
 # InfluxDB:  http://<truenas-ip>:8086 (org=renewvan, bucket=van)
 # Grafana:   http://<truenas-ip>:3000 (admin/admin on first run)
+# Dashboard: http://<truenas-ip>:8080
 
 services:
   mosquitto:
@@ -75,3 +80,77 @@ services:
       - influxdb
     volumes:
       - ${APPDATA_PATH:-/mnt/fast/apps/renewvan}/grafana:/var/lib/grafana
+
+  # Native MQTT tank driver (fresh + grey ADS1115 senders) — see
+  # docs/porting-dbus-driver-to-mqtt.md and
+  # .scratch/renewvan-hub-v0-build/issues/02-native-mqtt-tank-driver.md.
+  # Needs I2C device passthrough for the ADS1115; layered config.ini
+  # override lives on the bind-mounted host path below.
+  tank:
+    image: ghcr.io/renewvan/tank:${TANK_IMAGE_TAG:-0.1.0}
+    container_name: renewvan-tank
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    devices:
+      - "/dev/i2c-1:/dev/i2c-1"
+    environment:
+      MQTT_HOST: ${VAN_BUS_HOST:-mosquitto}
+      MQTT_PORT: ${VAN_BUS_PORT:-1883}
+      MQTT_USERNAME: ${VAN_BUS_USERNAME:-}
+      MQTT_PASSWORD: ${VAN_BUS_PASSWORD:-}
+    volumes:
+      - ${APPDATA_PATH:-/mnt/fast/apps/renewvan}/tank/config.ini:/app/config.ini:ro
+
+  # Victron Venus OS MQTT -> van-bus battery remap. Subscribes against
+  # the GX device's own broker (VICTRON_*), publishes onto this
+  # compose's van bus (mosquitto). See
+  # .scratch/renewvan-hub-v0-build/issues/04-victron-battery-bridge.md.
+  battery:
+    image: ghcr.io/renewvan/battery:${BATTERY_IMAGE_TAG:-0.1.0}
+    container_name: renewvan-battery
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    environment:
+      MQTT_HOST: ${VAN_BUS_HOST:-mosquitto}
+      MQTT_PORT: ${VAN_BUS_PORT:-1883}
+      MQTT_USERNAME: ${VAN_BUS_USERNAME:-}
+      MQTT_PASSWORD: ${VAN_BUS_PASSWORD:-}
+      VICTRON_MQTT_HOST: ${VICTRON_MQTT_HOST}
+      VICTRON_MQTT_PORT: ${VICTRON_MQTT_PORT:-1883}
+      VICTRON_PORTAL_ID: ${VICTRON_PORTAL_ID}
+
+  # van/# -> InfluxDB point writer, one point per message. See
+  # .scratch/renewvan-hub-v0-build/issues/05-influxdb-logger.md.
+  logger:
+    image: ghcr.io/renewvan/logger:${LOGGER_IMAGE_TAG:-0.1.0}
+    container_name: renewvan-logger
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+      - influxdb
+    environment:
+      MQTT_HOST: ${VAN_BUS_HOST:-mosquitto}
+      MQTT_PORT: ${VAN_BUS_PORT:-1883}
+      MQTT_USERNAME: ${VAN_BUS_USERNAME:-}
+      MQTT_PASSWORD: ${VAN_BUS_PASSWORD:-}
+      INFLUXDB_URL: http://influxdb:8086
+      INFLUXDB_TOKEN: ${INFLUXDB_ADMIN_TOKEN:-renewvan-dev-token}
+      INFLUXDB_ORG: renewvan
+      INFLUXDB_BUCKET: van
+
+  # Read-only kiosk/laptop dashboard, served static (nginx/Caddy per its
+  # own Dockerfile), connecting client-side over MQTT-over-WebSocket —
+  # not a polling backend. See
+  # .scratch/renewvan-hub-v0-build/issues/06-dashboard-web-app.md.
+  dashboard:
+    image: ghcr.io/renewvan/dashboard:${DASHBOARD_IMAGE_TAG:-0.1.0}
+    container_name: renewvan-dashboard
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      VAN_BUS_WS_URL: ${VAN_BUS_WS_URL}
+      VAN_BUS_USERNAME: ${DASHBOARD_MQTT_USERNAME:-}
+      VAN_BUS_PASSWORD: ${DASHBOARD_MQTT_PASSWORD:-}
