@@ -106,7 +106,7 @@ services:
   # van/# -> InfluxDB point writer, one point per message. See
   # .scratch/renewvan-hub-v0-build/issues/05-influxdb-logger.md.
   logger:
-    image: ghcr.io/renewvan/logger:${LOGGER_IMAGE_TAG:-0.1.0}
+    image: ghcr.io/renewvan/logger:${LOGGER_IMAGE_TAG:-v0.1.0}
     container_name: renewvan-logger
     restart: unless-stopped
     depends_on:
@@ -127,7 +127,7 @@ services:
   # not a polling backend. See
   # .scratch/renewvan-hub-v0-build/issues/06-dashboard-web-app.md.
   dashboard:
-    image: ghcr.io/renewvan/dashboard:${DASHBOARD_IMAGE_TAG:-0.1.0}
+    image: ghcr.io/renewvan/dashboard:${DASHBOARD_IMAGE_TAG:-v0.1.0}
     container_name: renewvan-dashboard
     restart: unless-stopped
     ports:
