@@ -37,3 +37,8 @@ logs/
 *.sqlite
 *.db
 
+
+# Re-include AGENTS.md and docs/, hidden by an overly-broad global ~/.gitignore rule
+# (docker-compose-truenas.yml stays hidden — personal deployment file, not tracked)
+!AGENTS.md
+!/docs
