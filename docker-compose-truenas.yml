@@ -1,0 +1,77 @@
+# TrueNAS SCALE "Custom App > Install via YAML" deployment.
+#
+# Before pasting into the YAML editor:
+#   1. Create a dataset for this app's data, e.g. `tank/apps/renewvan`.
+#   2. Replace every `${APPDATA_PATH:-/mnt/tank/apps/renewvan}` below — the
+#      default is just a placeholder — or set APPDATA_PATH in the
+#      Custom App's "Environment Variables" section instead of editing
+#      inline.
+#   3. TrueNAS bind-mounts (not named volumes) so app data lives on a
+#      real, backupable dataset — see apps.truenas.com "App Storage"
+#      guidance on host-path vs. ixVolume for production. Named volumes
+#      still work but are harder to back up/inspect from the TrueNAS UI.
+#   4. Each image runs as a fixed non-root UID and needs the bind-mount
+#      directory writable by that UID *before* first start:
+#        chown -R 1883:1883 $APPDATA_PATH/mosquitto
+#        chown -R 1000:1000 $APPDATA_PATH/influxdb
+#        chown -R 472:472   $APPDATA_PATH/grafana
+#      (run via TrueNAS shell, or add `user:`/permissions via an initial
+#      root container if you can't chown host-side.)
+#   5. `version:` is dropped — TrueNAS's Compose backend uses the
+#      Compose Spec, which no longer takes/needs it.
+#
+# v0 local dev bus: the "message bus" + "application services" layers
+# from docs/architecture.md. No drivers/dashboard/logging service yet —
+# those are separate processes (see .scratch/renewvan-hub-v0/) that
+# will connect to this bus once built.
+#
+# MQTT:      <truenas-ip>:1883 (plain), <truenas-ip>:9001 (websockets)
+# InfluxDB:  http://<truenas-ip>:8086 (org=renewvan, bucket=van)
+# Grafana:   http://<truenas-ip>:3000 (admin/admin on first run)
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: renewvan-mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ${APPDATA_PATH:-/mnt/fast/apps/renewvan}/mosquitto/config:/mosquitto/config
+      - ${APPDATA_PATH:-/mnt/fast/apps/renewvan}/mosquitto/data:/mosquitto/data
+      - ${APPDATA_PATH:-/mnt/fast/apps/renewvan}/mosquitto/log:/mosquitto/log
+
+  # History for tank/relay/battery topics (docs/architecture.md
+  # "Application services" row). Written by renewvan/logger, one point
+  # per van/# message — see
+  # .scratch/renewvan-hub-v0/issues/07-influxdb-logging-scope.md.
+  influxdb:
+    image: influxdb:2
+    container_name: renewvan-influxdb
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_ADMIN_PASSWORD:-renewvan-dev-only}
+      DOCKER_INFLUXDB_INIT_ORG: renewvan
+      DOCKER_INFLUXDB_INIT_BUCKET: van
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_ADMIN_TOKEN:-renewvan-dev-token}
+    volumes:
+      - ${APPDATA_PATH:-/mnt/fast/apps/renewvan}/influxdb:/var/lib/influxdb2
+
+  # Ad-hoc/ops history charts (Grafana over InfluxDB), separate from the
+  # v0 read-only mobile/web/kiosk dashboard (React app, see
+  # .scratch/renewvan-hub-v0/issues/06-dashboard-scope-and-stack.md).
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: renewvan-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - influxdb
+    volumes:
+      - ${APPDATA_PATH:-/mnt/fast/apps/renewvan}/grafana:/var/lib/grafana
