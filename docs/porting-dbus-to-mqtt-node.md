@@ -1,14 +1,14 @@
-# Porting a Venus OS D-Bus driver to a native MQTT driver
+# Porting a Venus OS D-Bus driver to a native MQTT node
 
 Reusable recipe for turning one of the existing Venus OS D-Bus driver
 packages (`dbus-ads1115`, `dbus_wattcycle_ble`, `dbus-autoterm`,
-`dbus-giandel-bridge`) into a standalone native MQTT `Driver` (see
-`Driver` in `CONTEXT.md`) that publishes straight to the renewvan bus, per the
+`dbus-giandel-bridge`) into a standalone native MQTT `Node` (see
+`Node` in `CONTEXT.md`) that publishes straight to the renewvan bus, per the
 pattern decided in [dbus-ads1115 bridge interface](../.scratch/renewvan-hub-v0/issues/02-dbus-ads1115-bridge-interface.md).
 
 Applies to **community/non-Victron hardware** — anything the project
 itself owns the sensing for. Genuine Victron gear (VE.Direct/VE.Can)
-stays on Venus OS and gets a remap-shaped `Driver` instead — same term,
+stays on Venus OS and gets a remap-shaped `Node` instead — same term,
 different shape (see [Battery SoC topic mapping](../.scratch/renewvan-hub-v0/issues/04-battery-soc-topic-mapping.md)
 for that counterpart), not this recipe.
 
@@ -27,7 +27,7 @@ Worked example throughout: `dbus-ads1115` → `renewvan/tank`.
 - **GUI calibration screens** — Venus OS QML/GUI calibration UI doesn't
   exist outside Venus OS. v0 calibration is config-file only (see "What
   to keep"); a calibration UI is a dashboard/v1 concern, not the
-  driver's.
+  node's.
 
 ## What to keep
 
@@ -44,11 +44,11 @@ Worked example throughout: `dbus-ads1115` → `renewvan/tank`.
 
 - **An MQTT client**: connect with retry/backoff, a Last Will and
   Testament (LWT) on a `.../status` or `health`-style topic so
-  downstream consumers can detect a dead driver, and a persistent
-  connection (drivers publish continuously; there's no Venus-OS-style
+  downstream consumers can detect a dead node, and a persistent
+  connection (nodes publish continuously; there's no Venus-OS-style
   "subscriber required to keep publishing" quirk on this side — the
-  *driver* is the source, not a re-publisher of someone else's feed).
-- **A publish loop** mapping the driver's internal readings onto its
+  *node* is the source, not a re-publisher of someone else's feed).
+- **A publish loop** mapping the node's internal readings onto its
   entity's `renewvan/<domain>/<id>/<property>` topics, per the schema in
   [Device-model v0.1 schema](../.scratch/renewvan-hub-v0/issues/01-device-model-v0.1-schema.md).
   `id` is the topic path segment itself, not a payload field.
@@ -63,7 +63,7 @@ Worked example throughout: `dbus-ads1115` → `renewvan/tank`.
 
 ## Service lifecycle
 
-The driver is off Venus OS's daemontools `/service` convention; it needs
+The node is off Venus OS's daemontools `/service` convention; it needs
 its own lifecycle:
 
 - **Where it runs**: wherever the physical sensor is wired — for
@@ -71,12 +71,12 @@ its own lifecycle:
   `renewvan/battery` and `renewvan/logger` (see
   [Hardware BOM](../.scratch/renewvan-hub-v0/issues/08-hardware-bom.md)),
   since the ADS1115 breakout is I2C-wired directly to that Pi's GPIO
-  header. A driver for hardware wired elsewhere in the van would instead
+  header. A node for hardware wired elsewhere in the van would instead
   run on whatever host is physically nearest that hardware — the pattern
   doesn't assume one central box.
 - **How it starts on boot**: a plain `systemd` unit
   (`Restart=on-failure`, `WantedBy=multi-user.target`) — no daemontools,
-  no SetupHelper install hooks. One unit per driver process.
+  no SetupHelper install hooks. One unit per node process.
 
 ## Applying this recipe again
 

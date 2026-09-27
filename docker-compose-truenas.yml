@@ -81,13 +81,13 @@ services:
     volumes:
       - ${APPDATA_PATH:-/mnt/fast/apps/renewvan}/grafana:/var/lib/grafana
 
-  # Native MQTT tank driver (fresh + grey ADS1115 senders) — see
-  # docs/porting-dbus-driver-to-mqtt.md and
+  # Native MQTT tank node (fresh + grey ADS1115 senders) — see
+  # docs/porting-dbus-to-mqtt-node.md and
   # .scratch/renewvan-hub-v0-build/issues/02-native-mqtt-tank-driver.md.
   # Needs I2C device passthrough for the ADS1115; layered config.ini
   # override lives on the bind-mounted host path below.
-  driver-tank:
-    image: ghcr.io/renewvan/driver-tank:${TANK_DRIVER_IMAGE_TAG:-v0.1.1}
+  node-tank:
+    image: ghcr.io/renewvan/node-tank:${NODE_TANK_IMAGE_TAG:-v0.1.0}
     container_name: renewvan-tank
     restart: unless-stopped
     depends_on:
@@ -106,8 +106,8 @@ services:
   # the GX device's own broker (VICTRON_*), publishes onto this
   # compose's renewvan bus (mosquitto). See
   # .scratch/renewvan-hub-v0-build/issues/04-victron-battery-bridge.md.
-  driver-battery:
-    image: ghcr.io/renewvan/driver-battery:${BATTERY_DRIVER_IMAGE_TAG:-v0.1.1}
+  node-battery:
+    image: ghcr.io/renewvan/node-battery:${NODE_BATTERY_IMAGE_TAG:-v0.1.0}
     container_name: renewvan-battery
     restart: unless-stopped
     depends_on:
