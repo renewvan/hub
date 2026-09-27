@@ -43,7 +43,7 @@ vendor-agnostic glue between them.
 Early / hobby-scale (v0). This repo (`hub`) hosts the shared device-model
 schema, the MQTT/InfluxDB/Grafana deployment (docker-compose), and
 project docs. Drivers, bridges, the logger, and the dashboard each live
-in their own repo under the `renewvan` GitHub org (`driver-tank`, `driver-battery`,
+in their own repo under the `renewvan` GitHub org (`node-tank`, `node-battery`,
 `logger`) — see `.scratch/renewvan-hub-v0-build/` for the v0 build spec.
 Not yet ready for production van use — see \[Roadmap\](#roadmap).
 
@@ -55,12 +55,12 @@ Not yet ready for production van use — see \[Roadmap\](#roadmap).
    and where it's used.
 2. **Pull and start everything:** `docker compose pull && docker
    compose up -d`. This brings up the infra layer (Mosquitto, InfluxDB,
-   Grafana) alongside `driver-tank`, `driver-battery`, `logger`, and `dashboard` —
+   Grafana) alongside `node-tank`, `node-battery`, `logger`, and `dashboard` —
    each a pinned, independently-published image (own repo, own
    release; nothing built from source in `hub`, per
    `docs/adr/0001-compose-services-via-pinned-images-not-git-submodules.md`).
    Bumping a service later is a single `*_IMAGE_TAG` edit in `.env`.
-3. **Flash the ESP32 relay node**, once, per `renewvan/driver-relay`'s own
+3. **Flash the ESP32 relay node**, once, per `renewvan/node-relay`'s own
    README (ESPHome YAML, no custom firmware).
 4. **Install the phone app** per `renewvan/mobile`'s own README (React
    Native — sideload or app-store build, not part of this compose flow).
