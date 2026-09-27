@@ -145,17 +145,18 @@ def find_touch_device() -> str | None:
     ABS_X (single-touch). The ft5x06 controller on the Official Touch
     Display 2 appears as /dev/input/event* with EV_ABS + BTN_TOUCH.
     """
-    for path in sorted(evdev.list_devices()):
+    for path in sorted(evdev.list_devices(), reverse=True):  # event4 before event0
         try:
             dev = evdev.InputDevice(path)
             caps = dev.capabilities()
-            has_abs = evdev.ecodes.EV_ABS in caps
+            # caps[EV_ABS] is a list of (code, AbsInfo) tuples — extract codes only
+            abs_codes = {code for code, _ in caps.get(evdev.ecodes.EV_ABS, [])}
             has_touch = (
-                evdev.ecodes.ABS_MT_POSITION_X in (caps.get(evdev.ecodes.EV_ABS) or [])
-                or evdev.ecodes.ABS_X in (caps.get(evdev.ecodes.EV_ABS) or [])
+                evdev.ecodes.ABS_MT_POSITION_X in abs_codes
+                or evdev.ecodes.ABS_X in abs_codes
             )
             dev.close()
-            if has_abs and has_touch:
+            if has_touch:
                 return path
         except Exception:
             pass
@@ -285,6 +286,7 @@ def main():
 
     client = mqtt.Client(
         client_id="renewvan-node-kiosk",
+        callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
         protocol=mqtt.MQTTv5,
     )
     client.on_connect = on_connect
