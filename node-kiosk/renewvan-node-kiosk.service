@@ -1,0 +1,17 @@
+[Unit]
+Description=renewvan kiosk display power bridge
+Documentation=https://github.com/renewvan/hub/blob/main/node-kiosk/README.md
+After=network.target mosquitto.service
+
+[Service]
+Type=simple
+User=pi
+EnvironmentFile=-/etc/renewvan/node-kiosk.env
+ExecStart=/usr/bin/python3 /opt/renewvan/node-kiosk/node_kiosk.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
