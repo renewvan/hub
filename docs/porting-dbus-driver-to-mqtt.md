@@ -3,7 +3,7 @@
 Reusable recipe for turning one of the existing Venus OS D-Bus driver
 packages (`dbus-ads1115`, `dbus_wattcycle_ble`, `dbus-autoterm`,
 `dbus-giandel-bridge`) into a standalone native MQTT `Driver` (see
-`Driver` in `CONTEXT.md`) that publishes straight to the van bus, per the
+`Driver` in `CONTEXT.md`) that publishes straight to the renewvan bus, per the
 pattern decided in [dbus-ads1115 bridge interface](../.scratch/renewvan-hub-v0/issues/02-dbus-ads1115-bridge-interface.md).
 
 Applies to **community/non-Victron hardware** — anything the project
@@ -49,7 +49,7 @@ Worked example throughout: `dbus-ads1115` → `renewvan/tank`.
   "subscriber required to keep publishing" quirk on this side — the
   *driver* is the source, not a re-publisher of someone else's feed).
 - **A publish loop** mapping the driver's internal readings onto its
-  entity's `van/<domain>/<id>/<property>` topics, per the schema in
+  entity's `renewvan/<domain>/<id>/<property>` topics, per the schema in
   [Device-model v0.1 schema](../.scratch/renewvan-hub-v0/issues/01-device-model-v0.1-schema.md).
   `id` is the topic path segment itself, not a payload field.
 - **Retained-topic conventions**: publish slow-changing/identity fields
