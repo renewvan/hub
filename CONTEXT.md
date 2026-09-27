@@ -35,4 +35,11 @@ _Avoid_: Node (for the hardware), board, device.
 **Naming convention**:
 Repos are named plainly, scoped by the `renewvan` GitHub org — not a stuttering `renewvan-<name>`; the org already provides the namespace, so re-prefixing every repo restates it. Exception: Node repos carry a `node-` role prefix (`renewvan/node-tank`, `renewvan/node-battery`, `renewvan/node-relay`), because bare `tank`/`battery`/`relay` collides with the **Entity** name the moment repo, image, and env var are referenced side by side. `logger`, `dashboard`, and `mobile` aren't Nodes, so they stay bare.
 
+**Kiosk node** (`renewvan/node-kiosk`):
+A Pi-host process (systemd service, not a Docker container) that bridges the renewvan bus to OS-level display control via `vcgencmd display_power`. Subscribes to `renewvan/kiosk/display/power/set`; publishes current state retained to `renewvan/kiosk/display/power`. Follows the same node artifact naming convention as other nodes: repo `renewvan/node-kiosk`, image `ghcr.io/renewvan/node-kiosk`. Runs outside compose because `vcgencmd` requires direct GPU firmware mailbox access.
+_Avoid_: "kiosk daemon", "display service" (it is a node — it publishes to the renewvan bus like every other node).
+
+**Display power state** (`renewvan/kiosk/display/power`):
+A retained MQTT topic carrying `"on"` or `"off"` (see `schema/kiosk-display-power.schema.json`). Published by the kiosk node after each successful `vcgencmd display_power` call, and initialised from the live hardware state on node startup. The dashboard subscribes to this topic to drive its sleeping overlay. The matching command topic (`renewvan/kiosk/display/power/set`) carries the same payload but is not retained.
+
 **Node artifact naming** (blanket rule, not a per-repo call): a node's repo, Docker image, and `hub`-side pin all carry the same role qualifier. Pattern: repo `renewvan/node-<entity>`, image `ghcr.io/renewvan/node-<entity>`, env var `NODE_<ENTITY>_IMAGE_TAG`. The role prefix comes first in every artifact name, so all node vars sort together and non-node vars (`LOGGER_IMAGE_TAG`, `DASHBOARD_IMAGE_TAG`) stand out clearly. `logger` and `dashboard` are exempt (`LOGGER_IMAGE_TAG`).
