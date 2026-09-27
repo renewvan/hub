@@ -179,10 +179,13 @@ def find_touch_device() -> str | None:
 
 def touch_wake_thread(get_display_off: "callable[[], bool]", on_wake: "callable[[], None]") -> None:
     """
-    Reads raw evdev events from the touch device. On EV_ABS / ABS_MT_SLOT or
-    EV_KEY / BTN_TOUCH DOWN while the display is off, calls on_wake().
-    Runs forever; crashes are logged and the thread exits (node stays alive).
+    Monitors the raw evdev touch device. Grabs the device (blocking compositor
+    routing) only while the display is sleeping, releases it immediately before
+    publishing wake so the waking touch is swallowed but normal touch resumes
+    at once. Polls every 100 ms so grab/ungrab tracks display-state changes.
     """
+    import select
+
     path = TOUCH_DEVICE or find_touch_device()
     if not path:
         log.warning("No touch device found — touch-to-wake disabled. Set TOUCH_DEVICE to enable.")
@@ -191,50 +194,66 @@ def touch_wake_thread(get_display_off: "callable[[], bool]", on_wake: "callable[
     log.info("Touch-to-wake monitoring %s", path)
     try:
         dev = evdev.InputDevice(path)
-        # Grab the device so events aren't also routed to the compositor
-        # while the display is off (avoids phantom taps on wake).
-        dev.grab()
-        log.info("Grabbed %s (events won't pass to compositor while display is off)", path)
-        grabbed = True
     except Exception as exc:
-        log.warning("Could not grab %s (%s) — events will also reach compositor", path, exc)
-        dev = evdev.InputDevice(path)
-        grabbed = False
+        log.error("Cannot open touch device %s: %s — touch-to-wake disabled", path, exc)
+        return
 
+    grabbed = False
     try:
-        for event in dev.read_loop():
-            # EV_ABS SYN or touch-begin events signal a finger down
-            if event.type == evdev.ecodes.EV_ABS and event.code in (
-                evdev.ecodes.ABS_MT_POSITION_X,
-                evdev.ecodes.ABS_X,
-            ):
-                if get_display_off():
-                    log.info("Touch detected while display is off — waking")
-                    if grabbed:
+        while True:
+            should_grab = get_display_off()
+
+            # Sync grab state with current display state
+            if should_grab and not grabbed:
+                try:
+                    dev.grab()
+                    grabbed = True
+                    log.info("Grabbed %s (display sleeping — touch events swallowed)", path)
+                except Exception as exc:
+                    log.warning("Could not grab touch device: %s", exc)
+            elif not should_grab and grabbed:
+                try:
+                    dev.ungrab()
+                    grabbed = False
+                    log.info("Released %s (display awake — touch flowing normally)", path)
+                except Exception:
+                    grabbed = False
+
+            # Poll with 100 ms timeout so grab state stays in sync with display state
+            r, _, _ = select.select([dev.fileno()], [], [], 0.1)
+            if not r:
+                continue
+
+            for event in dev.read():
+                is_touch = (
+                    event.type == evdev.ecodes.EV_ABS
+                    and event.code in (evdev.ecodes.ABS_MT_POSITION_X, evdev.ecodes.ABS_X)
+                ) or (
+                    event.type == evdev.ecodes.EV_KEY
+                    and event.code == evdev.ecodes.BTN_TOUCH
+                    and event.value == 1
+                )
+                if is_touch and grabbed:
+                    try:
                         dev.ungrab()
                         grabbed = False
-                    on_wake()
-            elif event.type == evdev.ecodes.EV_KEY and event.code == evdev.ecodes.BTN_TOUCH and event.value == 1:
-                if get_display_off():
-                    log.info("BTN_TOUCH detected while display is off — waking")
-                    if grabbed:
-                        dev.ungrab()
+                    except Exception:
                         grabbed = False
+                    log.info("Touch detected while display sleeping — waking")
                     on_wake()
+                    break  # discard remaining events in this read batch
     except Exception as exc:
         log.error("Touch-to-wake reader failed: %s", exc)
     finally:
+        if grabbed:
+            try:
+                dev.ungrab()
+            except Exception:
+                pass
         try:
             dev.close()
         except Exception:
             pass
-
-
-# ---------------------------------------------------------------------------
-# MQTT callbacks
-# ---------------------------------------------------------------------------
-
-_display_off = False  # tracks current display state; read by touch thread
 
 
 def on_connect(client: mqtt.Client, userdata, flags, rc, properties=None):
