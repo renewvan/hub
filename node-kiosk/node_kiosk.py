@@ -255,6 +255,7 @@ def touch_wake_thread(get_display_off: "callable[[], bool]", on_wake: "callable[
         except Exception:
             pass
 
+_display_off = False  # module-level; updated by on_connect/on_message; read by touch thread
 
 def on_connect(client: mqtt.Client, userdata, flags, rc, properties=None):
     if rc != 0:
