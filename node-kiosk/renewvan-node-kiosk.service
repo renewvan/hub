@@ -7,7 +7,7 @@ After=network.target mosquitto.service
 SupplementaryGroups=input
 Environment=WAYLAND_DISPLAY=wayland-0
 Environment=XDG_RUNTIME_DIR=/run/user/1000
-User=pi
+User=alexsanzder
 EnvironmentFile=-/etc/renewvan/node-kiosk.env
 ExecStart=/opt/renewvan/node-kiosk/.venv/bin/python /opt/renewvan/node-kiosk/node_kiosk.py
 Restart=on-failure
