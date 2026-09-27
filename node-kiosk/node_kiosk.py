@@ -105,22 +105,31 @@ def query_display_state() -> str | None:
     """
     Query the current display power state.
     Returns "on", "off", or None if unavailable/unreadable.
-    wlopm output: lines like "DSI-1  on" or "DSI-1  off".
-    vcgencmd output: "display_power=1" or "display_power=0".
+
+    Supported output formats:
+      bl_power sysfs (Official 7" Touch Display v1): "0" = on, "1" = off
+      wlopm: lines like "DSI-1  on" / "DSI-1  off"
+      vcgencmd: "display_power=1" (on) / "display_power=0" (off)
     """
     ok, stdout = _run(DISPLAY_QUERY_CMD)
     if not ok:
         return None
-    # wlopm: any output line ending in " off" → off; " on" → on
-    for line in stdout.splitlines():
+    stripped = stdout.strip()
+    # bl_power sysfs: raw "0" (backlight on) or "1" (backlight off)
+    if stripped == "0":
+        return "on"
+    if stripped == "1":
+        return "off"
+    # wlopm: lines ending in " on" / " off"
+    for line in stripped.splitlines():
         if line.strip().endswith(" off"):
             return "off"
         if line.strip().endswith(" on"):
             return "on"
     # vcgencmd fallback
-    if "display_power=1" in stdout:
+    if "display_power=1" in stripped:
         return "on"
-    if "display_power=0" in stdout:
+    if "display_power=0" in stripped:
         return "off"
     log.warning("Unrecognised display query output: %r", stdout)
     return None
