@@ -43,7 +43,7 @@ vendor-agnostic glue between them.
 Early / hobby-scale (v0). This repo (`hub`) hosts the shared device-model
 schema, the MQTT/InfluxDB/Grafana deployment (docker-compose), and
 project docs. Drivers, bridges, the logger, and the dashboard each live
-in their own repo under the `renewvan` GitHub org (`tank`, `battery`,
+in their own repo under the `renewvan` GitHub org (`node-tank`, `node-battery`,
 `logger`) — see `.scratch/renewvan-hub-v0-build/` for the v0 build spec.
 Not yet ready for production van use — see \[Roadmap\](#roadmap).
 
@@ -55,12 +55,12 @@ Not yet ready for production van use — see \[Roadmap\](#roadmap).
    and where it's used.
 2. **Pull and start everything:** `docker compose pull && docker
    compose up -d`. This brings up the infra layer (Mosquitto, InfluxDB,
-   Grafana) alongside `tank`, `battery`, `logger`, and `dashboard` —
+   Grafana) alongside `node-tank`, `node-battery`, `logger`, and `dashboard` —
    each a pinned, independently-published image (own repo, own
    release; nothing built from source in `hub`, per
    `docs/adr/0001-compose-services-via-pinned-images-not-git-submodules.md`).
    Bumping a service later is a single `*_IMAGE_TAG` edit in `.env`.
-3. **Flash the ESP32 relay node**, once, per `renewvan/relay`'s own
+3. **Flash the ESP32 relay node**, once, per `renewvan/node-relay`'s own
    README (ESPHome YAML, no custom firmware).
 4. **Install the phone app** per `renewvan/mobile`'s own README (React
    Native — sideload or app-store build, not part of this compose flow).
@@ -69,6 +69,26 @@ Not yet ready for production van use — see \[Roadmap\](#roadmap).
 host-path/bind-mount deployment (e.g. TrueNAS's Custom App "Install via
 YAML") is a personal deployment concern, not something this repo
 tracks — keep your own compose override outside version control.
+
+### Deploying to a Raspberry Pi over SSH
+
+`bin/bootstrap-pi.sh` and `bin/deploy.sh` automate steps 1–2 above for a
+Pi reachable over SSH, instead of running them by hand on the device:
+
+1. **One-time:** `bin/bootstrap-pi.sh [--host <ssh-alias>]` installs
+   Docker Engine + the Compose plugin if missing, and creates
+   `/opt/renewvan/hub` (deployed compose artifacts), `/etc/renewvan`
+   (host-specific config — Mosquitto broker config, tank calibration),
+   and `/var/log/renewvan`. Defaults to the `renewvan` SSH host alias;
+   set one up in `~/.ssh/config` first.
+2. **Repeatable:** `bin/deploy.sh [--host <ssh-alias>]` rsyncs
+   `docker-compose.yml` and `docker/` to `/opt/renewvan/hub`, then runs
+   `docker compose pull && up -d` on the Pi. On a fresh Pi it seeds
+   `.env` from `.env.example` (with `TANK_CONFIG_PATH` /
+   `MOSQUITTO_CONFIG_PATH` already pointed at `/etc/renewvan/`) and
+   exits asking you to fill in secrets and place
+   `/etc/renewvan/tank/config.ini` before re-running — it never
+   overwrites an existing `.env`.
 
 ## Architecture
 

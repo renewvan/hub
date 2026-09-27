@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://renewvan.dev/schema/battery.schema.json",
   "title": "battery",
-  "description": "v0.1 device-model entity: the house battery bank, bridged from Victron's native Venus OS MQTT feed. Published under van/battery/<id>/<property>.",
+  "description": "v0.1 device-model entity: the house battery bank, bridged from Victron's native Venus OS MQTT feed. Published under renewvan/battery/<id>/<property>.",
   "type": "object",
   "properties": {
     "soc_pct": {

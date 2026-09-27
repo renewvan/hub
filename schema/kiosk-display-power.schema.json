@@ -1,0 +1,8 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://renewvan.dev/schema/kiosk-display-power.schema.json",
+  "title": "kiosk-display-power",
+  "description": "Payload for the kiosk display power topics. Published retained by the kiosk node to renewvan/kiosk/display/power (state); sent unretained by the dashboard to renewvan/kiosk/display/power/set (command). Both topics share this payload contract.",
+  "type": "string",
+  "enum": ["on", "off"]
+}
