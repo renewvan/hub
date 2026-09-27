@@ -3,26 +3,32 @@
 renewvan/node-kiosk — display power bridge.
 
 Subscribes to  renewvan/kiosk/display/power/set  ("on" | "off").
-Executes the configured display-power command (default: vcgencmd display_power).
+Executes the configured display-power command (default: wlopm --off/--on DSI-1).
 Publishes the resulting state retained to  renewvan/kiosk/display/power.
 
 On startup the node probes the display-power command to read the current state
 and publishes it as the initial retained value, so the bus always reflects
 hardware reality rather than the last command.
 
+Touch-to-wake: a background thread monitors the raw evdev touch device
+(TOUCH_DEVICE, default: auto-detected). When a TOUCH_DOWN event arrives while
+the display is off, the node publishes "on" to the command topic — same as a
+manual wake from the dashboard. This works even under wlopm where Wayland gates
+input to Chromium clients when the output is powered off.
+
 If the display-power command is unavailable the node logs an error, publishes
 nothing, and continues — the dashboard and broker are unaffected.
 
-Environment variables (all optional, defaults match the hub compose stack):
-  MQTT_HOST          MQTT broker hostname     (default: localhost)
-  MQTT_PORT          MQTT broker port         (default: 1883)
-  MQTT_USERNAME      broker username          (default: empty)
-  MQTT_PASSWORD      broker password          (default: empty)
-  DISPLAY_ON_CMD     shell command to turn display on  (default: vcgencmd display_power 1)
-  DISPLAY_OFF_CMD    shell command to turn display off (default: vcgencmd display_power 0)
-  DISPLAY_QUERY_CMD  shell command to query display state; stdout is parsed for
-                     "display_power=1" (on) or "display_power=0" (off)
-                     (default: vcgencmd display_power)
+Environment variables (all optional):
+  MQTT_HOST          MQTT broker hostname          (default: localhost)
+  MQTT_PORT          MQTT broker port              (default: 1883)
+  MQTT_USERNAME      broker username               (default: empty)
+  MQTT_PASSWORD      broker password               (default: empty)
+  DISPLAY_ON_CMD     shell command to turn on      (default: wlopm --on DSI-1)
+  DISPLAY_OFF_CMD    shell command to turn off     (default: wlopm --off DSI-1)
+  DISPLAY_QUERY_CMD  shell command to query state  (default: wlopm)
+  TOUCH_DEVICE       evdev device path for touch-to-wake
+                     (default: auto-detect first touch-capable device)
 """
 
 import logging
@@ -30,8 +36,10 @@ import os
 import shlex
 import subprocess
 import sys
+import threading
 import time
 
+import evdev
 import paho.mqtt.client as mqtt
 
 # ---------------------------------------------------------------------------
@@ -43,9 +51,10 @@ MQTT_PORT = int(os.environ.get("MQTT_PORT", "1883"))
 MQTT_USERNAME = os.environ.get("MQTT_USERNAME", "")
 MQTT_PASSWORD = os.environ.get("MQTT_PASSWORD", "")
 
-DISPLAY_ON_CMD = os.environ.get("DISPLAY_ON_CMD", "vcgencmd display_power 1")
-DISPLAY_OFF_CMD = os.environ.get("DISPLAY_OFF_CMD", "vcgencmd display_power 0")
-DISPLAY_QUERY_CMD = os.environ.get("DISPLAY_QUERY_CMD", "vcgencmd display_power")
+DISPLAY_ON_CMD = os.environ.get("DISPLAY_ON_CMD", "wlopm --on DSI-1")
+DISPLAY_OFF_CMD = os.environ.get("DISPLAY_OFF_CMD", "wlopm --off DSI-1")
+DISPLAY_QUERY_CMD = os.environ.get("DISPLAY_QUERY_CMD", "wlopm")
+TOUCH_DEVICE = os.environ.get("TOUCH_DEVICE", "")
 
 TOPIC_STATE = "renewvan/kiosk/display/power"
 TOPIC_SET = "renewvan/kiosk/display/power/set"
@@ -82,7 +91,7 @@ def _run(cmd: str) -> tuple[bool, str]:
             return False, ""
         return True, result.stdout.strip()
     except FileNotFoundError:
-        log.error("Command not found: %r — is vcgencmd (or the configured DISPLAY_*_CMD) available?", cmd)
+        log.error("Command not found: %r", cmd)
         return False, ""
     except subprocess.TimeoutExpired:
         log.error("Command timed out: %r", cmd)
@@ -95,34 +104,127 @@ def _run(cmd: str) -> tuple[bool, str]:
 def query_display_state() -> str | None:
     """
     Query the current display power state.
-    Returns "on", "off", or None if the command is unavailable/unreadable.
+    Returns "on", "off", or None if unavailable/unreadable.
+    wlopm output: lines like "DSI-1  on" or "DSI-1  off".
+    vcgencmd output: "display_power=1" or "display_power=0".
     """
     ok, stdout = _run(DISPLAY_QUERY_CMD)
     if not ok:
         return None
-    # vcgencmd display_power output: "display_power=1" or "display_power=0"
+    # wlopm: any output line ending in " off" → off; " on" → on
+    for line in stdout.splitlines():
+        if line.strip().endswith(" off"):
+            return "off"
+        if line.strip().endswith(" on"):
+            return "on"
+    # vcgencmd fallback
     if "display_power=1" in stdout:
         return "on"
     if "display_power=0" in stdout:
         return "off"
-    # Pluggable command: treat exit-0 with any output as "on", no output as unknown.
-    log.warning("Unrecognised display query output: %r — cannot determine state", stdout)
+    log.warning("Unrecognised display query output: %r", stdout)
     return None
 
 
 def set_display(state: str) -> bool:
-    """
-    Apply display power state ("on" or "off").
-    Returns True on success, False on failure.
-    """
+    """Apply display power state. Returns True on success."""
     cmd = DISPLAY_ON_CMD if state == "on" else DISPLAY_OFF_CMD
     ok, _ = _run(cmd)
     return ok
 
 
 # ---------------------------------------------------------------------------
+# Touch device auto-detection
+# ---------------------------------------------------------------------------
+
+
+def find_touch_device() -> str | None:
+    """
+    Return the evdev path for the first touch-capable input device, or None.
+    A touch device has EV_ABS capability and reports ABS_MT_POSITION_X or
+    ABS_X (single-touch). The ft5x06 controller on the Official Touch
+    Display 2 appears as /dev/input/event* with EV_ABS + BTN_TOUCH.
+    """
+    for path in sorted(evdev.list_devices()):
+        try:
+            dev = evdev.InputDevice(path)
+            caps = dev.capabilities()
+            has_abs = evdev.ecodes.EV_ABS in caps
+            has_touch = (
+                evdev.ecodes.ABS_MT_POSITION_X in (caps.get(evdev.ecodes.EV_ABS) or [])
+                or evdev.ecodes.ABS_X in (caps.get(evdev.ecodes.EV_ABS) or [])
+            )
+            dev.close()
+            if has_abs and has_touch:
+                return path
+        except Exception:
+            pass
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Touch-to-wake thread
+# ---------------------------------------------------------------------------
+
+
+def touch_wake_thread(get_display_off: "callable[[], bool]", on_wake: "callable[[], None]") -> None:
+    """
+    Reads raw evdev events from the touch device. On EV_ABS / ABS_MT_SLOT or
+    EV_KEY / BTN_TOUCH DOWN while the display is off, calls on_wake().
+    Runs forever; crashes are logged and the thread exits (node stays alive).
+    """
+    path = TOUCH_DEVICE or find_touch_device()
+    if not path:
+        log.warning("No touch device found — touch-to-wake disabled. Set TOUCH_DEVICE to enable.")
+        return
+
+    log.info("Touch-to-wake monitoring %s", path)
+    try:
+        dev = evdev.InputDevice(path)
+        # Grab the device so events aren't also routed to the compositor
+        # while the display is off (avoids phantom taps on wake).
+        dev.grab()
+        log.info("Grabbed %s (events won't pass to compositor while display is off)", path)
+        grabbed = True
+    except Exception as exc:
+        log.warning("Could not grab %s (%s) — events will also reach compositor", path, exc)
+        dev = evdev.InputDevice(path)
+        grabbed = False
+
+    try:
+        for event in dev.read_loop():
+            # EV_ABS SYN or touch-begin events signal a finger down
+            if event.type == evdev.ecodes.EV_ABS and event.code in (
+                evdev.ecodes.ABS_MT_POSITION_X,
+                evdev.ecodes.ABS_X,
+            ):
+                if get_display_off():
+                    log.info("Touch detected while display is off — waking")
+                    if grabbed:
+                        dev.ungrab()
+                        grabbed = False
+                    on_wake()
+            elif event.type == evdev.ecodes.EV_KEY and event.code == evdev.ecodes.BTN_TOUCH and event.value == 1:
+                if get_display_off():
+                    log.info("BTN_TOUCH detected while display is off — waking")
+                    if grabbed:
+                        dev.ungrab()
+                        grabbed = False
+                    on_wake()
+    except Exception as exc:
+        log.error("Touch-to-wake reader failed: %s", exc)
+    finally:
+        try:
+            dev.close()
+        except Exception:
+            pass
+
+
+# ---------------------------------------------------------------------------
 # MQTT callbacks
 # ---------------------------------------------------------------------------
+
+_display_off = False  # tracks current display state; read by touch thread
 
 
 def on_connect(client: mqtt.Client, userdata, flags, rc, properties=None):
@@ -133,10 +235,10 @@ def on_connect(client: mqtt.Client, userdata, flags, rc, properties=None):
     client.subscribe(TOPIC_SET, qos=1)
     log.info("Subscribed to %s", TOPIC_SET)
 
-    # Publish current hardware state on every (re)connect so the retained
-    # topic reflects reality after a node restart or broker reconnect.
     state = query_display_state()
     if state is not None:
+        global _display_off
+        _display_off = state == "off"
         client.publish(TOPIC_STATE, payload=state, qos=1, retain=True)
         log.info("Published initial state: %s", state)
     else:
@@ -148,6 +250,7 @@ def on_connect(client: mqtt.Client, userdata, flags, rc, properties=None):
 
 
 def on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
+    global _display_off
     try:
         payload = msg.payload.decode().strip().lower()
     except Exception:
@@ -155,11 +258,12 @@ def on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
         return
 
     if payload not in VALID_PAYLOADS:
-        log.warning("Received invalid payload %r on %s (expected 'on' or 'off') — ignoring", payload, msg.topic)
+        log.warning("Invalid payload %r on %s — ignoring", payload, msg.topic)
         return
 
     log.info("Received command: %s", payload)
     if set_display(payload):
+        _display_off = payload == "off"
         client.publish(TOPIC_STATE, payload=payload, qos=1, retain=True)
         log.info("Display set to %s — published state", payload)
     else:
@@ -190,8 +294,7 @@ def main():
     if MQTT_USERNAME:
         client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
 
-    # Reconnect loop: wait up to 60 s for the broker (mirrors the 60 s
-    # Chromium startup wait added in the power-loss-recovery fix).
+    # Reconnect loop: wait up to 60 s for the broker.
     deadline = time.monotonic() + 60
     while True:
         try:
@@ -203,6 +306,19 @@ def main():
                 sys.exit(1)
             log.info("Broker not yet reachable (%s) — retrying in 5 s", exc)
             time.sleep(5)
+
+    def _on_wake():
+        """Called from the touch thread; publishes a wake command via MQTT."""
+        log.info("Touch-to-wake: publishing 'on' command")
+        client.publish(TOPIC_SET, payload="on", qos=1, retain=False)
+
+    t = threading.Thread(
+        target=touch_wake_thread,
+        args=(lambda: _display_off, _on_wake),
+        daemon=True,
+        name="touch-wake",
+    )
+    t.start()
 
     client.loop_forever()
 
