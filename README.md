@@ -97,3 +97,59 @@ See \[`/docs/[architecture.md](http://architecture.md)`\](docs/[architecture.md]
 design (edge nodes → drivers → MQTT bus → application services →
 
 presentation).
+## Tips
+
+### Rotating the display 180° (Official Raspberry Pi 7" Touchscreen v1)
+
+Four independent layers must be aligned. Do them in order — each step is separate and non-redundant.
+
+**1. Kernel & boot splash** — rotate at the KMS/DRM level so the boot splash, console, and touch coordinates all flip together from the earliest possible moment:
+
+```
+# /boot/firmware/cmdline.txt  (single line — no line breaks)
+# Append to the existing line:
+video=DSI-1:800x480M@60D,panel_orientation=upside_down
+```
+
+> `panel_orientation=upside_down` targets the DSI panel driver directly and is the only flag that rotates both the framebuffer and the early touch coordinate system in one step under `vc4-kms-v3d`. Legacy `lcd_rotate` / `display_rotate` do nothing on this driver.
+
+**2. Wayland compositor** — leave the kanshi output at `normal` transform. The KMS layer already rotated the image; a compositor transform on top would double-flip it back:
+
+```
+# ~/.config/kanshi/config
+profile {
+  output DSI-1 transform normal
+}
+```
+
+Reload without rebooting: `pkill -SIGHUP kanshi`
+
+**3. Touch coordinates** — the ft5x06 controller does not read the KMS `panel_orientation` property; its raw evdev coordinates remain unrotated. Add a udev rule with a 180° libinput calibration matrix:
+
+```
+# /etc/udev/rules.d/99-ft5x06-rotation.rules
+SUBSYSTEM=="input", ATTRS{name}=="10-0038 generic ft5x06 (00)", \
+  ENV{LIBINPUT_CALIBRATION_MATRIX}="-1 0 1 0 -1 1"
+```
+
+Apply without rebooting:
+
+```sh
+sudo udevadm control --reload-rules
+echo "10-0038" | sudo tee /sys/bus/i2c/drivers/edt_ft5x06/unbind
+sleep 1
+echo "10-0038" | sudo tee /sys/bus/i2c/drivers/edt_ft5x06/bind
+```
+
+**4. Mouse cursor** — hardware cursor overlays are exempt from `panel_orientation` and will appear unrotated. Force software rendering so the cursor is composited into the framebuffer and rotates with it:
+
+```
+# ~/.config/labwc/environment  (append one line)
+WLR_NO_HARDWARE_CURSORS=1
+```
+
+Takes effect on next labwc session start (reboot or log out/in).
+
+---
+
+Reboot once after all four steps to confirm everything survives a cold start.
