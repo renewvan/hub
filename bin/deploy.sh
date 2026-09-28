@@ -26,11 +26,12 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${REPO_ROOT}"
 
 echo "==> Syncing compose artifacts to ${HOST}:${REMOTE_DIR}"
-ssh "${HOST}" "mkdir -p ${REMOTE_DIR} /opt/renewvan/plugins/kiosk"
+ssh "${HOST}" "mkdir -p ${REMOTE_DIR} /opt/renewvan/plugins/kiosk /opt/renewvan/plugins/tailscale"
 rsync -az docker-compose.yml "${HOST}:${REMOTE_DIR}/docker-compose.yml"
 rsync -az --delete docker/ "${HOST}:${REMOTE_DIR}/docker/"
 rsync -az .env.example "${HOST}:${REMOTE_DIR}/.env.example"
 rsync -az --delete plugins/kiosk/ "${HOST}:/opt/renewvan/plugins/kiosk/"
+rsync -az --delete plugins/tailscale/ "${HOST}:/opt/renewvan/plugins/tailscale/"
 
 echo "==> Ensuring remote config"
 ssh "${HOST}" bash -s <<REMOTE
@@ -48,6 +49,9 @@ sudo systemctl enable --now renewvan-node-kiosk.service
 if [[ ! -f /etc/renewvan/node-kiosk.env ]]; then
   printf '# renewvan kiosk plugin environment overrides\n# See plugins/kiosk/README.md for available variables.\n# Uncomment and set to override defaults:\n# MQTT_HOST=localhost\n# MQTT_PORT=1883\n# MQTT_USERNAME=\n# MQTT_PASSWORD=\n# DISPLAY_ON_CMD=vcgencmd display_power 1\n# DISPLAY_OFF_CMD=vcgencmd display_power 0\n# DISPLAY_QUERY_CMD=vcgencmd display_power\n' | sudo tee /etc/renewvan/node-kiosk.env >/dev/null
 fi
+
+# plugin/tailscale: install tailscale, venv, service
+sudo bash /opt/renewvan/plugins/tailscale/install.sh
 
 if [[ ! -f .env ]]; then
   echo "No .env found — seeding from .env.example."
