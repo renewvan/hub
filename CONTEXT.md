@@ -35,9 +35,13 @@ _Avoid_: Node (for the hardware), board, device.
 **Naming convention**:
 Repos are named plainly, scoped by the `renewvan` GitHub org — not a stuttering `renewvan-<name>`; the org already provides the namespace, so re-prefixing every repo restates it. Exception: Node repos carry a `node-` role prefix (`renewvan/node-tank`, `renewvan/node-battery`, `renewvan/node-relay`), because bare `tank`/`battery`/`relay` collides with the **Entity** name the moment repo, image, and env var are referenced side by side. `logger`, `dashboard`, and `mobile` aren't Nodes, so they stay bare.
 
-**Kiosk node** (`renewvan/node-kiosk`):
-A Pi-host process (systemd service, not a Docker container) that bridges the renewvan bus to OS-level display control via `vcgencmd display_power`. Subscribes to `renewvan/kiosk/display/power/set`; publishes current state retained to `renewvan/kiosk/display/power`. Follows the same node artifact naming convention as other nodes: repo `renewvan/node-kiosk`, image `ghcr.io/renewvan/node-kiosk`. Runs outside compose because `vcgencmd` requires direct GPU firmware mailbox access.
-_Avoid_: "kiosk daemon", "display service" (it is a node — it publishes to the renewvan bus like every other node).
+**Kiosk plugin** (`plugins/kiosk`):
+A Pi-host process (systemd service `renewvan-node-kiosk`, not a Docker container) in `plugins/kiosk/` that bridges the renewvan bus to OS-level backlight control via the `bl_power` sysfs interface. Subscribes to `renewvan/kiosk/display/power/set`; publishes current state retained to `renewvan/kiosk/display/power`. Also monitors the touch device via evdev and wakes the display on any touch event while the backlight is off.
+_Avoid_: "kiosk daemon", "display service", "node-kiosk" (deprecated directory name).
+
+**Tailscale plugin** (`plugins/tailscale`):
+A Pi-host process (systemd service `renewvan-tailscale`) in `plugins/tailscale/` that connects the Pi to a Tailscale tailnet and publishes VPN status retained to `renewvan/tailscale/status`. Payload fields: `enabled` (daemon running), `connected` (authenticated + online), `ip` (Tailscale IPv4), `hostname`, `peers` (online peer count). Ships installed by `bin/deploy.sh`; requires one-time `sudo tailscale up` to authenticate.
+_Avoid_: "VPN node", "Tailscale node" (plugins are not MQTT nodes — they run on the Pi host but have a different contract).
 
 **Display power state** (`renewvan/kiosk/display/power`):
 A retained MQTT topic carrying `"on"` or `"off"` (see `schema/kiosk-display-power.schema.json`). Published by the kiosk node after each successful `vcgencmd display_power` call, and initialised from the live hardware state on node startup. The dashboard subscribes to this topic to drive its sleeping overlay. The matching command topic (`renewvan/kiosk/display/power/set`) carries the same payload but is not retained.

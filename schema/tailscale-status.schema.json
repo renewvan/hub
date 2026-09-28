@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://renewvan.dev/schema/tailscale-status.schema.json",
+  "title": "tailscale-status",
+  "description": "Payload published retained by the Tailscale plugin to renewvan/tailscale/status. Reports daemon state, authentication, Tailscale IP, hostname, and online peer count. Published every 30 s and on state change.",
+  "type": "object",
+  "required": ["enabled", "connected", "ip", "hostname", "peers"],
+  "additionalProperties": false,
+  "properties": {
+    "enabled": {
+      "type": "boolean",
+      "description": "True when the tailscaled daemon is installed and running."
+    },
+    "connected": {
+      "type": "boolean",
+      "description": "True when authenticated and BackendState is Running."
+    },
+    "ip": {
+      "type": ["string", "null"],
+      "description": "Tailscale IPv4 address (100.x.x.x), or null when not connected."
+    },
+    "hostname": {
+      "type": ["string", "null"],
+      "description": "Tailscale machine hostname, or null when not connected."
+    },
+    "peers": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of currently online Tailscale peers."
+    }
+  }
+}
