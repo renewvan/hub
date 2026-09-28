@@ -1,0 +1,17 @@
+[Unit]
+Description=renewvan Tailscale status MQTT bridge
+Documentation=https://github.com/renewvan/hub/blob/main/plugins/tailscale/README.md
+After=network-online.target tailscaled.service mosquitto.service
+Wants=network-online.target
+
+[Service]
+User=alexsanzder
+EnvironmentFile=-/etc/renewvan/tailscale.env
+ExecStart=/opt/renewvan/plugins/tailscale/.venv/bin/python /opt/renewvan/plugins/tailscale/tailscale_status.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
