@@ -14,15 +14,15 @@ Payload schema: `schema/kiosk-display-power.schema.json`.
 ## Install (Pi)
 
 ```bash
-# 1. Copy to /opt/renewvan/node-kiosk/
+# 1. Copy to /opt/renewvan/plugins/kiosk/
 sudo mkdir -p /opt/renewvan/node-kiosk
-sudo cp node-kiosk/node_kiosk.py node-kiosk/requirements.txt /opt/renewvan/node-kiosk/
+sudo cp plugins/kiosk/node_kiosk.py plugins/kiosk/requirements.txt /opt/renewvan/plugins/kiosk/
 
 # 2. Install Python deps (system-level, no venv needed on Pi OS)
-pip3 install -r /opt/renewvan/node-kiosk/requirements.txt
+pip3 install -r /opt/renewvan/plugins/kiosk/requirements.txt
 
 # 3. Install + enable systemd service
-sudo cp node-kiosk/renewvan-node-kiosk.service /etc/systemd/system/
+sudo cp plugins/kiosk/renewvan-node-kiosk.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now renewvan-node-kiosk.service
 ```
