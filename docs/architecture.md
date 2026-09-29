@@ -8,6 +8,7 @@ A few terms get used a lot below and across the split-out node repos, so worth p
 - **Host** — the physical hardware a node runs on: the Raspberry Pi, an ESP32 board, a wall panel. One host may run several nodes; a node is never a host. _Avoid: Node (for the hardware), board, device._
 - **Plugin** — the broader installable-extension concept: nodes are one kind of plugin, but so are UI panels and (eventually) automation rule-packs. This is the term used specifically for the registry described under **Delivery and distribution** — not a synonym for "node."
 - **Package** — the distribution mechanism only (how a node or plugin ships — e.g. as its own PyPI or npm package). Says nothing about what the thing does; use node/plugin/host for that.
+- **Renewvan hub** — the Docker Compose stack running on the Pi: the Mosquitto broker (renewvan bus), pinned node containers, and plugins. The user-facing name for the Pi-side deployment; "Renewvan hub connected" in any UI means an active MQTT-over-WebSocket connection to this stack. _Avoid: "Bus connected" (ambiguous — could mean vehicle CAN bus or MQTT protocol)._
 
 ## Design principles
 
