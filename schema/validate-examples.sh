@@ -16,7 +16,7 @@ for schema in *.schema.json; do
       status=1
     fi
   done
-  for fixture in examples/"${entity}".invalid.json; do
+  for fixture in examples/"${entity}"*.invalid.json; do
     [ -e "$fixture" ] || continue
     if npx --yes ajv-cli@5 test -s "$schema" -d "$fixture" --invalid >/dev/null; then
       echo "PASS  $fixture correctly rejected by $schema"
