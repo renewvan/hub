@@ -26,11 +26,11 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${REPO_ROOT}"
 
 echo "==> Syncing compose artifacts to ${HOST}:${REMOTE_DIR}"
-ssh "${HOST}" "mkdir -p ${REMOTE_DIR} /opt/renewvan/plugins/kiosk /opt/renewvan/plugins/tailscale"
+ssh "${HOST}" "mkdir -p ${REMOTE_DIR} /opt/renewvan/plugins/kiosk /opt/renewvan/plugins/tailscale /opt/renewvan/venvs"
 rsync -az docker-compose.yml "${HOST}:${REMOTE_DIR}/docker-compose.yml"
 rsync -az --delete docker/ "${HOST}:${REMOTE_DIR}/docker/"
 rsync -az .env.example "${HOST}:${REMOTE_DIR}/.env.example"
-rsync -az --delete plugins/kiosk/ "${HOST}:/opt/renewvan/plugins/kiosk/"
+rsync -az --delete --exclude='.venv' plugins/kiosk/ "${HOST}:/opt/renewvan/plugins/kiosk/"
 rsync -az --delete plugins/tailscale/ "${HOST}:/opt/renewvan/plugins/tailscale/"
 
 echo "==> Ensuring remote config"
@@ -41,8 +41,8 @@ cd "${REMOTE_DIR}"
 mkdir -p /etc/renewvan/mosquitto /etc/renewvan/tank
 
 # plugin/kiosk: create venv (Bookworm externally-managed Python) and install deps
-python3 -m venv /opt/renewvan/plugins/kiosk/.venv
-/opt/renewvan/plugins/kiosk/.venv/bin/pip install --quiet -r /opt/renewvan/plugins/kiosk/requirements.txt
+python3 -m venv /opt/renewvan/venvs/kiosk
+/opt/renewvan/venvs/kiosk/bin/pip install --quiet -r /opt/renewvan/plugins/kiosk/requirements.txt
 sudo cp /opt/renewvan/plugins/kiosk/renewvan-node-kiosk.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now renewvan-node-kiosk.service
@@ -82,5 +82,24 @@ echo "==> docker compose pull && up -d"
 docker compose pull
 docker compose up -d
 REMOTE
+
+echo "==> Reloading kiosk browser"
+ssh "${HOST}" "
+  pkill chromium || true
+  sleep 2
+  WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/1000 nohup chromium \
+    --kiosk \
+    --ozone-platform=wayland \
+    --password-store=basic \
+    --noerrdialogs \
+    --disable-infobars \
+    --disable-session-crashed-bubble \
+    --disable-translate \
+    --disable-pinch \
+    --overscroll-history-navigation=0 \
+    --check-for-update-interval=31536000 \
+    --no-first-run \
+    http://localhost >/dev/null 2>&1 &
+"
 
 echo "==> Deploy complete"

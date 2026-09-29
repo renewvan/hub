@@ -7,7 +7,7 @@ Wants=network-online.target
 [Service]
 User=alexsanzder
 EnvironmentFile=-/etc/renewvan/tailscale.env
-ExecStart=/opt/renewvan/plugins/tailscale/.venv/bin/python /opt/renewvan/plugins/tailscale/tailscale_status.py
+ExecStart=/opt/renewvan/venvs/tailscale/bin/python /opt/renewvan/plugins/tailscale/tailscale_status.py
 Restart=on-failure
 RestartSec=10
 StandardOutput=journal
