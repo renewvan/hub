@@ -86,6 +86,9 @@ REMOTE
 echo "==> Reloading kiosk browser"
 ssh "${HOST}" "
   pkill chromium || true
+  # Fresh cache: chromium heuristic-caches index.html, which would keep
+  # serving the previous dashboard build after an image bump.
+  rm -rf "\${HOME}/.cache/chromium" || true
   sleep 2
   WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/1000 nohup chromium \
     --kiosk \
