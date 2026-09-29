@@ -27,8 +27,8 @@ echo "==> tailscaled enabled and running"
 # ---------------------------------------------------------------------------
 # 3. Python venv + deps
 # ---------------------------------------------------------------------------
-python3 -m venv "${PLUGIN_DIR}/.venv"
-"${PLUGIN_DIR}/.venv/bin/pip" install --quiet -r "${PLUGIN_DIR}/requirements.txt"
+python3 -m venv /opt/renewvan/venvs/tailscale
+/opt/renewvan/venvs/tailscale/bin/pip install --quiet -r "${PLUGIN_DIR}/requirements.txt"
 echo "==> Python venv ready"
 
 # ---------------------------------------------------------------------------
