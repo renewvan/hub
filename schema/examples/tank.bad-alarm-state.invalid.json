@@ -1,0 +1,7 @@
+{
+  "fluid_type": "fresh_water",
+  "capacity_l": 70,
+  "level_pct": 18,
+  "status": "ok",
+  "alarm_state": "low"
+}
