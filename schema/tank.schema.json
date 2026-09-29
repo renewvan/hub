@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://renewvan.dev/schema/tank.schema.json",
   "title": "tank",
-  "description": "v0.1 device-model entity: a fluid reservoir monitored by a resistive level sensor. Published under renewvan/tank/<id>/<property>.",
+  "description": "v0.1 device-model entity: a fluid reservoir monitored by a resistive level sensor. Published under renewvan/tank/<id>/<property>. (v0.1 additions: alarm_state, temperature_c, last_inspected_date)",
   "type": "object",
   "properties": {
     "fluid_type": {
@@ -21,6 +21,20 @@
     "status": {
       "type": "string",
       "enum": ["ok", "open_circuit", "short_circuit"]
+    },
+    "alarm_state": {
+      "type": "string",
+      "enum": ["ok", "alarm"],
+      "description": "Tank-level alarm state. Direction (low/high) is implicit in per-tank config."
+    },
+    "temperature_c": {
+      "type": "number",
+      "description": "Water temperature in degrees Celsius. Present only if a DS18B20 sensor is configured for this tank."
+    },
+    "last_inspected_date": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "Most recent tank inspection date (YYYY-MM-DD). Set via /set command topic; republished at startup."
     }
   },
   "required": ["fluid_type", "capacity_l", "level_pct", "status"],
