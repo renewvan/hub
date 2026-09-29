@@ -1,0 +1,9 @@
+{
+  "fluid_type": "grey_water",
+  "capacity_l": 70,
+  "level_pct": 91.2,
+  "status": "ok",
+  "alarm_state": "alarm",
+  "temperature_c": 18.4,
+  "last_inspected_date": "2026-09-29"
+}
