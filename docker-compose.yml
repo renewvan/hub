@@ -70,7 +70,7 @@ services:
   # Needs I2C device passthrough for the ADS1115; layered config.ini
   # override lives on the bind-mounted host path below.
   node-tank:
-    image: ghcr.io/renewvan/node-tank:v0.5.0
+    image: ghcr.io/renewvan/node-tank:v0.6.0
     container_name: renewvan-tank
     restart: unless-stopped
     depends_on:
@@ -128,7 +128,7 @@ services:
   # not a polling backend. See
   # .scratch/renewvan-hub-v0-build/issues/06-dashboard-web-app.md.
   dashboard:
-    image: ghcr.io/renewvan/dashboard:v0.1.15
+    image: ghcr.io/renewvan/dashboard:v0.1.17
     container_name: renewvan-dashboard
     restart: unless-stopped
     ports:
