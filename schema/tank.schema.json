@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://renewvan.dev/schema/tank.schema.json",
   "title": "tank",
-  "description": "v0.1 device-model entity: a fluid reservoir monitored by a resistive level sensor. Published under renewvan/tank/<id>/<property>. (v0.1 additions: alarm_state, temperature_c, last_inspected_date)",
+  "description": "v0.1 device-model entity: a fluid reservoir monitored by a resistive level sensor. Published under renewvan/tank/<id>/<property>. Field additions since v0.1: alarm_state, temperature_c, last_inspected_date (v0.2); fill_rate_lpm, drain_rate_lpm, last_full_date, last_empty_date (v0.3); volume_since_full_l, volume_since_empty_l, level_pct_smoothed (v0.4), and last_inspected_date/last_full_date/last_empty_date renamed to last_inspected_at/last_full_at/last_empty_at with full ISO-8601 timestamps (v0.4, breaking).",
   "type": "object",
   "properties": {
     "fluid_type": {
@@ -18,25 +18,71 @@
       "minimum": 0,
       "maximum": 100
     },
+    "level_pct_smoothed": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Rate-extrapolated display value for stepped/reed-switch senders (e.g. A5-E200) that only report a handful of discrete resistance steps across their travel. level_pct stays the untouched raw sender reading -- alarms, flow-rate edges, and full/empty latching all key off it, never this field. Display-only, unconditional live field."
+    },
     "status": {
       "type": "string",
       "enum": ["ok", "open_circuit", "short_circuit"]
     },
+    "fill_rate_lpm": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Live fill rate in liters/minute, computed edge-to-edge from level_pct. 0 when not filling or flow has gone idle. Unconditional live field."
+    },
+    "drain_rate_lpm": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Live drain rate in liters/minute, computed edge-to-edge from level_pct. 0 when not draining or flow has gone idle. Unconditional live field."
+    },
+    "volume_since_full_l": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Net liters moved since level_pct last committed a last_full_at latch. 0 if the tank has never latched full. Unconditional live field."
+    },
+    "volume_since_empty_l": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Net liters moved since level_pct last committed a last_empty_at latch. 0 if the tank has never latched empty. Unconditional live field."
+    },
     "alarm_state": {
       "type": "string",
       "enum": ["ok", "alarm"],
-      "description": "Tank-level alarm state. Direction (low/high) is implicit in per-tank config."
+      "description": "Tank-level alarm state. Direction (low/high) is implicit in per-tank config. Present only if alarm_direction is configured for this tank."
     },
     "temperature_c": {
       "type": "number",
       "description": "Water temperature in degrees Celsius. Present only if a DS18B20 sensor is configured for this tank."
     },
-    "last_inspected_date": {
+    "last_inspected_at": {
       "type": "string",
-      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
-      "description": "Most recent tank inspection date (YYYY-MM-DD). Set via /set command topic; republished at startup."
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}[+-]\\d{2}:\\d{2}$",
+      "description": "Most recent tank inspection, ISO-8601 timestamp with local UTC offset. Set via /set command topic (accepts a full timestamp or a bare YYYY-MM-DD date, normalized to local midnight); republished at startup only if previously set. Renamed from last_inspected_date (bare date) in v0.4."
+    },
+    "last_full_at": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}[+-]\\d{2}:\\d{2}$",
+      "description": "Most recent auto-detected sustained full crossing (level_pct >= full_threshold_pct), ISO-8601 timestamp with local UTC offset. Also settable via /set command topic. Republished at startup only if previously latched. Renamed from last_full_date (bare date) in v0.4."
+    },
+    "last_empty_at": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}[+-]\\d{2}:\\d{2}$",
+      "description": "Most recent auto-detected sustained empty crossing (level_pct <= empty_threshold_pct), ISO-8601 timestamp with local UTC offset. Also settable via /set command topic. Republished at startup only if previously latched. Renamed from last_empty_date (bare date) in v0.4."
     }
   },
-  "required": ["fluid_type", "capacity_l", "level_pct", "status"],
+  "required": [
+    "fluid_type",
+    "capacity_l",
+    "level_pct",
+    "level_pct_smoothed",
+    "status",
+    "fill_rate_lpm",
+    "drain_rate_lpm",
+    "volume_since_full_l",
+    "volume_since_empty_l"
+  ],
   "additionalProperties": false
 }

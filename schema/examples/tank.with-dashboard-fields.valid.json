@@ -2,8 +2,14 @@
   "fluid_type": "grey_water",
   "capacity_l": 70,
   "level_pct": 91.2,
+  "level_pct_smoothed": 89.7,
   "status": "ok",
+  "fill_rate_lpm": 0,
+  "drain_rate_lpm": 1.4,
+  "volume_since_full_l": 2.1,
+  "volume_since_empty_l": 68.3,
   "alarm_state": "alarm",
   "temperature_c": 18.4,
-  "last_inspected_date": "2026-09-29"
+  "last_inspected_at": "2026-09-29T14:32:05-04:00",
+  "last_full_at": "2026-09-28T09:10:02-04:00"
 }

@@ -59,7 +59,7 @@ Not yet ready for production van use — see \[Roadmap\](#roadmap).
    each a pinned, independently-published image (own repo, own
    release; nothing built from source in `hub`, per
    `docs/adr/0001-compose-services-via-pinned-images-not-git-submodules.md`).
-   Bumping a service later is a single `*_IMAGE_TAG` edit in `.env`.
+   Bumping a service later is a single `image:` tag edit in `docker-compose.yml`.
 3. **Flash the ESP32 relay node**, once, per `renewvan/node-relay`'s own
    README (ESPHome YAML, no custom firmware).
 4. **Install the phone app** per `renewvan/mobile`'s own README (React

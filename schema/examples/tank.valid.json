@@ -2,5 +2,10 @@
   "fluid_type": "fresh_water",
   "capacity_l": 95,
   "level_pct": 62.5,
-  "status": "ok"
+  "level_pct_smoothed": 62.5,
+  "status": "ok",
+  "fill_rate_lpm": 0,
+  "drain_rate_lpm": 0,
+  "volume_since_full_l": 0,
+  "volume_since_empty_l": 0
 }

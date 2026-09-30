@@ -4,8 +4,9 @@
 # `logger`, `dashboard`) — per
 # docs/adr/0001-compose-services-via-pinned-images-not-git-submodules.md,
 # none of them are built from local/submodule source here. Bumping a
-# service is a single-line `_IMAGE_TAG` edit below; see `.env.example`
-# for every config value an installer needs to set.
+# service is a single-line `image:` tag edit below (git-tracked, no
+# env var indirection); see `.env.example` for every other config
+# value an installer needs to set.
 #
 # `docker compose pull && docker compose up -d` from a copy of
 # `.env.example` (as `.env`) is the whole install. Data persists in
@@ -69,7 +70,7 @@ services:
   # Needs I2C device passthrough for the ADS1115; layered config.ini
   # override lives on the bind-mounted host path below.
   node-tank:
-    image: ghcr.io/renewvan/node-tank:${NODE_TANK_IMAGE_TAG:-v0.2.0}
+    image: ghcr.io/renewvan/node-tank:v0.4.0
     container_name: renewvan-tank
     restart: unless-stopped
     depends_on:
@@ -89,7 +90,7 @@ services:
   # compose's renewvan bus (mosquitto). See
   # .scratch/renewvan-hub-v0-build/issues/04-victron-battery-bridge.md.
   node-battery:
-    image: ghcr.io/renewvan/node-battery:${NODE_BATTERY_IMAGE_TAG:-v0.1.3}
+    image: ghcr.io/renewvan/node-battery:v0.1.3
     container_name: renewvan-battery
     restart: unless-stopped
     depends_on:
@@ -106,7 +107,7 @@ services:
   # renewvan/# -> InfluxDB point writer, one point per message. See
   # .scratch/renewvan-hub-v0-build/issues/05-influxdb-logger.md.
   logger:
-    image: ghcr.io/renewvan/logger:${LOGGER_IMAGE_TAG:-v0.1.1}
+    image: ghcr.io/renewvan/logger:v0.1.1
     container_name: renewvan-logger
     restart: unless-stopped
     depends_on:
@@ -127,7 +128,7 @@ services:
   # not a polling backend. See
   # .scratch/renewvan-hub-v0-build/issues/06-dashboard-web-app.md.
   dashboard:
-    image: ghcr.io/renewvan/dashboard:${DASHBOARD_IMAGE_TAG:-v0.1.10}
+    image: ghcr.io/renewvan/dashboard:v0.1.12
     container_name: renewvan-dashboard
     restart: unless-stopped
     ports:
