@@ -17,7 +17,7 @@ The Docker Compose stack running on the Pi that forms the connective core of the
 _Avoid_: "Bus connected" (ambiguous — sounds like a vehicle CAN/RV-C bus or the MQTT protocol itself, not the Pi service); "hub service" (the hub is the whole stack, not one service inside it).
 
 **Tank**:
-A fluid reservoir (fresh water, grey water, black water, fuel, or LPG) monitored by a resistive level sensor. Reports `fluid_type`, `capacity_l`, `level_pct` (fill percentage, not volume), and `status`.
+A fluid reservoir (fresh water, grey water, black water, fuel, or LPG) monitored by a resistive level sensor. Reports `fluid_type`, `capacity_l`, `level_pct` (raw, fill percentage not volume), `level_pct_smoothed` (rate-extrapolated display value for stepped senders), `status`, `fill_rate_lpm`/`drain_rate_lpm`, and `volume_since_full_l`/`volume_since_empty_l`, plus optionally `alarm_state`, `temperature_c`, and the `last_inspected_at`/`last_full_at`/`last_empty_at` timestamps.
 _Avoid_: Reservoir.
 
 **Relay**:
@@ -50,4 +50,4 @@ _Avoid_: "VPN node", "Tailscale node" (plugins are not MQTT nodes — they run o
 **Display power state** (`renewvan/kiosk/display/power`):
 A retained MQTT topic carrying `"on"` or `"off"` (see `schema/kiosk-display-power.schema.json`). Published by the kiosk node after each successful `vcgencmd display_power` call, and initialised from the live hardware state on node startup. The dashboard subscribes to this topic to drive its sleeping overlay. The matching command topic (`renewvan/kiosk/display/power/set`) carries the same payload but is not retained.
 
-**Node artifact naming** (blanket rule, not a per-repo call): a node's repo, Docker image, and `hub`-side pin all carry the same role qualifier. Pattern: repo `renewvan/node-<entity>`, image `ghcr.io/renewvan/node-<entity>`, env var `NODE_<ENTITY>_IMAGE_TAG`. The role prefix comes first in every artifact name, so all node vars sort together and non-node vars (`LOGGER_IMAGE_TAG`, `DASHBOARD_IMAGE_TAG`) stand out clearly. `logger` and `dashboard` are exempt (`LOGGER_IMAGE_TAG`).
+**Node artifact naming** (blanket rule, not a per-repo call): a node's repo, Docker image, and `hub`-side pin all carry the same role qualifier. Pattern: repo `renewvan/node-<entity>`, image `ghcr.io/renewvan/node-<entity>`. The role prefix comes first in every artifact name. `logger` and `dashboard` are exempt (bare `renewvan/logger`, `renewvan/dashboard`). The `hub`-side pin is the `image:` tag in `docker-compose.yml` itself (git-tracked, no env var indirection — see `docs/adr/0001-compose-services-via-pinned-images-not-git-submodules.md`), not an `.env` value.
