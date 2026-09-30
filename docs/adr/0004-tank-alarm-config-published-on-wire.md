@@ -21,4 +21,4 @@ Hard to reverse: it's the second reversal on this exact question inside one week
 - `docs/adr/0003-tank-alarm-config-stays-a-local-mirror.md` — the case against, still valid reasoning; this ADR reverses its conclusion, not its evidence.
 - `docs/adr/0001-compose-services-via-pinned-images-not-git-submodules.md` — the cross-repo coupling cost this decision accepts paying.
 - `CONTEXT.md` — `Tank` definition.
-</content>
+

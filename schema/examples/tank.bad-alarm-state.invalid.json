@@ -2,7 +2,6 @@
   "fluid_type": "fresh_water",
   "capacity_l": 70,
   "level_pct": 18,
-  "level_pct_smoothed": 18,
   "status": "ok",
   "fill_rate_lpm": 0,
   "drain_rate_lpm": 0,
