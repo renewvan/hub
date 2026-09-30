@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://renewvan.dev/schema/tank.schema.json",
   "title": "tank",
-  "description": "v0.1 device-model entity: a fluid reservoir monitored by a resistive level sensor. Published under renewvan/tank/<id>/<property>. Field additions since v0.1: alarm_state, temperature_c, last_inspected_date (v0.2); fill_rate_lpm, drain_rate_lpm, last_full_date, last_empty_date (v0.3); volume_since_full_l, volume_since_empty_l, level_pct_smoothed (v0.4), and last_inspected_date/last_full_date/last_empty_date renamed to last_inspected_at/last_full_at/last_empty_at with full ISO-8601 timestamps (v0.4, breaking); alarm_direction, alarm_threshold_pct, alarm_restore_pct (v0.5) -- retained/static identity fields, published once at startup alongside fluid_type/capacity_l, present under the same condition as alarm_state (a tank with alarm configured). Supersedes the v0.2-v0.4 pattern of keeping alarm threshold/restore as a dashboard-side hardcoded mirror of node-tank's local config; see docs/adr/0004.",
+  "description": "v0.1 device-model entity: a fluid reservoir monitored by a resistive level sensor. Published under renewvan/tank/<id>/<property>. Field additions since v0.1: alarm_state, temperature_c, last_inspected_date (v0.2); fill_rate_lpm, drain_rate_lpm, last_full_date, last_empty_date (v0.3); volume_since_full_l, volume_since_empty_l, level_pct_smoothed (v0.4), and last_inspected_date/last_full_date/last_empty_date renamed to last_inspected_at/last_full_at/last_empty_at with full ISO-8601 timestamps (v0.4, breaking); alarm_direction, alarm_threshold_pct, alarm_restore_pct (v0.5) -- retained/static identity fields, published once at startup alongside fluid_type/capacity_l, present under the same condition as alarm_state (a tank with alarm configured). Supersedes the v0.2-v0.4 pattern of keeping alarm threshold/restore as a dashboard-side hardcoded mirror of node-tank's local config; see docs/adr/0004. level_pct_smoothed removed (v0.6, breaking): the rate-extrapolated display value had no remaining consumer once the dashboard reverted to showing raw level_pct directly; node-tank no longer computes or publishes it.",
   "type": "object",
   "properties": {
     "fluid_type": {
@@ -17,12 +17,6 @@
       "type": "number",
       "minimum": 0,
       "maximum": 100
-    },
-    "level_pct_smoothed": {
-      "type": "number",
-      "minimum": 0,
-      "maximum": 100,
-      "description": "Rate-extrapolated display value for stepped/reed-switch senders (e.g. A5-E200) that only report a handful of discrete resistance steps across their travel. level_pct stays the untouched raw sender reading -- alarms, flow-rate edges, and full/empty latching all key off it, never this field. Display-only, unconditional live field."
     },
     "status": {
       "type": "string",
@@ -94,7 +88,6 @@
     "fluid_type",
     "capacity_l",
     "level_pct",
-    "level_pct_smoothed",
     "status",
     "fill_rate_lpm",
     "drain_rate_lpm",

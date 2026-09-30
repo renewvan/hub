@@ -2,7 +2,6 @@
   "fluid_type": "grey_water",
   "capacity_l": 70,
   "level_pct": 91.2,
-  "level_pct_smoothed": 89.7,
   "status": "ok",
   "fill_rate_lpm": 0,
   "drain_rate_lpm": 1.4,
