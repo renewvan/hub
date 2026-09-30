@@ -1,5 +1,5 @@
 ---
-status: accepted
+status: superseded by docs/adr/0004-tank-alarm-config-published-on-wire.md
 ---
 
 # Tank alarm threshold/restore config stays a local mirror, not a wire field
