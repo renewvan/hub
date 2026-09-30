@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://renewvan.dev/schema/tank.schema.json",
   "title": "tank",
-  "description": "v0.1 device-model entity: a fluid reservoir monitored by a resistive level sensor. Published under renewvan/tank/<id>/<property>. Field additions since v0.1: alarm_state, temperature_c, last_inspected_date (v0.2); fill_rate_lpm, drain_rate_lpm, last_full_date, last_empty_date (v0.3); volume_since_full_l, volume_since_empty_l, level_pct_smoothed (v0.4), and last_inspected_date/last_full_date/last_empty_date renamed to last_inspected_at/last_full_at/last_empty_at with full ISO-8601 timestamps (v0.4, breaking).",
+  "description": "v0.1 device-model entity: a fluid reservoir monitored by a resistive level sensor. Published under renewvan/tank/<id>/<property>. Field additions since v0.1: alarm_state, temperature_c, last_inspected_date (v0.2); fill_rate_lpm, drain_rate_lpm, last_full_date, last_empty_date (v0.3); volume_since_full_l, volume_since_empty_l, level_pct_smoothed (v0.4), and last_inspected_date/last_full_date/last_empty_date renamed to last_inspected_at/last_full_at/last_empty_at with full ISO-8601 timestamps (v0.4, breaking); alarm_direction, alarm_threshold_pct, alarm_restore_pct (v0.5) -- retained/static identity fields, published once at startup alongside fluid_type/capacity_l, present under the same condition as alarm_state (a tank with alarm configured). Supersedes the v0.2-v0.4 pattern of keeping alarm threshold/restore as a dashboard-side hardcoded mirror of node-tank's local config; see docs/adr/0004.",
   "type": "object",
   "properties": {
     "fluid_type": {
@@ -52,6 +52,23 @@
       "type": "string",
       "enum": ["ok", "alarm"],
       "description": "Tank-level alarm state. Direction (low/high) is implicit in per-tank config. Present only if alarm_direction is configured for this tank."
+    },
+    "alarm_direction": {
+      "type": "string",
+      "enum": ["low", "high"],
+      "description": "Which side of the threshold triggers alarm: 'low' alarms when level_pct drops to/below alarm_threshold_pct (e.g. fresh water), 'high' alarms when it rises to/above it (e.g. grey/black water). Retained/static, published once at startup (v0.5). Present only if alarm is configured for this tank -- same condition as alarm_state."
+    },
+    "alarm_threshold_pct": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "level_pct value that trips alarm_state to 'alarm' (inclusive, per node-tank's hysteresis: low direction triggers at <=, high direction at >=). Retained/static, published once at startup (v0.5). Present only if alarm is configured for this tank."
+    },
+    "alarm_restore_pct": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "level_pct value that clears alarm_state back to 'ok' (inclusive). The open band between alarm_threshold_pct and alarm_restore_pct is the caution zone. Retained/static, published once at startup (v0.5). Present only if alarm is configured for this tank."
     },
     "temperature_c": {
       "type": "number",
