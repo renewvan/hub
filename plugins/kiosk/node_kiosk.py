@@ -539,7 +539,7 @@ def on_connect(client: mqtt.Client, userdata, flags, rc, properties=None):
 
 
 def _handle_power_set(client: mqtt.Client, payload: str) -> None:
-    global _display_off
+    global _display_off, _last_touch_monotonic
     if payload not in VALID_PAYLOADS:
         log.warning("Invalid payload %r on %s — ignoring", payload, TOPIC_SET)
         return
@@ -549,6 +549,12 @@ def _handle_power_set(client: mqtt.Client, payload: str) -> None:
     log.info("Received power command: %s", payload)
     if set_display(payload):
         _display_off = payload == "off"
+        if payload == "on":
+            # Reset the idle clock so a remote wake (no physical touch) doesn't
+            # leave auto-sleep's idle timer stale and immediately re-trigger on
+            # the next poll. Local touch-wake already resets this via on_touch;
+            # this covers wakes that arrive directly on TOPIC_SET.
+            _last_touch_monotonic = time.monotonic()
         client.publish(TOPIC_STATE, payload=payload, qos=1, retain=True)
         log.info("Display set to %s — published state", payload)
     else:
