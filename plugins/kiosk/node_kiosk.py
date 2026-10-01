@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """
-renewvan/node-kiosk — display power bridge.
+renewvan/node-kiosk — display power bridge, brightness control, remote-sleep
+gate, and auto-sleep idle timer.
+
+## Display power
 
 Subscribes to  renewvan/kiosk/display/power/set  ("on" | "off").
 Executes the configured display-power command (default: wlopm --off/--on DSI-1).
@@ -10,14 +13,50 @@ On startup the node probes the display-power command to read the current state
 and publishes it as the initial retained value, so the bus always reflects
 hardware reality rather than the last command.
 
+## Remote-sleep-allowed gate
+
+Subscribes to  renewvan/kiosk/display/remote-sleep-allowed/set  (boolean).
+When this gate is false, an incoming "off" command on the power/set topic is
+rejected (logged, no-op) — the hardware/host can always be put to sleep by
+whoever has shell access, but a remote/browser command cannot unless the gate
+is open. Waking ("on") is never gated. Enforced here, not just hidden in the
+dashboard UI, since a browser-side-only gate is trivially bypassed by anyone
+who can publish MQTT directly. Defaults to true (allowed) if no retained
+value exists on startup.
+
+## Brightness
+
+Subscribes to  renewvan/kiosk/display/brightness/set  (integer 0-100,
+normalized — the wire contract doesn't encode the attached panel's native
+brightness range). Writes the kernel backlight sysfs node
+(/sys/class/backlight/<id>/brightness, rescaled to the panel's native
+max_brightness) and publishes the resulting state retained. On startup,
+publishes the live sysfs reading (rescaled to 0-100), mirroring the
+display-power startup probe.
+
+## Auto-sleep idle timer
+
+Subscribes to  renewvan/kiosk/display/auto-sleep-enabled/set  (boolean) and
+renewvan/kiosk/display/auto-sleep-timeout-minutes/set  (integer, one of
+1/5/15/30). When enabled, the node tracks touch activity on the same evdev
+touch device already used for touch-to-wake; once the configured number of
+idle minutes elapses with the display on, the node sleeps the display
+itself — independent of the remote-sleep-allowed gate (this is a host-local
+decision, not a remote command). Both settings default to disabled/5 if no
+retained value exists on startup.
+
+## Touch-to-wake
+
 Touch-to-wake: a background thread monitors the raw evdev touch device
 (TOUCH_DEVICE, default: auto-detected). When a TOUCH_DOWN event arrives while
 the display is off, the node publishes "on" to the command topic — same as a
 manual wake from the dashboard. This works even under wlopm where Wayland gates
-input to Chromium clients when the output is powered off.
+input to Chromium clients when the output is powered off. Every touch event
+(not just while sleeping) also resets the auto-sleep idle clock.
 
-If the display-power command is unavailable the node logs an error, publishes
-nothing, and continues — the dashboard and broker are unaffected.
+If a display-power/brightness command is unavailable the node logs an error,
+publishes nothing for that property, and continues — the dashboard and
+broker are unaffected.
 
 Environment variables (all optional):
   MQTT_HOST          MQTT broker hostname          (default: localhost)
@@ -29,8 +68,11 @@ Environment variables (all optional):
   DISPLAY_QUERY_CMD  shell command to query state  (default: wlopm)
   TOUCH_DEVICE       evdev device path for touch-to-wake
                      (default: auto-detect first touch-capable device)
+  BRIGHTNESS_DEVICE  /sys/class/backlight/<id> directory for brightness
+                     (default: auto-detect first backlight device)
 """
 
+import json
 import logging
 import os
 import shlex
@@ -55,11 +97,37 @@ DISPLAY_ON_CMD = os.environ.get("DISPLAY_ON_CMD", "wlopm --on DSI-1")
 DISPLAY_OFF_CMD = os.environ.get("DISPLAY_OFF_CMD", "wlopm --off DSI-1")
 DISPLAY_QUERY_CMD = os.environ.get("DISPLAY_QUERY_CMD", "wlopm")
 TOUCH_DEVICE = os.environ.get("TOUCH_DEVICE", "")
+BRIGHTNESS_DEVICE = os.environ.get("BRIGHTNESS_DEVICE", "")
 
 TOPIC_STATE = "renewvan/kiosk/display/power"
 TOPIC_SET = "renewvan/kiosk/display/power/set"
 
+TOPIC_REMOTE_SLEEP_ALLOWED_STATE = "renewvan/kiosk/display/remote-sleep-allowed"
+TOPIC_REMOTE_SLEEP_ALLOWED_SET = "renewvan/kiosk/display/remote-sleep-allowed/set"
+
+TOPIC_BRIGHTNESS_STATE = "renewvan/kiosk/display/brightness"
+TOPIC_BRIGHTNESS_SET = "renewvan/kiosk/display/brightness/set"
+
+TOPIC_AUTO_SLEEP_ENABLED_STATE = "renewvan/kiosk/display/auto-sleep-enabled"
+TOPIC_AUTO_SLEEP_ENABLED_SET = "renewvan/kiosk/display/auto-sleep-enabled/set"
+
+TOPIC_AUTO_SLEEP_TIMEOUT_STATE = "renewvan/kiosk/display/auto-sleep-timeout-minutes"
+TOPIC_AUTO_SLEEP_TIMEOUT_SET = "renewvan/kiosk/display/auto-sleep-timeout-minutes/set"
+
 VALID_PAYLOADS = {"on", "off"}
+AUTO_SLEEP_TIMEOUT_CHOICES = {1, 5, 15, 30}
+
+DEFAULT_REMOTE_SLEEP_ALLOWED = True
+DEFAULT_AUTO_SLEEP_ENABLED = False
+DEFAULT_AUTO_SLEEP_TIMEOUT_MINUTES = 5
+
+# How long to wait after subscribing for a retained value to arrive before
+# concluding none exists and publishing the default. Topics with no hardware
+# source of truth (unlike power/brightness, which probe real state) have no
+# other way to know "never published" from "published, happens to be default".
+RETAINED_PROBE_WINDOW_S = 2.0
+
+AUTO_SLEEP_POLL_INTERVAL_S = 5.0
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -143,6 +211,94 @@ def set_display(state: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Brightness helpers
+# ---------------------------------------------------------------------------
+
+_backlight_device_cache: str | None | bool = False  # False = not yet resolved
+
+
+def find_backlight_device() -> str | None:
+    """Return the first /sys/class/backlight/<id> directory, or None."""
+    base = "/sys/class/backlight"
+    try:
+        entries = sorted(os.listdir(base))
+    except OSError:
+        return None
+    return os.path.join(base, entries[0]) if entries else None
+
+
+def _resolve_backlight_device() -> str | None:
+    """Resolve and cache the backlight device directory for this process."""
+    global _backlight_device_cache
+    if _backlight_device_cache is False:
+        device = BRIGHTNESS_DEVICE or find_backlight_device()
+        if device:
+            log.info("Using backlight device %s", device)
+        else:
+            log.warning("No backlight device found under /sys/class/backlight — brightness control disabled")
+        _backlight_device_cache = device
+    return _backlight_device_cache
+
+
+def read_brightness_pct() -> int | None:
+    """Read live brightness, rescaled from the panel's native range to 0-100."""
+    device = _resolve_backlight_device()
+    if not device:
+        return None
+    try:
+        with open(os.path.join(device, "brightness")) as f:
+            raw = int(f.read().strip())
+        with open(os.path.join(device, "max_brightness")) as f:
+            max_raw = int(f.read().strip())
+        if max_raw <= 0:
+            return None
+        return round(raw * 100 / max_raw)
+    except (OSError, ValueError) as exc:
+        log.error("Failed to read brightness from %s: %s", device, exc)
+        return None
+
+
+def set_brightness_pct(pct: int) -> bool:
+    """Write brightness, rescaled from 0-100 to the panel's native range."""
+    device = _resolve_backlight_device()
+    if not device:
+        log.error("No backlight device — cannot set brightness")
+        return False
+    try:
+        with open(os.path.join(device, "max_brightness")) as f:
+            max_raw = int(f.read().strip())
+        raw = max(0, min(max_raw, round(pct * max_raw / 100)))
+        with open(os.path.join(device, "brightness"), "w") as f:
+            f.write(str(raw))
+        return True
+    except (OSError, ValueError, PermissionError) as exc:
+        log.error("Failed to set brightness on %s: %s", device, exc)
+        return False
+
+
+# ---------------------------------------------------------------------------
+# Boolean/integer payload helpers (JSON scalars, not the power topic's
+# "on"/"off" string enum — see schema/kiosk-display-*.schema.json)
+# ---------------------------------------------------------------------------
+
+
+def _parse_bool_payload(raw: bytes) -> bool | None:
+    try:
+        value = json.loads(raw.decode().strip())
+    except (UnicodeDecodeError, ValueError):
+        return None
+    return value if isinstance(value, bool) else None
+
+
+def _parse_int_payload(raw: bytes) -> int | None:
+    try:
+        value = json.loads(raw.decode().strip())
+    except (UnicodeDecodeError, ValueError):
+        return None
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+# ---------------------------------------------------------------------------
 # Touch device auto-detection
 # ---------------------------------------------------------------------------
 
@@ -173,16 +329,24 @@ def find_touch_device() -> str | None:
 
 
 # ---------------------------------------------------------------------------
-# Touch-to-wake thread
+# Touch-to-wake thread (also drives the auto-sleep idle clock via on_touch)
 # ---------------------------------------------------------------------------
 
 
-def touch_wake_thread(get_display_off: "callable[[], bool]", on_wake: "callable[[], None]") -> None:
+def touch_wake_thread(
+    get_display_off: "callable[[], bool]",
+    on_wake: "callable[[], None]",
+    on_touch: "callable[[], None] | None" = None,
+) -> None:
     """
     Monitors the raw evdev touch device. Grabs the device (blocking compositor
     routing) only while the display is sleeping, releases it immediately before
     publishing wake so the waking touch is swallowed but normal touch resumes
     at once. Polls every 100 ms so grab/ungrab tracks display-state changes.
+
+    Every detected touch event calls on_touch (if given), regardless of grab
+    state — this is how the auto-sleep idle timer's clock gets reset by
+    normal, awake-screen interaction, not just by waking touches.
     """
     import select
 
@@ -233,7 +397,11 @@ def touch_wake_thread(get_display_off: "callable[[], bool]", on_wake: "callable[
                     and event.code == evdev.ecodes.BTN_TOUCH
                     and event.value == 1
                 )
-                if is_touch and grabbed:
+                if not is_touch:
+                    continue
+                if on_touch:
+                    on_touch()
+                if grabbed:
                     try:
                         dev.ungrab()
                         grabbed = False
@@ -255,22 +423,102 @@ def touch_wake_thread(get_display_off: "callable[[], bool]", on_wake: "callable[
         except Exception:
             pass
 
-_display_off = False  # module-level; updated by on_connect/on_message; read by touch thread
+
+# ---------------------------------------------------------------------------
+# Auto-sleep idle timer thread
+# ---------------------------------------------------------------------------
+
+
+def auto_sleep_thread(
+    get_state: "callable[[], tuple[bool, int, float]]",
+    get_display_off: "callable[[], bool]",
+    trigger_sleep: "callable[[], None]",
+) -> None:
+    """
+    Polls every AUTO_SLEEP_POLL_INTERVAL_S. If auto-sleep is enabled, the
+    display is currently on, and the idle clock (last touch, from
+    touch_wake_thread's on_touch callback) has exceeded the configured
+    timeout, triggers a local sleep. Independent of the remote-sleep-allowed
+    gate — this is the node deciding to sleep itself, not honoring a remote
+    command.
+    """
+    while True:
+        time.sleep(AUTO_SLEEP_POLL_INTERVAL_S)
+        enabled, timeout_minutes, last_touch_monotonic = get_state()
+        if not enabled or get_display_off():
+            continue
+        idle_s = time.monotonic() - last_touch_monotonic
+        if idle_s >= timeout_minutes * 60:
+            log.info("Auto-sleep: idle for %.0fs (timeout %dm) — sleeping display", idle_s, timeout_minutes)
+            trigger_sleep()
+
+
+# ---------------------------------------------------------------------------
+# Module-level state — updated by on_connect/on_message, read by the
+# touch-wake and auto-sleep threads.
+# ---------------------------------------------------------------------------
+
+_display_off = False
+_remote_sleep_allowed = DEFAULT_REMOTE_SLEEP_ALLOWED
+_auto_sleep_enabled = DEFAULT_AUTO_SLEEP_ENABLED
+_auto_sleep_timeout_minutes = DEFAULT_AUTO_SLEEP_TIMEOUT_MINUTES
+_last_touch_monotonic = time.monotonic()
+
+# Set True the moment a retained message is observed on each "soft" state
+# topic (no hardware readback exists for these, unlike power/brightness), so
+# the post-subscribe default-publish timer knows whether one already exists.
+_got_remote_sleep_retained = False
+_got_auto_sleep_enabled_retained = False
+_got_auto_sleep_timeout_retained = False
+
+
+def _publish_missing_defaults(client: mqtt.Client) -> None:
+    """
+    Runs once, RETAINED_PROBE_WINDOW_S after subscribing. Publishes the
+    default for any "soft" setting that never received a retained value —
+    same self-healing intent as the display-power startup probe, just
+    without a hardware read to fall back on.
+    """
+    global _remote_sleep_allowed, _auto_sleep_enabled, _auto_sleep_timeout_minutes
+    if not _got_remote_sleep_retained:
+        _remote_sleep_allowed = DEFAULT_REMOTE_SLEEP_ALLOWED
+        client.publish(TOPIC_REMOTE_SLEEP_ALLOWED_STATE, payload=json.dumps(DEFAULT_REMOTE_SLEEP_ALLOWED), qos=1, retain=True)
+        log.info("No retained remote-sleep-allowed — published default %s", DEFAULT_REMOTE_SLEEP_ALLOWED)
+    if not _got_auto_sleep_enabled_retained:
+        _auto_sleep_enabled = DEFAULT_AUTO_SLEEP_ENABLED
+        client.publish(TOPIC_AUTO_SLEEP_ENABLED_STATE, payload=json.dumps(DEFAULT_AUTO_SLEEP_ENABLED), qos=1, retain=True)
+        log.info("No retained auto-sleep-enabled — published default %s", DEFAULT_AUTO_SLEEP_ENABLED)
+    if not _got_auto_sleep_timeout_retained:
+        _auto_sleep_timeout_minutes = DEFAULT_AUTO_SLEEP_TIMEOUT_MINUTES
+        client.publish(TOPIC_AUTO_SLEEP_TIMEOUT_STATE, payload=json.dumps(DEFAULT_AUTO_SLEEP_TIMEOUT_MINUTES), qos=1, retain=True)
+        log.info("No retained auto-sleep-timeout-minutes — published default %s", DEFAULT_AUTO_SLEEP_TIMEOUT_MINUTES)
+
 
 def on_connect(client: mqtt.Client, userdata, flags, rc, properties=None):
+    global _display_off
     if rc != 0:
         log.error("MQTT connect failed (rc=%d) — will retry", rc)
         return
     log.info("Connected to MQTT broker %s:%d", MQTT_HOST, MQTT_PORT)
-    client.subscribe(TOPIC_SET, qos=1)
-    log.info("Subscribed to %s", TOPIC_SET)
+
+    for topic in (
+        TOPIC_SET,
+        TOPIC_REMOTE_SLEEP_ALLOWED_STATE,
+        TOPIC_REMOTE_SLEEP_ALLOWED_SET,
+        TOPIC_BRIGHTNESS_SET,
+        TOPIC_AUTO_SLEEP_ENABLED_STATE,
+        TOPIC_AUTO_SLEEP_ENABLED_SET,
+        TOPIC_AUTO_SLEEP_TIMEOUT_STATE,
+        TOPIC_AUTO_SLEEP_TIMEOUT_SET,
+    ):
+        client.subscribe(topic, qos=1)
+    log.info("Subscribed to kiosk display command/settings topics")
 
     state = query_display_state()
     if state is not None:
-        global _display_off
         _display_off = state == "off"
         client.publish(TOPIC_STATE, payload=state, qos=1, retain=True)
-        log.info("Published initial state: %s", state)
+        log.info("Published initial power state: %s", state)
     else:
         log.warning(
             "Could not read initial display state — retained topic not updated. "
@@ -278,26 +526,125 @@ def on_connect(client: mqtt.Client, userdata, flags, rc, properties=None):
             DISPLAY_QUERY_CMD,
         )
 
+    brightness = read_brightness_pct()
+    if brightness is not None:
+        client.publish(TOPIC_BRIGHTNESS_STATE, payload=json.dumps(brightness), qos=1, retain=True)
+        log.info("Published initial brightness: %d%%", brightness)
+    else:
+        log.warning("Could not read initial brightness — retained topic not updated")
 
-def on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
+    # Give retained messages for the three hardware-less settings a short
+    # window to arrive before concluding none exist and publishing defaults.
+    threading.Timer(RETAINED_PROBE_WINDOW_S, _publish_missing_defaults, args=(client,)).start()
+
+
+def _handle_power_set(client: mqtt.Client, payload: str) -> None:
     global _display_off
-    try:
-        payload = msg.payload.decode().strip().lower()
-    except Exception:
-        log.warning("Received undecodable payload on %s — ignoring", msg.topic)
-        return
-
     if payload not in VALID_PAYLOADS:
-        log.warning("Invalid payload %r on %s — ignoring", payload, msg.topic)
+        log.warning("Invalid payload %r on %s — ignoring", payload, TOPIC_SET)
         return
-
-    log.info("Received command: %s", payload)
+    if payload == "off" and (not _got_remote_sleep_retained or not _remote_sleep_allowed):
+        log.warning("Remote sleep rejected — remote-sleep-allowed gate is disabled or not yet confirmed")
+        return
+    log.info("Received power command: %s", payload)
     if set_display(payload):
         _display_off = payload == "off"
         client.publish(TOPIC_STATE, payload=payload, qos=1, retain=True)
         log.info("Display set to %s — published state", payload)
     else:
         log.error("Failed to set display to %s — state topic not updated", payload)
+
+
+def _handle_brightness_set(client: mqtt.Client, raw: bytes) -> None:
+    pct = _parse_int_payload(raw)
+    if pct is None or not (0 <= pct <= 100):
+        log.warning("Invalid brightness payload %r on %s — ignoring", raw, TOPIC_BRIGHTNESS_SET)
+        return
+    log.info("Received brightness command: %d%%", pct)
+    if set_brightness_pct(pct):
+        actual = read_brightness_pct()
+        published = actual if actual is not None else pct
+        client.publish(TOPIC_BRIGHTNESS_STATE, payload=json.dumps(published), qos=1, retain=True)
+        log.info("Brightness set to %d%% — published state", published)
+    else:
+        log.error("Failed to set brightness to %d%% — state topic not updated", pct)
+
+
+def on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
+    global _remote_sleep_allowed, _auto_sleep_enabled, _auto_sleep_timeout_minutes
+    global _got_remote_sleep_retained, _got_auto_sleep_enabled_retained, _got_auto_sleep_timeout_retained
+
+    topic = msg.topic
+
+    if topic == TOPIC_SET:
+        try:
+            payload = msg.payload.decode().strip().lower()
+        except Exception:
+            log.warning("Received undecodable payload on %s — ignoring", topic)
+            return
+        _handle_power_set(client, payload)
+        return
+
+    if topic == TOPIC_BRIGHTNESS_SET:
+        _handle_brightness_set(client, msg.payload)
+        return
+
+    if topic == TOPIC_REMOTE_SLEEP_ALLOWED_STATE:
+        # Our own retained state, echoed back — just confirms one exists.
+        _got_remote_sleep_retained = True
+        value = _parse_bool_payload(msg.payload)
+        if value is not None:
+            _remote_sleep_allowed = value
+        return
+
+    if topic == TOPIC_REMOTE_SLEEP_ALLOWED_SET:
+        value = _parse_bool_payload(msg.payload)
+        if value is None:
+            log.warning("Invalid remote-sleep-allowed payload %r — ignoring", msg.payload)
+            return
+        _remote_sleep_allowed = value
+        _got_remote_sleep_retained = True
+        client.publish(TOPIC_REMOTE_SLEEP_ALLOWED_STATE, payload=json.dumps(value), qos=1, retain=True)
+        log.info("remote-sleep-allowed set to %s", value)
+        return
+
+    if topic == TOPIC_AUTO_SLEEP_ENABLED_STATE:
+        _got_auto_sleep_enabled_retained = True
+        value = _parse_bool_payload(msg.payload)
+        if value is not None:
+            _auto_sleep_enabled = value
+        return
+
+    if topic == TOPIC_AUTO_SLEEP_ENABLED_SET:
+        value = _parse_bool_payload(msg.payload)
+        if value is None:
+            log.warning("Invalid auto-sleep-enabled payload %r — ignoring", msg.payload)
+            return
+        _auto_sleep_enabled = value
+        _got_auto_sleep_enabled_retained = True
+        client.publish(TOPIC_AUTO_SLEEP_ENABLED_STATE, payload=json.dumps(value), qos=1, retain=True)
+        log.info("auto-sleep-enabled set to %s", value)
+        return
+
+    if topic == TOPIC_AUTO_SLEEP_TIMEOUT_STATE:
+        _got_auto_sleep_timeout_retained = True
+        value = _parse_int_payload(msg.payload)
+        if value is not None:
+            _auto_sleep_timeout_minutes = value
+        return
+
+    if topic == TOPIC_AUTO_SLEEP_TIMEOUT_SET:
+        value = _parse_int_payload(msg.payload)
+        if value not in AUTO_SLEEP_TIMEOUT_CHOICES:
+            log.warning("Invalid auto-sleep-timeout-minutes payload %r — ignoring", msg.payload)
+            return
+        _auto_sleep_timeout_minutes = value
+        _got_auto_sleep_timeout_retained = True
+        client.publish(TOPIC_AUTO_SLEEP_TIMEOUT_STATE, payload=json.dumps(value), qos=1, retain=True)
+        log.info("auto-sleep-timeout-minutes set to %d", value)
+        return
+
+    log.warning("Received message on unexpected topic %s — ignoring", topic)
 
 
 def on_disconnect(client: mqtt.Client, userdata, rc, properties=None):
@@ -343,13 +690,39 @@ def main():
         log.info("Touch-to-wake: publishing 'on' command")
         client.publish(TOPIC_SET, payload="on", qos=1, retain=False)
 
-    t = threading.Thread(
+    def _on_touch():
+        """Called from the touch thread on every touch; resets the idle clock."""
+        global _last_touch_monotonic
+        _last_touch_monotonic = time.monotonic()
+
+    def _trigger_auto_sleep():
+        """Called from the auto-sleep thread; sleeps the display directly,
+        bypassing the remote-sleep-allowed gate (host-local decision)."""
+        global _display_off
+        if set_display("off"):
+            _display_off = True
+            client.publish(TOPIC_STATE, payload="off", qos=1, retain=True)
+        else:
+            log.error("Auto-sleep: failed to set display off")
+
+    def _auto_sleep_state():
+        return _auto_sleep_enabled, _auto_sleep_timeout_minutes, _last_touch_monotonic
+
+    touch_thread = threading.Thread(
         target=touch_wake_thread,
-        args=(lambda: _display_off, _on_wake),
+        args=(lambda: _display_off, _on_wake, _on_touch),
         daemon=True,
         name="touch-wake",
     )
-    t.start()
+    touch_thread.start()
+
+    idle_thread = threading.Thread(
+        target=auto_sleep_thread,
+        args=(_auto_sleep_state, lambda: _display_off, _trigger_auto_sleep),
+        daemon=True,
+        name="auto-sleep",
+    )
+    idle_thread.start()
 
     client.loop_forever()
 

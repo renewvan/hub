@@ -80,9 +80,26 @@ alternative mechanism would be needed.
 
 ## Design decisions
 
-- **Manual button only, no idle timeout.** The dashboard is a read-only
-  live-data display; a timer that hides it while the occupant is still
-  consulting it would be worse than no auto-sleep at all.
+- **Auto-sleep is opt-in, off by default.** The original "manual button
+  only, no idle timeout" decision here assumed auto-sleep would surprise
+  an occupant still reading live data. That's still true for the
+  default — but a new `auto-sleep-enabled` setting (default `false`, see
+  `plugins/kiosk/README.md`) lets a user who wants it turn on an
+  idle-timeout sleep (preset `1`/`5`/`15`/`30` minute options), reusing
+  the existing touch-to-wake evdev monitor as the idle clock. Manual
+  sleep/wake remains available regardless.
+- **Remote-sleep-allowed gate.** A new node-enforced toggle
+  (`renewvan/kiosk/display/remote-sleep-allowed`, default `true`) lets a
+  user disable *remote* (dashboard/MQTT) sleep commands while the host
+  itself can always be put to sleep by whoever has shell access. Waking
+  is never gated. Enforced in the kiosk node, not just hidden in the
+  dashboard UI, since a UI-only gate is trivially bypassed by publishing
+  MQTT directly.
+- **Brightness joins the same `display/*` topic family.** A
+  `renewvan/kiosk/display/brightness` setting (0–100, normalized) was
+  added alongside power — see `plugins/kiosk/README.md` for the full
+  current topic table, which supersedes this document's topic list above
+  (written before brightness/gate/auto-sleep existed).
 - **Retained state topic, not `localStorage`.** The Chromium profile on this
   kiosk Pi has been observed to crash (see power-loss recovery ticket); a
   retained MQTT topic survives any browser restart without blinking the display
