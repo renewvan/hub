@@ -543,8 +543,8 @@ def _handle_power_set(client: mqtt.Client, payload: str) -> None:
     if payload not in VALID_PAYLOADS:
         log.warning("Invalid payload %r on %s — ignoring", payload, TOPIC_SET)
         return
-    if payload == "off" and not _remote_sleep_allowed:
-        log.warning("Remote sleep rejected — remote-sleep-allowed gate is disabled")
+    if payload == "off" and (not _got_remote_sleep_retained or not _remote_sleep_allowed):
+        log.warning("Remote sleep rejected — remote-sleep-allowed gate is disabled or not yet confirmed")
         return
     log.info("Received power command: %s", payload)
     if set_display(payload):
