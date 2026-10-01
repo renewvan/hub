@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://renewvan.dev/schema/tank.schema.json",
   "title": "tank",
-  "description": "v0.1 device-model entity: a fluid reservoir monitored by a resistive level sensor. Published under renewvan/tank/<id>/<property>. Field additions since v0.1: alarm_state, temperature_c, last_inspected_date (v0.2); fill_rate_lpm, drain_rate_lpm, last_full_date, last_empty_date (v0.3); volume_since_full_l, volume_since_empty_l, level_pct_smoothed (v0.4), and last_inspected_date/last_full_date/last_empty_date renamed to last_inspected_at/last_full_at/last_empty_at with full ISO-8601 timestamps (v0.4, breaking); alarm_direction, alarm_threshold_pct, alarm_restore_pct (v0.5) -- retained/static identity fields, published once at startup alongside fluid_type/capacity_l, present under the same condition as alarm_state (a tank with alarm configured). Supersedes the v0.2-v0.4 pattern of keeping alarm threshold/restore as a dashboard-side hardcoded mirror of node-tank's local config; see docs/adr/0004. level_pct_smoothed removed (v0.6, breaking): the rate-extrapolated display value had no remaining consumer once the dashboard reverted to showing raw level_pct directly; node-tank no longer computes or publishes it.",
+  "description": "v0.1 device-model entity: a fluid reservoir monitored by a resistive level sensor. Published under renewvan/tank/<id>/<property>. Field additions since v0.1: alarm_state, temperature_c, last_inspected_date (v0.2); fill_rate_lpm, drain_rate_lpm, last_full_date, last_empty_date (v0.3); volume_since_full_l, volume_since_empty_l, level_pct_smoothed (v0.4), and last_inspected_date/last_full_date/last_empty_date renamed to last_inspected_at/last_full_at/last_empty_at with full ISO-8601 timestamps (v0.4, breaking); alarm_direction, alarm_threshold_pct, alarm_restore_pct (v0.5) -- retained/static identity fields, published once at startup alongside fluid_type/capacity_l, present under the same condition as alarm_state (a tank with alarm configured); level_pct_smoothed removed (v0.6, breaking, see docs/adr/0005); fill_rate_lpm, drain_rate_lpm removed (v0.7, breaking, see docs/adr/0006) -- unused instantaneous flow-rate fields, no consumer ever displayed them, superseded by volume_since_full_l/volume_since_empty_l for the dashboard's pace-based telemetry.",
   "type": "object",
   "properties": {
     "fluid_type": {
@@ -21,16 +21,6 @@
     "status": {
       "type": "string",
       "enum": ["ok", "open_circuit", "short_circuit"]
-    },
-    "fill_rate_lpm": {
-      "type": "number",
-      "minimum": 0,
-      "description": "Live fill rate in liters/minute, computed edge-to-edge from level_pct. 0 when not filling or flow has gone idle. Unconditional live field."
-    },
-    "drain_rate_lpm": {
-      "type": "number",
-      "minimum": 0,
-      "description": "Live drain rate in liters/minute, computed edge-to-edge from level_pct. 0 when not draining or flow has gone idle. Unconditional live field."
     },
     "volume_since_full_l": {
       "type": "number",
@@ -89,8 +79,6 @@
     "capacity_l",
     "level_pct",
     "status",
-    "fill_rate_lpm",
-    "drain_rate_lpm",
     "volume_since_full_l",
     "volume_since_empty_l"
   ],

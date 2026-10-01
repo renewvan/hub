@@ -3,8 +3,6 @@
   "capacity_l": 70,
   "level_pct": 91.2,
   "status": "ok",
-  "fill_rate_lpm": 0,
-  "drain_rate_lpm": 1.4,
   "volume_since_full_l": 2.1,
   "volume_since_empty_l": 68.3,
   "alarm_state": "alarm",
