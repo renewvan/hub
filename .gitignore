@@ -37,3 +37,7 @@ logs/
 # Database
 *.sqlite
 *.db
+
+# Python
+__pycache__/
+*.pyc

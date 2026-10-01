@@ -1,15 +1,33 @@
 # renewvan/node-kiosk
 
-Display power bridge for the kiosk Pi. Subscribes to the renewvan bus command topic and calls `vcgencmd display_power` (or a configured substitute) to physically cut or restore the DSI panel's backlight.
+Display power bridge for the kiosk Pi: display sleep/wake, brightness, a
+remote-sleep-allowed gate, and an idle-based auto-sleep timer.
 
 ## MQTT
 
 | Topic | Direction | Retained | Payload |
 |---|---|---|---|
-| `renewvan/kiosk/display/power/set` | dashboard → node | no | `"on"` or `"off"` |
+| `renewvan/kiosk/display/power/set` | dashboard → node | no | `"on"` or `"off"` (rejected when `off` and the gate below is disabled) |
 | `renewvan/kiosk/display/power` | node → consumers | **yes** | `"on"` or `"off"` |
+| `renewvan/kiosk/display/remote-sleep-allowed/set` | dashboard → node | no | `boolean` |
+| `renewvan/kiosk/display/remote-sleep-allowed` | node → consumers | **yes** | `boolean` (default `true`) |
+| `renewvan/kiosk/display/brightness/set` | dashboard → node | no | `integer` 0–100 (normalized, rescaled to the panel's native range) |
+| `renewvan/kiosk/display/brightness` | node → consumers | **yes** | `integer` 0–100 |
+| `renewvan/kiosk/display/auto-sleep-enabled/set` | dashboard → node | no | `boolean` |
+| `renewvan/kiosk/display/auto-sleep-enabled` | node → consumers | **yes** | `boolean` (default `false`) |
+| `renewvan/kiosk/display/auto-sleep-timeout-minutes/set` | dashboard → node | no | `integer`, one of `1`/`5`/`15`/`30` |
+| `renewvan/kiosk/display/auto-sleep-timeout-minutes` | node → consumers | **yes** | `integer` (default `5`) |
 
-Payload schema: `schema/kiosk-display-power.schema.json`.
+Payload schemas: `schema/kiosk-display-{power,remote-sleep-allowed,brightness,auto-sleep-enabled,auto-sleep-timeout-minutes}.schema.json`.
+
+The remote-sleep-allowed gate only restricts `off` commands arriving over
+MQTT; waking (`on`) is never gated, and the auto-sleep timer (below) sleeps
+the display itself independent of this gate — it's a host-local decision,
+not a remote command.
+
+Auto-sleep reuses the same evdev touch device as touch-to-wake as its idle
+clock: any touch (not just a waking one) resets it. When enabled, the
+display sleeps itself after the configured idle minutes with no touch.
 
 ## Install (Pi)
 
@@ -40,6 +58,7 @@ All config via environment variables — set them in the systemd unit's `[Servic
 | `DISPLAY_ON_CMD` | `vcgencmd display_power 1` | Command to power display on |
 | `DISPLAY_OFF_CMD` | `vcgencmd display_power 0` | Command to power display off |
 | `DISPLAY_QUERY_CMD` | `vcgencmd display_power` | Command to read current state (stdout parsed for `display_power=0/1`) |
+| `BRIGHTNESS_DEVICE` | _(auto-detect)_ | `/sys/class/backlight/<id>` directory; auto-detects the first backlight device if unset |
 
 ### Wayland fallback
 

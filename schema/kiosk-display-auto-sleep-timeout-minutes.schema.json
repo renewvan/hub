@@ -1,0 +1,8 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://renewvan.dev/schema/kiosk-display-auto-sleep-timeout-minutes.schema.json",
+  "title": "kiosk-display-auto-sleep-timeout-minutes",
+  "description": "Payload for the kiosk auto-sleep timeout topics. Published retained by the kiosk node to renewvan/kiosk/display/auto-sleep-timeout-minutes (state), publishing its default (5) on startup if no retained value exists; sent unretained by the dashboard to renewvan/kiosk/display/auto-sleep-timeout-minutes/set (command). Restricted to the dashboard's preset duration picker values.",
+  "type": "integer",
+  "enum": [1, 5, 15, 30]
+}
