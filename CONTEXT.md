@@ -17,7 +17,7 @@ The Docker Compose stack running on the Pi that forms the connective core of the
 _Avoid_: "Bus connected" (ambiguous — sounds like a vehicle CAN/RV-C bus or the MQTT protocol itself, not the Pi service); "hub service" (the hub is the whole stack, not one service inside it).
 
 **Tank**:
-A fluid reservoir (fresh water, grey water, black water, fuel, or LPG) monitored by a resistive level sensor. Reports `fluid_type`, `capacity_l`, `level_pct` (raw, fill percentage not volume), `status`, `fill_rate_lpm`/`drain_rate_lpm`, and `volume_since_full_l`/`volume_since_empty_l`, plus optionally `alarm_state`/`alarm_direction`/`alarm_threshold_pct`/`alarm_restore_pct`, `temperature_c`, and the `last_inspected_at`/`last_full_at`/`last_empty_at` timestamps.
+A fluid reservoir (fresh water, grey water, black water, fuel, or LPG) monitored by a resistive level sensor. Reports `fluid_type`, `capacity_l`, `level_pct` (raw, fill percentage not volume), `status`, and `volume_since_full_l`/`volume_since_empty_l`, plus optionally `alarm_state`/`alarm_direction`/`alarm_threshold_pct`/`alarm_restore_pct`, `temperature_c`, and the `last_inspected_at`/`last_full_at`/`last_empty_at` timestamps.
 _Avoid_: Reservoir.
 
 **Relay**:
