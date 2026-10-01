@@ -128,7 +128,7 @@ services:
   # not a polling backend. See
   # .scratch/renewvan-hub-v0-build/issues/06-dashboard-web-app.md.
   dashboard:
-    image: ghcr.io/renewvan/dashboard:v0.1.20
+    image: ghcr.io/renewvan/dashboard:v0.1.21
     container_name: renewvan-dashboard
     restart: unless-stopped
     ports:
