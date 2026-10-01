@@ -430,22 +430,32 @@ def touch_wake_thread(
 
 
 def auto_sleep_thread(
-    get_state: "callable[[], tuple[bool, int, float]]",
+    get_state: "callable[[], tuple[bool, int, float, str]]",
     get_display_off: "callable[[], bool]",
     trigger_sleep: "callable[[], None]",
 ) -> None:
     """
     Polls every AUTO_SLEEP_POLL_INTERVAL_S. If auto-sleep is enabled, the
-    display is currently on, and the idle clock (last touch, from
+    display is currently on, the idle clock (last touch, from
     touch_wake_thread's on_touch callback) has exceeded the configured
-    timeout, triggers a local sleep. Independent of the remote-sleep-allowed
-    gate — this is the node deciding to sleep itself, not honoring a remote
-    command.
+    timeout, AND the current on-session originated from a physical touch
+    (not a remote wake command), triggers a local sleep.
+
+    The origin check is what makes auto-sleep a host-presence feature
+    rather than a display-on-duration timer: a remote wake (phone app,
+    dashboard) has no touch signal to measure idleness against, so without
+    it the idle clock reads as stale the moment someone starts working
+    remotely and the display re-sleeps mid-session. A physical touch always
+    flips the origin back to "local", so the feature still protects the
+    screen once someone is actually at the van and walks away.
+
+    Independent of the remote-sleep-allowed gate — this is the node
+    deciding to sleep itself, not honoring a remote command.
     """
     while True:
         time.sleep(AUTO_SLEEP_POLL_INTERVAL_S)
-        enabled, timeout_minutes, last_touch_monotonic = get_state()
-        if not enabled or get_display_off():
+        enabled, timeout_minutes, last_touch_monotonic, origin = get_state()
+        if not enabled or get_display_off() or origin != "local":
             continue
         idle_s = time.monotonic() - last_touch_monotonic
         if idle_s >= timeout_minutes * 60:
@@ -463,6 +473,15 @@ _remote_sleep_allowed = DEFAULT_REMOTE_SLEEP_ALLOWED
 _auto_sleep_enabled = DEFAULT_AUTO_SLEEP_ENABLED
 _auto_sleep_timeout_minutes = DEFAULT_AUTO_SLEEP_TIMEOUT_MINUTES
 _last_touch_monotonic = time.monotonic()
+
+# Provenance of the current on-session: "local" if the display was last
+# turned on (or last confirmed occupied) by a physical touch, "remote" if
+# by an MQTT power/set=on command with no accompanying touch. Read by
+# auto_sleep_thread so idle-based sleep only ever fires for host-local
+# sessions — see its docstring. Defaults to "local" so a display already on
+# at startup (e.g. after a reboot while someone's at the van) behaves as
+# before this field existed.
+_display_on_origin = "local"
 
 # Set True the moment a retained message is observed on each "soft" state
 # topic (no hardware readback exists for these, unlike power/brightness), so
@@ -538,8 +557,27 @@ def on_connect(client: mqtt.Client, userdata, flags, rc, properties=None):
     threading.Timer(RETAINED_PROBE_WINDOW_S, _publish_missing_defaults, args=(client,)).start()
 
 
+def _apply_power_on(client: mqtt.Client, origin: str) -> None:
+    """
+    Turn the display on and record this session's provenance. Shared by the
+    local touch-wake path (origin="local", called directly — see _on_wake)
+    and remote power/set=on commands (origin="remote", via
+    _handle_power_set). auto_sleep_thread only auto-sleeps "local" sessions
+    — see its docstring and _display_on_origin.
+    """
+    global _display_off, _display_on_origin, _last_touch_monotonic
+    if set_display("on"):
+        _display_off = False
+        _display_on_origin = origin
+        _last_touch_monotonic = time.monotonic()
+        client.publish(TOPIC_STATE, payload="on", qos=1, retain=True)
+        log.info("Display set to on (origin=%s) — published state", origin)
+    else:
+        log.error("Failed to set display to on — state topic not updated")
+
+
 def _handle_power_set(client: mqtt.Client, payload: str) -> None:
-    global _display_off, _last_touch_monotonic
+    global _display_off
     if payload not in VALID_PAYLOADS:
         log.warning("Invalid payload %r on %s — ignoring", payload, TOPIC_SET)
         return
@@ -547,18 +585,15 @@ def _handle_power_set(client: mqtt.Client, payload: str) -> None:
         log.warning("Remote sleep rejected — remote-sleep-allowed gate is disabled or not yet confirmed")
         return
     log.info("Received power command: %s", payload)
-    if set_display(payload):
-        _display_off = payload == "off"
-        if payload == "on":
-            # Reset the idle clock so a remote wake (no physical touch) doesn't
-            # leave auto-sleep's idle timer stale and immediately re-trigger on
-            # the next poll. Local touch-wake already resets this via on_touch;
-            # this covers wakes that arrive directly on TOPIC_SET.
-            _last_touch_monotonic = time.monotonic()
-        client.publish(TOPIC_STATE, payload=payload, qos=1, retain=True)
-        log.info("Display set to %s — published state", payload)
+    if payload == "on":
+        _apply_power_on(client, origin="remote")
+        return
+    if set_display("off"):
+        _display_off = True
+        client.publish(TOPIC_STATE, payload="off", qos=1, retain=True)
+        log.info("Display set to off — published state")
     else:
-        log.error("Failed to set display to %s — state topic not updated", payload)
+        log.error("Failed to set display to off — state topic not updated")
 
 
 def _handle_brightness_set(client: mqtt.Client, raw: bytes) -> None:
@@ -692,14 +727,21 @@ def main():
             time.sleep(5)
 
     def _on_wake():
-        """Called from the touch thread; publishes a wake command via MQTT."""
-        log.info("Touch-to-wake: publishing 'on' command")
-        client.publish(TOPIC_SET, payload="on", qos=1, retain=False)
+        """Called from the touch thread when a touch wakes a sleeping
+        display. Applies the wake directly (origin="local") rather than
+        round-tripping through TOPIC_SET — avoids racing the loopback
+        against _on_touch's origin flip and correctly marks this as a
+        host-local session for auto_sleep_thread."""
+        log.info("Touch-to-wake: waking display")
+        _apply_power_on(client, origin="local")
 
     def _on_touch():
-        """Called from the touch thread on every touch; resets the idle clock."""
-        global _last_touch_monotonic
+        """Called from the touch thread on every touch; resets the idle
+        clock and confirms host-local presence (flips origin back to
+        "local" even if the current session was woken remotely)."""
+        global _last_touch_monotonic, _display_on_origin
         _last_touch_monotonic = time.monotonic()
+        _display_on_origin = "local"
 
     def _trigger_auto_sleep():
         """Called from the auto-sleep thread; sleeps the display directly,
@@ -712,7 +754,7 @@ def main():
             log.error("Auto-sleep: failed to set display off")
 
     def _auto_sleep_state():
-        return _auto_sleep_enabled, _auto_sleep_timeout_minutes, _last_touch_monotonic
+        return _auto_sleep_enabled, _auto_sleep_timeout_minutes, _last_touch_monotonic, _display_on_origin
 
     touch_thread = threading.Thread(
         target=touch_wake_thread,
