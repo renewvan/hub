@@ -56,7 +56,7 @@
     },
     "temperature_c": {
       "type": "number",
-      "description": "Water temperature in degrees Celsius. Present only if a DS18B20 sensor is configured for this tank."
+      "description": "Water temperature in degrees Celsius. Present only if an NTC temperature sensor is configured for this tank (10k thermistor divider on a spare ADS1115 channel, read by the tank node)."
     },
     "last_inspected_at": {
       "type": "string",
