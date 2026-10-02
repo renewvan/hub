@@ -46,6 +46,11 @@ python3 -m venv /opt/renewvan/venvs/kiosk
 sudo cp /opt/renewvan/plugins/kiosk/renewvan-node-kiosk.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now renewvan-node-kiosk.service
+# Kiosk touch input: stock Pi OS labwc rc.xml mouse-emulates the
+# touchscreen (wl_pointer only) — flip to real wl_touch so touch-drag
+# scrolling works in the dashboard. Idempotent; see the script's header
+# for the full rationale.
+sudo bash /opt/renewvan/plugins/kiosk/fix-labwc-touch-scroll.sh
 if [[ ! -f /etc/renewvan/node-kiosk.env ]]; then
   printf '# renewvan kiosk plugin environment overrides\n# See plugins/kiosk/README.md for available variables.\n# Uncomment and set to override defaults:\n# MQTT_HOST=localhost\n# MQTT_PORT=1883\n# MQTT_USERNAME=\n# MQTT_PASSWORD=\n# DISPLAY_ON_CMD=vcgencmd display_power 1\n# DISPLAY_OFF_CMD=vcgencmd display_power 0\n# DISPLAY_QUERY_CMD=vcgencmd display_power\n' | sudo tee /etc/renewvan/node-kiosk.env >/dev/null
 fi
