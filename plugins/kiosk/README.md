@@ -60,6 +60,18 @@ sudo systemctl enable --now renewvan-node-kiosk.service
 #    URL; this file only matters for a cold boot/reflash.
 sudo cp plugins/kiosk/labwc-autostart /etc/xdg/labwc/autostart
 sudo chmod +x /etc/xdg/labwc/autostart
+
+# 5. Touch-drag scrolling: stock Pi OS labwc rc.xml mouse-emulates the
+#    touchscreen (compositor translates touches to virtual-mouse events),
+#    so kiosk Chromium receives wl_pointer only — taps and sliders work,
+#    finger-drag panning never scrolls. It also ships touch rules mapped
+#    to a DSI-2 output that doesn't exist on single-panel hosts, which
+#    makes labwc drop native touches entirely. This fixes both:
+sudo bash /opt/renewvan/plugins/kiosk/fix-labwc-touch-scroll.sh
+#    (bin/deploy.sh runs this on every deploy so a Pi OS update that
+#    rewrites rc.xml can't silently regress it. If it reports changing
+#    anything, reboot once — labwc applies <touch> rules when attaching
+#    input devices at startup.)
 ```
 
 ## Configuration
