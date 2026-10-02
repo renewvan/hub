@@ -53,18 +53,24 @@ in `docs/pi-agent-sudo-setup.md` and resolved for Chromium in the
 
 ## Dashboard (`renewvan/dashboard`)
 
-Two additions:
+1. **Sleep button** (`DisplaySleepButton`, header icon) — publishes `"off"`
+   / `"on"` to the command topic.
 
-1. **Sleep button** — in a dedicated Settings panel (new surface; the sleep
-   button is its only item in this version). Publishes `"off"` to the command
-   topic.
-
-2. **Sleeping overlay** — a fullscreen black layer rendered above all content
-   when the state topic reads `"off"` (including on page load if the retained
-   value is `"off"`). The first `pointerdown`/`touchstart` on the overlay
-   publishes `"on"` to the command topic and removes the overlay; that waking
-   touch is swallowed (not forwarded to the document beneath), matching
-   Venus OS GUI-v2's documented behaviour.
+2. **Sleeping overlay — added, then removed.** Originally a fullscreen
+   black layer rendered above all content when the state topic read
+   `"off"`, swallowing the first waking touch. Removed: redundant with
+   `vcgencmd display_power`/`wlopm` physically cutting the panel's
+   backlight (the screen is actually off, not CSS-black — see "Physical
+   panel power-off" below) and with `node_kiosk.py`'s own evdev touch
+   grab, which already consumes the waking touch at the input layer
+   before it ever reaches the browser (see `plugins/kiosk/README.md`'s
+   touch-to-wake section) — the CSS overlay's touch-swallow logic never
+   actually fired in production. It also carried a recurring footgun: any
+   dashboard viewer, including a remote phone, rendered it too, needing
+   increasingly complex machinery (`isLocalKiosk()`, a `?kioskHost=1` URL
+   marker set by `bin/deploy.sh`/`plugins/kiosk/labwc-autostart`) just to
+   suppress it for non-kiosk viewers. All of that is gone along with the
+   overlay.
 
 The dashboard never calls `vcgencmd` directly; it speaks MQTT only.
 
@@ -88,13 +94,20 @@ alternative mechanism would be needed.
   idle-timeout sleep (preset `1`/`5`/`15`/`30` minute options), reusing
   the existing touch-to-wake evdev monitor as the idle clock. Manual
   sleep/wake remains available regardless.
-- **Remote-sleep-allowed gate.** A new node-enforced toggle
-  (`renewvan/kiosk/display/remote-sleep-allowed`, default `true`) lets a
-  user disable *remote* (dashboard/MQTT) sleep commands while the host
-  itself can always be put to sleep by whoever has shell access. Waking
-  is never gated. Enforced in the kiosk node, not just hidden in the
-  dashboard UI, since a UI-only gate is trivially bypassed by publishing
-  MQTT directly.
+- **Remote-sleep-allowed gate — added, then removed.** A node-enforced
+  toggle (`renewvan/kiosk/display/remote-sleep-allowed`, default `true`)
+  originally let a user disable *remote* (dashboard/MQTT) sleep commands
+  while the host itself could always be put to sleep by whoever has shell
+  access. Removed once two things were true at the same time: (1) `"off"`
+  no longer has any visible effect on any dashboard viewer at all —
+  local or remote — now that the sleeping overlay is gone too (above);
+  the only visible effect of sleeping is the physical backlight cutting
+  on the Pi itself, and (2) the gate was trivially bypassed by the same
+  remote device that was supposedly blocked — flip it back on from
+  Settings, no shell access needed, since it was just another retained
+  MQTT topic. With (1) true, there was nothing left worth gating; (2)
+  meant the gate was never a real protection even before that.
+  `power/set` now applies unconditionally, same as waking always did.
 - **Brightness joins the same `display/*` topic family.** A
   `renewvan/kiosk/display/brightness` setting (0–100, normalized) was
   added alongside power — see `plugins/kiosk/README.md` for the full

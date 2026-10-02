@@ -2,6 +2,6 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://renewvan.dev/schema/kiosk-display-auto-sleep-enabled.schema.json",
   "title": "kiosk-display-auto-sleep-enabled",
-  "description": "Payload for the kiosk auto-sleep-enabled topics. Published retained by the kiosk node to renewvan/kiosk/display/auto-sleep-enabled (state), publishing its default (false) on startup if no retained value exists; sent unretained by the dashboard to renewvan/kiosk/display/auto-sleep-enabled/set (command). When true, the kiosk node puts the display to sleep after renewvan/kiosk/display/auto-sleep-timeout-minutes of no touch activity, independent of the remote-sleep-allowed gate.",
+  "description": "Payload for the kiosk auto-sleep-enabled topics. Published retained by the kiosk node to renewvan/kiosk/display/auto-sleep-enabled (state), publishing its default (false) on startup if no retained value exists; sent unretained by the dashboard to renewvan/kiosk/display/auto-sleep-enabled/set (command). When true, the kiosk node puts the display to sleep after renewvan/kiosk/display/auto-sleep-timeout-minutes of no touch activity, but only for a session a physical touch originated — a remote wake alone never triggers it.",
   "type": "boolean"
 }
