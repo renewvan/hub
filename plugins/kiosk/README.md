@@ -5,22 +5,22 @@ an idle-based auto-sleep timer.
 
 ## MQTT
 
-| Topic | Direction | Retained | Payload |
-|---|---|---|---|
-| `renewvan/kiosk/display/power/set` | dashboard → plugin | no | `"on"` or `"off"` |
-| `renewvan/kiosk/display/power` | plugin → consumers | **yes** | `"on"` or `"off"` |
-| `renewvan/kiosk/display/brightness/set` | dashboard → plugin | no | `integer` 0–100 (normalized, rescaled to the panel's native range) |
-| `renewvan/kiosk/display/brightness` | plugin → consumers | **yes** | `integer` 0–100 |
-| `renewvan/kiosk/display/auto-sleep-enabled/set` | dashboard → plugin | no | `boolean` |
-| `renewvan/kiosk/display/auto-sleep-enabled` | plugin → consumers | **yes** | `boolean` (default `false`) |
-| `renewvan/kiosk/display/auto-sleep-timeout-minutes/set` | dashboard → plugin | no | `integer`, one of `1`/`5`/`15`/`30` |
-| `renewvan/kiosk/display/auto-sleep-timeout-minutes` | plugin → consumers | **yes** | `integer` (default `5`) |
+| Topic                                                   | Direction          | Retained | Payload                                                            |
+| ------------------------------------------------------- | ------------------ | -------- | ------------------------------------------------------------------ |
+| `renewvan/kiosk/display/power/set`                      | dashboard → plugin | no       | `"on"` or `"off"`                                                  |
+| `renewvan/kiosk/display/power`                          | plugin → consumers | **yes**  | `"on"` or `"off"`                                                  |
+| `renewvan/kiosk/display/brightness/set`                 | dashboard → plugin | no       | `integer` 0–100 (normalized, rescaled to the panel's native range) |
+| `renewvan/kiosk/display/brightness`                     | plugin → consumers | **yes**  | `integer` 0–100                                                    |
+| `renewvan/kiosk/display/auto-sleep-enabled/set`         | dashboard → plugin | no       | `boolean`                                                          |
+| `renewvan/kiosk/display/auto-sleep-enabled`             | plugin → consumers | **yes**  | `boolean` (default `false`)                                        |
+| `renewvan/kiosk/display/auto-sleep-timeout-minutes/set` | dashboard → plugin | no       | `integer`, one of `1`/`5`/`15`/`30`                                |
+| `renewvan/kiosk/display/auto-sleep-timeout-minutes`     | plugin → consumers | **yes**  | `integer` (default `5`)                                            |
 
 Payload schemas: `schema/kiosk-display-{power,brightness,auto-sleep-enabled,auto-sleep-timeout-minutes}.schema.json`.
 
 `power/set` applies unconditionally regardless of who sent it — there is no
 remote/local distinction on sleep commands. There used to be a
-remote-sleep-allowed gate restricting *remote* `off` commands; it was
+remote-sleep-allowed gate restricting _remote_ `off` commands; it was
 removed (see `docs/kiosk-display-sleep-wake.md`'s Design decisions) once
 sleeping the display stopped having any visible effect on any dashboard
 viewer at all — local or remote (the dashboard's old sleeping overlay is
@@ -66,16 +66,16 @@ sudo chmod +x /etc/xdg/labwc/autostart
 
 All config via environment variables — set them in the systemd unit's `[Service]` block or in `/etc/renewvan/node-kiosk.env`:
 
-| Variable | Default | Description |
-|---|---|---|
-| `MQTT_HOST` | `localhost` | MQTT broker hostname |
-| `MQTT_PORT` | `1883` | MQTT broker port |
-| `MQTT_USERNAME` | _(empty)_ | Broker username |
-| `MQTT_PASSWORD` | _(empty)_ | Broker password |
-| `DISPLAY_ON_CMD` | `vcgencmd display_power 1` | Command to power display on |
-| `DISPLAY_OFF_CMD` | `vcgencmd display_power 0` | Command to power display off |
-| `DISPLAY_QUERY_CMD` | `vcgencmd display_power` | Command to read current state (stdout parsed for `display_power=0/1`) |
-| `BRIGHTNESS_DEVICE` | _(auto-detect)_ | `/sys/class/backlight/<id>` directory; auto-detects the first backlight device if unset |
+| Variable            | Default                    | Description                                                                             |
+| ------------------- | -------------------------- | --------------------------------------------------------------------------------------- |
+| `MQTT_HOST`         | `localhost`                | MQTT broker hostname                                                                    |
+| `MQTT_PORT`         | `1883`                     | MQTT broker port                                                                        |
+| `MQTT_USERNAME`     | _(empty)_                  | Broker username                                                                         |
+| `MQTT_PASSWORD`     | _(empty)_                  | Broker password                                                                         |
+| `DISPLAY_ON_CMD`    | `vcgencmd display_power 1` | Command to power display on                                                             |
+| `DISPLAY_OFF_CMD`   | `vcgencmd display_power 0` | Command to power display off                                                            |
+| `DISPLAY_QUERY_CMD` | `vcgencmd display_power`   | Command to read current state (stdout parsed for `display_power=0/1`)                   |
+| `BRIGHTNESS_DEVICE` | _(auto-detect)_            | `/sys/class/backlight/<id>` directory; auto-detects the first backlight device if unset |
 
 ### Wayland fallback
 

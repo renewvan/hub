@@ -14,7 +14,7 @@ Unlike `docs/adr/0005-remove-level-pct-smoothed.md` (which explicitly kept this 
 
 ## Why this is an ADR
 
-Hard to reverse: schema v0.3 made these required fields; removing them is a breaking wire change any lagging consumer would need to handle, and re-adding them later means redoing the edge-tracking rate logic node-tank had already built and tested. Surprising without context: `docs/adr/0005` explicitly argued for *keeping* this machinery on the grounds these fields had "their own consumers" — a reader needs this ADR to know that assumption turned out false and the field was removed anyway. Result of a real trade-off: the fields weren't broken, they were confirmed unused and traded away for a leaner schema.
+Hard to reverse: schema v0.3 made these required fields; removing them is a breaking wire change any lagging consumer would need to handle, and re-adding them later means redoing the edge-tracking rate logic node-tank had already built and tested. Surprising without context: `docs/adr/0005` explicitly argued for _keeping_ this machinery on the grounds these fields had "their own consumers" — a reader needs this ADR to know that assumption turned out false and the field was removed anyway. Result of a real trade-off: the fields weren't broken, they were confirmed unused and traded away for a leaner schema.
 
 ## See also
 

@@ -10,10 +10,10 @@ Both the command and state topics share the [`kiosk-display-power`
 schema](../schema/kiosk-display-power.schema.json): a plain JSON string,
 either `"on"` or `"off"`.
 
-| Topic | Direction | Retained | Description |
-|---|---|---|---|
-| `renewvan/kiosk/display/power` | kiosk plugin → consumers | **yes** | Current display power state, published after each successful command execution. Initialised from the live `vcgencmd` reading on startup. |
-| `renewvan/kiosk/display/power/set` | dashboard → kiosk plugin | no | Command: `"on"` or `"off"`. The kiosk plugin executes the OS-level call and publishes the result to the state topic only on success. |
+| Topic                              | Direction                | Retained | Description                                                                                                                              |
+| ---------------------------------- | ------------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `renewvan/kiosk/display/power`     | kiosk plugin → consumers | **yes**  | Current display power state, published after each successful command execution. Initialised from the live `vcgencmd` reading on startup. |
+| `renewvan/kiosk/display/power/set` | dashboard → kiosk plugin | no       | Command: `"on"` or `"off"`. The kiosk plugin executes the OS-level call and publishes the result to the state topic only on success.     |
 
 The `kiosk` segment is a new domain on the renewvan bus, sitting alongside
 `tank`, `battery`, and `relay`. The `display/power` leaf is the only topic
@@ -96,7 +96,7 @@ alternative mechanism would be needed.
   sleep/wake remains available regardless.
 - **Remote-sleep-allowed gate — added, then removed.** A node-enforced
   toggle (`renewvan/kiosk/display/remote-sleep-allowed`, default `true`)
-  originally let a user disable *remote* (dashboard/MQTT) sleep commands
+  originally let a user disable _remote_ (dashboard/MQTT) sleep commands
   while the host itself could always be put to sleep by whoever has shell
   access. Removed once two things were true at the same time: (1) `"off"`
   no longer has any visible effect on any dashboard viewer at all —
