@@ -10,6 +10,10 @@ While this repository itself does not host the source code for microservices (ta
 
 For deployment changes specific to this host repo, bump a service by editing its `image:` tag directly in `docker-compose.yml` — that is the single git-tracked source of truth, not `.env`. Don't add a Dockerfile or local build step for them here.
 
+### Code formatting/linting (new repo? read this first)
+
+Every `renewvan/*` repo formats/lints on every commit via a pre-commit hook — never CI-only. Per `docs/adr/0007-per-language-formatting-linting-convention.md`: Prettier (or Biome, where already adopted) + oxlint for JS/TS, ruff for Python, enforced via `husky`+`lint-staged` (JS/TS) or the `pre-commit` framework (Python/config-only repos). Starting a new repo: copy the setup from the nearest sibling of the same language (`renewvan/dashboard` for JS/TS, `renewvan/node-tank` for Python) rather than designing it from scratch.
+
 ## Verify
 
 `./schema/validate-examples.sh` validates every fixture under `schema/examples/` against its entity's JSON Schema (`*.valid.json` must pass, `*.invalid.json` must fail). Run after any schema change.
