@@ -70,7 +70,7 @@ services:
   # Needs I2C device passthrough for the ADS1115; layered config.ini
   # override lives on the bind-mounted host path below.
   node-tank:
-    image: ghcr.io/renewvan/node-tank:v0.7.1
+    image: ghcr.io/renewvan/node-tank:v0.8.0
     container_name: renewvan-tank
     restart: unless-stopped
     depends_on:
