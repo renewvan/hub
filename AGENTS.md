@@ -2,9 +2,13 @@
 
 Open-source, vendor-agnostic campervan control hub (MQTT broker + shared device-model schema + deployment compose). See `CONTEXT.md` for domain vocabulary, `README.md` for install, `docs/architecture.md` for the layered design.
 
-## Scope boundary
+## Scope Boundary &amp; Multi-Repo Coordination
 
-This repo hosts schema, deployment compose, docs, and `plugins/` — host-level Pi integrations that run as systemd services outside Docker (e.g. kiosk display power bridge, tailscale status). It never hosts node/logger/dashboard source: `tank`, `battery`, `logger`, `dashboard` in `docker-compose.yml` are pinned, independently-published images from their own `renewvan/*` repos, never built locally (see `docs/adr/0001-compose-services-via-pinned-images-not-git-submodules.md`). Don't add a Dockerfile or build step for them here; bump a service by editing its `image:` tag directly in `docker-compose.yml` instead — that's the single git-tracked source of truth, not `.env`.
+This repo hosts schema, deployment compose, docs, and `plugins/` — host-level Pi integrations that run as systemd services outside Docker (e.g., kiosk display power bridge, tailscale status).
+
+While this repository itself does not host the source code for microservices (tank, battery, logger, and dashboard in `docker-compose.yml` use pinned, independently-published images from their respective `renewvan/*` repos per `docs/adr/[0001-compose-services-via-pinned-images-not-git-submodules.md](http://0001-compose-services-via-pinned-images-not-git-submodules.md)`), **agents are not restricted from working across repositories if the context or task involves them.** If a bugfix or feature spans frontend dashboard behavior, node logic, or backend services, you may navigate to and work within the relevant `renewvan/*` source repository when available in the workspace, rather than treating this host repository boundary as a blanket refusal.
+
+For deployment changes specific to this host repo, bump a service by editing its `image:` tag directly in `docker-compose.yml` — that is the single git-tracked source of truth, not `.env`. Don't add a Dockerfile or local build step for them here.
 
 ## Verify
 

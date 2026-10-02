@@ -1,0 +1,31 @@
+#!/bin/sh
+# renewvan kiosk — waits for the dashboard nginx to be ready before launching
+# Chromium so a boot-order race never parks the kiosk on a connection-refused page.
+#
+# Install: copy to /etc/xdg/labwc/autostart on the Pi (system-wide, not the
+# per-user file — labwc runs both, and only the system file suppresses the
+# default desktop's panel/file-manager icons). See plugins/kiosk/README.md.
+#
+# The ?kioskHost=1 query param on the dashboard URL is load-bearing: it's
+# how the dashboard (renewvan/dashboard, src/lib/kioskHost.ts) tells this
+# specific browser instance apart from any other device viewing the same
+# dashboard over the LAN/Tailscale (hostname can't do this -- "localhost"
+# means "this device" on a remote dev machine too). Keep this in sync with
+# the URL bin/deploy.sh uses to relaunch Chromium after a deploy.
+i=0
+until curl -sf -o /dev/null http://localhost || [ "$i" -ge 60 ]; do
+  i=$((i + 1))
+  sleep 1
+done
+chromium \
+  --kiosk \
+  --password-store=basic \
+  --noerrdialogs \
+  --disable-infobars \
+  --disable-session-crashed-bubble \
+  --disable-translate \
+  --disable-pinch \
+  --overscroll-history-navigation=0 \
+  --check-for-update-interval=31536000 \
+  --no-first-run \
+  'http://localhost/?kioskHost=1' &

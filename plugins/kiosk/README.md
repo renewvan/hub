@@ -50,6 +50,14 @@ pip3 install -r /opt/renewvan/plugins/kiosk/requirements.txt
 sudo cp plugins/kiosk/renewvan-node-kiosk.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now renewvan-node-kiosk.service
+
+# 4. Install the boot-time Chromium kiosk launcher. System-wide, not the
+#    per-user labwc autostart file — labwc runs both, and only the system
+#    file suppresses the default desktop's panel/file-manager icons.
+#    bin/deploy.sh relaunches Chromium after every deploy with the same
+#    URL; this file only matters for a cold boot/reflash.
+sudo cp plugins/kiosk/labwc-autostart /etc/xdg/labwc/autostart
+sudo chmod +x /etc/xdg/labwc/autostart
 ```
 
 ## Configuration
