@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-renewvan/node-kiosk — display power bridge, brightness control, and
-auto-sleep idle timer.
+renewvan kiosk plugin (plugins/kiosk) — display power bridge, brightness
+control, and auto-sleep idle timer. Systemd service `renewvan-node-kiosk`.
 
 ## Display power
 
@@ -9,9 +9,9 @@ Subscribes to  renewvan/kiosk/display/power/set  ("on" | "off").
 Executes the configured display-power command (default: wlopm --off/--on DSI-1).
 Publishes the resulting state retained to  renewvan/kiosk/display/power.
 
-On startup the node probes the display-power command to read the current state
-and publishes it as the initial retained value, so the bus always reflects
-hardware reality rather than the last command.
+On startup the plugin probes the display-power command to read the current
+state and publishes it as the initial retained value, so the bus always
+reflects hardware reality rather than the last command.
 
 ## Brightness
 
@@ -27,9 +27,9 @@ display-power startup probe.
 
 Subscribes to  renewvan/kiosk/display/auto-sleep-enabled/set  (boolean) and
 renewvan/kiosk/display/auto-sleep-timeout-minutes/set  (integer, one of
-1/5/15/30). When enabled, the node tracks touch activity on the same evdev
+1/5/15/30). When enabled, the plugin tracks touch activity on the same evdev
 touch device already used for touch-to-wake; once the configured number of
-idle minutes elapses with the display on, the node sleeps the display
+idle minutes elapses with the display on, the plugin sleeps the display
 itself (a host-local decision, not a remote command). Both settings default
 to disabled/5 if no retained value exists on startup.
 
@@ -37,12 +37,12 @@ to disabled/5 if no retained value exists on startup.
 
 Touch-to-wake: a background thread monitors the raw evdev touch device
 (TOUCH_DEVICE, default: auto-detected). When a TOUCH_DOWN event arrives while
-the display is off, the node publishes "on" to the command topic — same as a
+the display is off, the plugin publishes "on" to the command topic — same as a
 manual wake from the dashboard. This works even under wlopm where Wayland gates
 input to Chromium clients when the output is powered off. Every touch event
 (not just while sleeping) also resets the auto-sleep idle clock.
 
-If a display-power/brightness command is unavailable the node logs an error,
+If a display-power/brightness command is unavailable the plugin logs an error,
 publishes nothing for that property, and continues — the dashboard and
 broker are unaffected.
 
@@ -433,7 +433,7 @@ def auto_sleep_thread(
     flips the origin back to "local", so the feature still protects the
     screen once someone is actually at the van and walks away.
 
-    This is the node deciding to sleep itself, not honoring a remote
+    This is the plugin deciding to sleep itself, not honoring a remote
     command — manual sleep (on/off) is unconditional, see
     _handle_power_set.
     """

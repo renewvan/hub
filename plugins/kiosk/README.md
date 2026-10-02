@@ -1,4 +1,4 @@
-# renewvan/node-kiosk
+# plugins/kiosk
 
 Display power bridge for the kiosk Pi: display sleep/wake, brightness, and
 an idle-based auto-sleep timer.
@@ -7,14 +7,14 @@ an idle-based auto-sleep timer.
 
 | Topic | Direction | Retained | Payload |
 |---|---|---|---|
-| `renewvan/kiosk/display/power/set` | dashboard → node | no | `"on"` or `"off"` |
-| `renewvan/kiosk/display/power` | node → consumers | **yes** | `"on"` or `"off"` |
-| `renewvan/kiosk/display/brightness/set` | dashboard → node | no | `integer` 0–100 (normalized, rescaled to the panel's native range) |
-| `renewvan/kiosk/display/brightness` | node → consumers | **yes** | `integer` 0–100 |
-| `renewvan/kiosk/display/auto-sleep-enabled/set` | dashboard → node | no | `boolean` |
-| `renewvan/kiosk/display/auto-sleep-enabled` | node → consumers | **yes** | `boolean` (default `false`) |
-| `renewvan/kiosk/display/auto-sleep-timeout-minutes/set` | dashboard → node | no | `integer`, one of `1`/`5`/`15`/`30` |
-| `renewvan/kiosk/display/auto-sleep-timeout-minutes` | node → consumers | **yes** | `integer` (default `5`) |
+| `renewvan/kiosk/display/power/set` | dashboard → plugin | no | `"on"` or `"off"` |
+| `renewvan/kiosk/display/power` | plugin → consumers | **yes** | `"on"` or `"off"` |
+| `renewvan/kiosk/display/brightness/set` | dashboard → plugin | no | `integer` 0–100 (normalized, rescaled to the panel's native range) |
+| `renewvan/kiosk/display/brightness` | plugin → consumers | **yes** | `integer` 0–100 |
+| `renewvan/kiosk/display/auto-sleep-enabled/set` | dashboard → plugin | no | `boolean` |
+| `renewvan/kiosk/display/auto-sleep-enabled` | plugin → consumers | **yes** | `boolean` (default `false`) |
+| `renewvan/kiosk/display/auto-sleep-timeout-minutes/set` | dashboard → plugin | no | `integer`, one of `1`/`5`/`15`/`30` |
+| `renewvan/kiosk/display/auto-sleep-timeout-minutes` | plugin → consumers | **yes** | `integer` (default `5`) |
 
 Payload schemas: `schema/kiosk-display-{power,brightness,auto-sleep-enabled,auto-sleep-timeout-minutes}.schema.json`.
 
@@ -88,7 +88,7 @@ DISPLAY_OFF_CMD=wlopm --off '*'
 DISPLAY_QUERY_CMD=wlopm
 ```
 
-`wlopm` with no arguments lists outputs and their power state; the node logs the raw output and marks state unknown (no retained publish) — supply a wrapper script if state initialisation matters for your setup.
+`wlopm` with no arguments lists outputs and their power state; the plugin logs the raw output and marks state unknown (no retained publish) — supply a wrapper script if state initialisation matters for your setup.
 
 ## Logs
 
