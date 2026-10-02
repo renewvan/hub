@@ -12,14 +12,14 @@ either `"on"` or `"off"`.
 
 | Topic | Direction | Retained | Description |
 |---|---|---|---|
-| `renewvan/kiosk/display/power` | kiosk node → consumers | **yes** | Current display power state, published after each successful command execution. Initialised from the live `vcgencmd` reading on node startup. |
-| `renewvan/kiosk/display/power/set` | dashboard → kiosk node | no | Command: `"on"` or `"off"`. The kiosk node executes the OS-level call and publishes the result to the state topic only on success. |
+| `renewvan/kiosk/display/power` | kiosk plugin → consumers | **yes** | Current display power state, published after each successful command execution. Initialised from the live `vcgencmd` reading on startup. |
+| `renewvan/kiosk/display/power/set` | dashboard → kiosk plugin | no | Command: `"on"` or `"off"`. The kiosk plugin executes the OS-level call and publishes the result to the state topic only on success. |
 
 The `kiosk` segment is a new domain on the renewvan bus, sitting alongside
 `tank`, `battery`, and `relay`. The `display/power` leaf is the only topic
 defined so far; the namespace is reserved for future kiosk-specific topics.
 
-## Kiosk node (`renewvan/node-kiosk`)
+## Kiosk plugin (`plugins/kiosk`, systemd service `renewvan-node-kiosk`)
 
 A small process running on the Pi host **outside** the Docker compose stack
 (it needs direct access to `vcgencmd` and the GPU firmware mailbox, which
@@ -34,9 +34,9 @@ systemd service.
 - On `"on"`: run `vcgencmd display_power 1`; publish `"on"` retained on
   success.
 - At startup: probe `vcgencmd display_power` (no-arg call reads current
-  state). If unavailable, log an error and continue — the node must not crash
-  the dashboard or block the broker. If available, publish the current state
-  retained so the topic reflects reality after a node restart.
+  state). If unavailable, log an error and continue — the plugin must not
+  crash the dashboard or block the broker. If available, publish the
+  current state retained so the topic reflects reality after a restart.
 
 ### Pluggable command
 
@@ -46,7 +46,7 @@ config change, not a code change.
 
 ### Systemd sequencing
 
-The kiosk node's unit must declare `After=mosquitto.service` (or the compose
+The kiosk plugin's systemd unit must declare `After=mosquitto.service` (or the compose
 service that surfaces the broker) to avoid the same boot-order race documented
 in `docs/pi-agent-sudo-setup.md` and resolved for Chromium in the
 `07-kiosk-power-loss-recovery` ticket.
