@@ -1,16 +1,14 @@
 # renewvan/node-kiosk
 
-Display power bridge for the kiosk Pi: display sleep/wake, brightness, a
-remote-sleep-allowed gate, and an idle-based auto-sleep timer.
+Display power bridge for the kiosk Pi: display sleep/wake, brightness, and
+an idle-based auto-sleep timer.
 
 ## MQTT
 
 | Topic | Direction | Retained | Payload |
 |---|---|---|---|
-| `renewvan/kiosk/display/power/set` | dashboard → node | no | `"on"` or `"off"` (`off` rejected when the gate below is disabled, unless the command arrives within `LOCAL_COMMAND_GRACE_S` of a physical touch — see below) |
+| `renewvan/kiosk/display/power/set` | dashboard → node | no | `"on"` or `"off"` |
 | `renewvan/kiosk/display/power` | node → consumers | **yes** | `"on"` or `"off"` |
-| `renewvan/kiosk/display/remote-sleep-allowed/set` | dashboard → node | no | `boolean` |
-| `renewvan/kiosk/display/remote-sleep-allowed` | node → consumers | **yes** | `boolean` (default `true`) |
 | `renewvan/kiosk/display/brightness/set` | dashboard → node | no | `integer` 0–100 (normalized, rescaled to the panel's native range) |
 | `renewvan/kiosk/display/brightness` | node → consumers | **yes** | `integer` 0–100 |
 | `renewvan/kiosk/display/auto-sleep-enabled/set` | dashboard → node | no | `boolean` |
@@ -18,23 +16,27 @@ remote-sleep-allowed gate, and an idle-based auto-sleep timer.
 | `renewvan/kiosk/display/auto-sleep-timeout-minutes/set` | dashboard → node | no | `integer`, one of `1`/`5`/`15`/`30` |
 | `renewvan/kiosk/display/auto-sleep-timeout-minutes` | node → consumers | **yes** | `integer` (default `5`) |
 
-Payload schemas: `schema/kiosk-display-{power,remote-sleep-allowed,brightness,auto-sleep-enabled,auto-sleep-timeout-minutes}.schema.json`.
+Payload schemas: `schema/kiosk-display-{power,brightness,auto-sleep-enabled,auto-sleep-timeout-minutes}.schema.json`.
 
-The remote-sleep-allowed gate restricts `off` commands arriving over MQTT —
-but only ones with no local provenance. `power/set` has no origin field
-(the same dashboard code runs whether loaded in the van's own kiosk
-Chromium or on a remote phone), so a physical touch on the host screen
-within `LOCAL_COMMAND_GRACE_S` (3s) of the command is treated as proof it
-came from someone physically at the van, and bypasses the gate — the gate
-exists to stop a remote device sleeping the display out from under someone
-standing at it, never to stop the host sleeping itself. Waking (`on`) is
-never gated, and the auto-sleep timer (below) sleeps the display itself
-independent of this gate — it's a host-local decision, not a remote
-command.
+`power/set` applies unconditionally regardless of who sent it — there is no
+remote/local distinction on sleep commands. There used to be a
+remote-sleep-allowed gate restricting *remote* `off` commands; it was
+removed (see `docs/kiosk-display-sleep-wake.md`'s Design decisions) once
+sleeping the display stopped having any visible effect on any dashboard
+viewer at all — local or remote (the dashboard's old sleeping overlay is
+also gone, for the same reason: redundant with the backlight physically
+cutting). A gate that only ever inconvenienced the legitimate dashboard
+UI, while anyone who wanted to bypass it could just flip the same toggle
+back on from Settings on the same remote device, wasn't protecting
+anything.
 
 Auto-sleep reuses the same evdev touch device as touch-to-wake as its idle
 clock: any touch (not just a waking one) resets it. When enabled, the
-display sleeps itself after the configured idle minutes with no touch.
+display sleeps itself after the configured idle minutes with no touch —
+but only for a session a physical touch originated (see
+`_display_on_origin` in `node_kiosk.py`): a remote wake never triggers
+auto-sleep on its own, so leaving the dashboard open remotely doesn't
+fight the idle timer.
 
 ## Install (Pi)
 

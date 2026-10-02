@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-renewvan/node-kiosk — display power bridge, brightness control, remote-sleep
-gate, and auto-sleep idle timer.
+renewvan/node-kiosk — display power bridge, brightness control, and
+auto-sleep idle timer.
 
 ## Display power
 
@@ -12,17 +12,6 @@ Publishes the resulting state retained to  renewvan/kiosk/display/power.
 On startup the node probes the display-power command to read the current state
 and publishes it as the initial retained value, so the bus always reflects
 hardware reality rather than the last command.
-
-## Remote-sleep-allowed gate
-
-Subscribes to  renewvan/kiosk/display/remote-sleep-allowed/set  (boolean).
-When this gate is false, an incoming "off" command on the power/set topic is
-rejected (logged, no-op) — the hardware/host can always be put to sleep by
-whoever has shell access, but a remote/browser command cannot unless the gate
-is open. Waking ("on") is never gated. Enforced here, not just hidden in the
-dashboard UI, since a browser-side-only gate is trivially bypassed by anyone
-who can publish MQTT directly. Defaults to true (allowed) if no retained
-value exists on startup.
 
 ## Brightness
 
@@ -41,9 +30,8 @@ renewvan/kiosk/display/auto-sleep-timeout-minutes/set  (integer, one of
 1/5/15/30). When enabled, the node tracks touch activity on the same evdev
 touch device already used for touch-to-wake; once the configured number of
 idle minutes elapses with the display on, the node sleeps the display
-itself — independent of the remote-sleep-allowed gate (this is a host-local
-decision, not a remote command). Both settings default to disabled/5 if no
-retained value exists on startup.
+itself (a host-local decision, not a remote command). Both settings default
+to disabled/5 if no retained value exists on startup.
 
 ## Touch-to-wake
 
@@ -102,9 +90,6 @@ BRIGHTNESS_DEVICE = os.environ.get("BRIGHTNESS_DEVICE", "")
 TOPIC_STATE = "renewvan/kiosk/display/power"
 TOPIC_SET = "renewvan/kiosk/display/power/set"
 
-TOPIC_REMOTE_SLEEP_ALLOWED_STATE = "renewvan/kiosk/display/remote-sleep-allowed"
-TOPIC_REMOTE_SLEEP_ALLOWED_SET = "renewvan/kiosk/display/remote-sleep-allowed/set"
-
 TOPIC_BRIGHTNESS_STATE = "renewvan/kiosk/display/brightness"
 TOPIC_BRIGHTNESS_SET = "renewvan/kiosk/display/brightness/set"
 
@@ -117,7 +102,6 @@ TOPIC_AUTO_SLEEP_TIMEOUT_SET = "renewvan/kiosk/display/auto-sleep-timeout-minute
 VALID_PAYLOADS = {"on", "off"}
 AUTO_SLEEP_TIMEOUT_CHOICES = {1, 5, 15, 30}
 
-DEFAULT_REMOTE_SLEEP_ALLOWED = True
 DEFAULT_AUTO_SLEEP_ENABLED = False
 DEFAULT_AUTO_SLEEP_TIMEOUT_MINUTES = 5
 
@@ -128,17 +112,6 @@ DEFAULT_AUTO_SLEEP_TIMEOUT_MINUTES = 5
 RETAINED_PROBE_WINDOW_S = 2.0
 
 AUTO_SLEEP_POLL_INTERVAL_S = 5.0
-
-# A power/set command arriving within this many seconds of the last physical
-# touch is treated as host-local (same signal _display_on_origin uses for
-# wakes) and bypasses the remote-sleep-allowed gate. power/set carries no
-# origin field — the same dashboard code runs whether loaded in the van's
-# own kiosk Chromium or on a remote phone, so a touch immediately before the
-# command is the only available "this request came from someone physically
-# at the van" signal. Generous vs. typical same-LAN tap-to-MQTT latency
-# (tens of ms), tight vs. plausible coincidence with an unrelated remote
-# command.
-LOCAL_COMMAND_GRACE_S = 3.0
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -460,8 +433,9 @@ def auto_sleep_thread(
     flips the origin back to "local", so the feature still protects the
     screen once someone is actually at the van and walks away.
 
-    Independent of the remote-sleep-allowed gate — this is the node
-    deciding to sleep itself, not honoring a remote command.
+    This is the node deciding to sleep itself, not honoring a remote
+    command — manual sleep (on/off) is unconditional, see
+    _handle_power_set.
     """
     while True:
         time.sleep(AUTO_SLEEP_POLL_INTERVAL_S)
@@ -480,7 +454,6 @@ def auto_sleep_thread(
 # ---------------------------------------------------------------------------
 
 _display_off = False
-_remote_sleep_allowed = DEFAULT_REMOTE_SLEEP_ALLOWED
 _auto_sleep_enabled = DEFAULT_AUTO_SLEEP_ENABLED
 _auto_sleep_timeout_minutes = DEFAULT_AUTO_SLEEP_TIMEOUT_MINUTES
 _last_touch_monotonic = time.monotonic()
@@ -497,7 +470,6 @@ _display_on_origin = "local"
 # Set True the moment a retained message is observed on each "soft" state
 # topic (no hardware readback exists for these, unlike power/brightness), so
 # the post-subscribe default-publish timer knows whether one already exists.
-_got_remote_sleep_retained = False
 _got_auto_sleep_enabled_retained = False
 _got_auto_sleep_timeout_retained = False
 
@@ -509,11 +481,7 @@ def _publish_missing_defaults(client: mqtt.Client) -> None:
     same self-healing intent as the display-power startup probe, just
     without a hardware read to fall back on.
     """
-    global _remote_sleep_allowed, _auto_sleep_enabled, _auto_sleep_timeout_minutes
-    if not _got_remote_sleep_retained:
-        _remote_sleep_allowed = DEFAULT_REMOTE_SLEEP_ALLOWED
-        client.publish(TOPIC_REMOTE_SLEEP_ALLOWED_STATE, payload=json.dumps(DEFAULT_REMOTE_SLEEP_ALLOWED), qos=1, retain=True)
-        log.info("No retained remote-sleep-allowed — published default %s", DEFAULT_REMOTE_SLEEP_ALLOWED)
+    global _auto_sleep_enabled, _auto_sleep_timeout_minutes
     if not _got_auto_sleep_enabled_retained:
         _auto_sleep_enabled = DEFAULT_AUTO_SLEEP_ENABLED
         client.publish(TOPIC_AUTO_SLEEP_ENABLED_STATE, payload=json.dumps(DEFAULT_AUTO_SLEEP_ENABLED), qos=1, retain=True)
@@ -533,8 +501,6 @@ def on_connect(client: mqtt.Client, userdata, flags, rc, properties=None):
 
     for topic in (
         TOPIC_SET,
-        TOPIC_REMOTE_SLEEP_ALLOWED_STATE,
-        TOPIC_REMOTE_SLEEP_ALLOWED_SET,
         TOPIC_BRIGHTNESS_SET,
         TOPIC_AUTO_SLEEP_ENABLED_STATE,
         TOPIC_AUTO_SLEEP_ENABLED_SET,
@@ -592,11 +558,6 @@ def _handle_power_set(client: mqtt.Client, payload: str) -> None:
     if payload not in VALID_PAYLOADS:
         log.warning("Invalid payload %r on %s — ignoring", payload, TOPIC_SET)
         return
-    if payload == "off":
-        is_local = (time.monotonic() - _last_touch_monotonic) <= LOCAL_COMMAND_GRACE_S
-        if not is_local and (not _got_remote_sleep_retained or not _remote_sleep_allowed):
-            log.warning("Remote sleep rejected — remote-sleep-allowed gate is disabled or not yet confirmed")
-            return
     log.info("Received power command: %s", payload)
     if payload == "on":
         _apply_power_on(client, origin="remote")
@@ -625,8 +586,8 @@ def _handle_brightness_set(client: mqtt.Client, raw: bytes) -> None:
 
 
 def on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
-    global _remote_sleep_allowed, _auto_sleep_enabled, _auto_sleep_timeout_minutes
-    global _got_remote_sleep_retained, _got_auto_sleep_enabled_retained, _got_auto_sleep_timeout_retained
+    global _auto_sleep_enabled, _auto_sleep_timeout_minutes
+    global _got_auto_sleep_enabled_retained, _got_auto_sleep_timeout_retained
 
     topic = msg.topic
 
@@ -641,25 +602,6 @@ def on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
 
     if topic == TOPIC_BRIGHTNESS_SET:
         _handle_brightness_set(client, msg.payload)
-        return
-
-    if topic == TOPIC_REMOTE_SLEEP_ALLOWED_STATE:
-        # Our own retained state, echoed back — just confirms one exists.
-        _got_remote_sleep_retained = True
-        value = _parse_bool_payload(msg.payload)
-        if value is not None:
-            _remote_sleep_allowed = value
-        return
-
-    if topic == TOPIC_REMOTE_SLEEP_ALLOWED_SET:
-        value = _parse_bool_payload(msg.payload)
-        if value is None:
-            log.warning("Invalid remote-sleep-allowed payload %r — ignoring", msg.payload)
-            return
-        _remote_sleep_allowed = value
-        _got_remote_sleep_retained = True
-        client.publish(TOPIC_REMOTE_SLEEP_ALLOWED_STATE, payload=json.dumps(value), qos=1, retain=True)
-        log.info("remote-sleep-allowed set to %s", value)
         return
 
     if topic == TOPIC_AUTO_SLEEP_ENABLED_STATE:
@@ -757,8 +699,8 @@ def main():
         _display_on_origin = "local"
 
     def _trigger_auto_sleep():
-        """Called from the auto-sleep thread; sleeps the display directly,
-        bypassing the remote-sleep-allowed gate (host-local decision)."""
+        """Called from the auto-sleep thread; sleeps the display directly
+        (host-local decision)."""
         global _display_off
         if set_display("off"):
             _display_off = True

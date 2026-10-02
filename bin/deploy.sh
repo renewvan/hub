@@ -102,7 +102,7 @@ ssh "${HOST}" "
     --overscroll-history-navigation=0 \
     --check-for-update-interval=31536000 \
     --no-first-run \
-    'http://localhost/?kioskHost=1' >/dev/null 2>&1 &
+    http://localhost >/dev/null 2>&1 &
 "
 
 echo "==> Deploy complete"
