@@ -129,6 +129,17 @@ RETAINED_PROBE_WINDOW_S = 2.0
 
 AUTO_SLEEP_POLL_INTERVAL_S = 5.0
 
+# A power/set command arriving within this many seconds of the last physical
+# touch is treated as host-local (same signal _display_on_origin uses for
+# wakes) and bypasses the remote-sleep-allowed gate. power/set carries no
+# origin field — the same dashboard code runs whether loaded in the van's
+# own kiosk Chromium or on a remote phone, so a touch immediately before the
+# command is the only available "this request came from someone physically
+# at the van" signal. Generous vs. typical same-LAN tap-to-MQTT latency
+# (tens of ms), tight vs. plausible coincidence with an unrelated remote
+# command.
+LOCAL_COMMAND_GRACE_S = 3.0
+
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
@@ -581,9 +592,11 @@ def _handle_power_set(client: mqtt.Client, payload: str) -> None:
     if payload not in VALID_PAYLOADS:
         log.warning("Invalid payload %r on %s — ignoring", payload, TOPIC_SET)
         return
-    if payload == "off" and (not _got_remote_sleep_retained or not _remote_sleep_allowed):
-        log.warning("Remote sleep rejected — remote-sleep-allowed gate is disabled or not yet confirmed")
-        return
+    if payload == "off":
+        is_local = (time.monotonic() - _last_touch_monotonic) <= LOCAL_COMMAND_GRACE_S
+        if not is_local and (not _got_remote_sleep_retained or not _remote_sleep_allowed):
+            log.warning("Remote sleep rejected — remote-sleep-allowed gate is disabled or not yet confirmed")
+            return
     log.info("Received power command: %s", payload)
     if payload == "on":
         _apply_power_on(client, origin="remote")

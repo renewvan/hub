@@ -7,7 +7,7 @@ remote-sleep-allowed gate, and an idle-based auto-sleep timer.
 
 | Topic | Direction | Retained | Payload |
 |---|---|---|---|
-| `renewvan/kiosk/display/power/set` | dashboard → node | no | `"on"` or `"off"` (rejected when `off` and the gate below is disabled) |
+| `renewvan/kiosk/display/power/set` | dashboard → node | no | `"on"` or `"off"` (`off` rejected when the gate below is disabled, unless the command arrives within `LOCAL_COMMAND_GRACE_S` of a physical touch — see below) |
 | `renewvan/kiosk/display/power` | node → consumers | **yes** | `"on"` or `"off"` |
 | `renewvan/kiosk/display/remote-sleep-allowed/set` | dashboard → node | no | `boolean` |
 | `renewvan/kiosk/display/remote-sleep-allowed` | node → consumers | **yes** | `boolean` (default `true`) |
@@ -20,10 +20,17 @@ remote-sleep-allowed gate, and an idle-based auto-sleep timer.
 
 Payload schemas: `schema/kiosk-display-{power,remote-sleep-allowed,brightness,auto-sleep-enabled,auto-sleep-timeout-minutes}.schema.json`.
 
-The remote-sleep-allowed gate only restricts `off` commands arriving over
-MQTT; waking (`on`) is never gated, and the auto-sleep timer (below) sleeps
-the display itself independent of this gate — it's a host-local decision,
-not a remote command.
+The remote-sleep-allowed gate restricts `off` commands arriving over MQTT —
+but only ones with no local provenance. `power/set` has no origin field
+(the same dashboard code runs whether loaded in the van's own kiosk
+Chromium or on a remote phone), so a physical touch on the host screen
+within `LOCAL_COMMAND_GRACE_S` (3s) of the command is treated as proof it
+came from someone physically at the van, and bypasses the gate — the gate
+exists to stop a remote device sleeping the display out from under someone
+standing at it, never to stop the host sleeping itself. Waking (`on`) is
+never gated, and the auto-sleep timer (below) sleeps the display itself
+independent of this gate — it's a host-local decision, not a remote
+command.
 
 Auto-sleep reuses the same evdev touch device as touch-to-wake as its idle
 clock: any touch (not just a waking one) resets it. When enabled, the
