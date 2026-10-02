@@ -1,0 +1,6 @@
+# .scratch is the issue-tracker's local markdown history (docs/agents/issue-tracker.md)
+# -- historical record, not reformatted after the fact.
+.scratch/
+node_modules
+pnpm-lock.yaml
+package-lock.json

@@ -47,7 +47,7 @@ Worked example throughout: `dbus-ads1115` → `renewvan/tank`.
   downstream consumers can detect a dead node, and a persistent
   connection (nodes publish continuously; there's no Venus-OS-style
   "subscriber required to keep publishing" quirk on this side — the
-  *node* is the source, not a re-publisher of someone else's feed).
+  _node_ is the source, not a re-publisher of someone else's feed).
 - **A publish loop** mapping the node's internal readings onto its
   entity's `renewvan/<domain>/<id>/<property>` topics, per the schema in
   [Device-model v0.1 schema](../.scratch/renewvan-hub-v0/issues/01-device-model-v0.1-schema.md).
@@ -57,7 +57,7 @@ Worked example throughout: `dbus-ads1115` → `renewvan/tank`.
   subscriber gets them immediately without waiting for the next change.
   Publish live/frequently-changing fields (e.g. `level_pct`) retained
   too, per ticket 01/04's decision that all v0.1 topics are retained —
-  the distinction that matters is just *how often* a topic is
+  the distinction that matters is just _how often_ a topic is
   republished (identity fields: once at startup, or on config reload;
   live fields: every sensor read/change), not whether it's retained.
 

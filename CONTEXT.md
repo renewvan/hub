@@ -29,7 +29,7 @@ The house battery bank, sourced from Victron's native Venus OS MQTT feed (`N/{po
 _Avoid_: Shunt, BMS (those are the underlying hardware on the Victron side, not this project's entity name).
 
 **Node**:
-Anything that publishes one specific device or feed onto the renewvan bus, normalized into the device model — whether it's firmware on an ESP32 (the relay node) or a process on the Pi (the tank node), and whether it owns the sensing (the tank node's ADS1115 math) or remaps an *existing* external feed (the battery node, remapping Victron's Venus OS MQTT feed onto `renewvan/battery/<id>/...`).
+Anything that publishes one specific device or feed onto the renewvan bus, normalized into the device model — whether it's firmware on an ESP32 (the relay node) or a process on the Pi (the tank node), and whether it owns the sensing (the tank node's ADS1115 math) or remaps an _existing_ external feed (the battery node, remapping Victron's Venus OS MQTT feed onto `renewvan/battery/<id>/...`).
 _Avoid_: Driver (superseded — one term for firmware and process alike), Bridge (a node that remaps an existing feed is still a Node).
 
 **Host**:

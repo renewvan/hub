@@ -1,0 +1,30 @@
+# Per docs/adr/0007-per-language-formatting-linting-convention.md.
+# Install once: `pip install --user pre-commit && pre-commit install`
+# (hooks run in their own isolated envs -- no need to pip/npm install
+# ruff or prettier yourself).
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.9
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  # Official pre-commit/mirrors-prettier is archived and stuck on
+  # Prettier v3.1.0 -- rbubley/mirrors-prettier is the actively
+  # maintained fork that tracks current Prettier releases.
+  - repo: https://github.com/rbubley/mirrors-prettier
+    rev: v3.9.9
+    hooks:
+      - id: prettier
+        types_or: [json, markdown, yaml]
+        exclude: ^\.scratch/
+
+  - repo: local
+    hooks:
+      - id: schema-validate-examples
+        name: validate schema examples
+        entry: ./schema/validate-examples.sh
+        language: system
+        pass_filenames: false
+        files: ^schema/

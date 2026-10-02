@@ -219,7 +219,9 @@ def _resolve_backlight_device() -> str | None:
         if device:
             log.info("Using backlight device %s", device)
         else:
-            log.warning("No backlight device found under /sys/class/backlight — brightness control disabled")
+            log.warning(
+                "No backlight device found under /sys/class/backlight — brightness control disabled"
+            )
         _backlight_device_cache = device
     return _backlight_device_cache
 
@@ -301,8 +303,7 @@ def find_touch_device() -> str | None:
             # caps[EV_ABS] is a list of (code, AbsInfo) tuples — extract codes only
             abs_codes = {code for code, _ in caps.get(evdev.ecodes.EV_ABS, [])}
             has_touch = (
-                evdev.ecodes.ABS_MT_POSITION_X in abs_codes
-                or evdev.ecodes.ABS_X in abs_codes
+                evdev.ecodes.ABS_MT_POSITION_X in abs_codes or evdev.ecodes.ABS_X in abs_codes
             )
             dev.close()
             if has_touch:
@@ -444,7 +445,11 @@ def auto_sleep_thread(
             continue
         idle_s = time.monotonic() - last_touch_monotonic
         if idle_s >= timeout_minutes * 60:
-            log.info("Auto-sleep: idle for %.0fs (timeout %dm) — sleeping display", idle_s, timeout_minutes)
+            log.info(
+                "Auto-sleep: idle for %.0fs (timeout %dm) — sleeping display",
+                idle_s,
+                timeout_minutes,
+            )
             trigger_sleep()
 
 
@@ -484,12 +489,27 @@ def _publish_missing_defaults(client: mqtt.Client) -> None:
     global _auto_sleep_enabled, _auto_sleep_timeout_minutes
     if not _got_auto_sleep_enabled_retained:
         _auto_sleep_enabled = DEFAULT_AUTO_SLEEP_ENABLED
-        client.publish(TOPIC_AUTO_SLEEP_ENABLED_STATE, payload=json.dumps(DEFAULT_AUTO_SLEEP_ENABLED), qos=1, retain=True)
-        log.info("No retained auto-sleep-enabled — published default %s", DEFAULT_AUTO_SLEEP_ENABLED)
+        client.publish(
+            TOPIC_AUTO_SLEEP_ENABLED_STATE,
+            payload=json.dumps(DEFAULT_AUTO_SLEEP_ENABLED),
+            qos=1,
+            retain=True,
+        )
+        log.info(
+            "No retained auto-sleep-enabled — published default %s", DEFAULT_AUTO_SLEEP_ENABLED
+        )
     if not _got_auto_sleep_timeout_retained:
         _auto_sleep_timeout_minutes = DEFAULT_AUTO_SLEEP_TIMEOUT_MINUTES
-        client.publish(TOPIC_AUTO_SLEEP_TIMEOUT_STATE, payload=json.dumps(DEFAULT_AUTO_SLEEP_TIMEOUT_MINUTES), qos=1, retain=True)
-        log.info("No retained auto-sleep-timeout-minutes — published default %s", DEFAULT_AUTO_SLEEP_TIMEOUT_MINUTES)
+        client.publish(
+            TOPIC_AUTO_SLEEP_TIMEOUT_STATE,
+            payload=json.dumps(DEFAULT_AUTO_SLEEP_TIMEOUT_MINUTES),
+            qos=1,
+            retain=True,
+        )
+        log.info(
+            "No retained auto-sleep-timeout-minutes — published default %s",
+            DEFAULT_AUTO_SLEEP_TIMEOUT_MINUTES,
+        )
 
 
 def on_connect(client: mqtt.Client, userdata, flags, rc, properties=None):
@@ -618,7 +638,9 @@ def on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
             return
         _auto_sleep_enabled = value
         _got_auto_sleep_enabled_retained = True
-        client.publish(TOPIC_AUTO_SLEEP_ENABLED_STATE, payload=json.dumps(value), qos=1, retain=True)
+        client.publish(
+            TOPIC_AUTO_SLEEP_ENABLED_STATE, payload=json.dumps(value), qos=1, retain=True
+        )
         log.info("auto-sleep-enabled set to %s", value)
         return
 
@@ -636,7 +658,9 @@ def on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
             return
         _auto_sleep_timeout_minutes = value
         _got_auto_sleep_timeout_retained = True
-        client.publish(TOPIC_AUTO_SLEEP_TIMEOUT_STATE, payload=json.dumps(value), qos=1, retain=True)
+        client.publish(
+            TOPIC_AUTO_SLEEP_TIMEOUT_STATE, payload=json.dumps(value), qos=1, retain=True
+        )
         log.info("auto-sleep-timeout-minutes set to %d", value)
         return
 
@@ -709,7 +733,12 @@ def main():
             log.error("Auto-sleep: failed to set display off")
 
     def _auto_sleep_state():
-        return _auto_sleep_enabled, _auto_sleep_timeout_minutes, _last_touch_monotonic, _display_on_origin
+        return (
+            _auto_sleep_enabled,
+            _auto_sleep_timeout_minutes,
+            _last_touch_monotonic,
+            _display_on_origin,
+        )
 
     touch_thread = threading.Thread(
         target=touch_wake_thread,

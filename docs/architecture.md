@@ -20,16 +20,14 @@ A few terms get used a lot below and across the split-out node repos, so worth p
 
 ## Layered architecture
 
-
-| Layer                     | Components                                                                                                                     | Recommended tech                                                                          |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
-| **Physical devices**      | Batteries/BMS, inverter-charger, MPPT, pumps, heaters, lights, tanks, doors, gas/CO/smoke, vehicle CAN                         | —                                                                                         |
-| **Hosts**                 | Pi (runs Pi-side nodes), ESP32 boards (run ESPHome firmware nodes), wall panels, CAN HAT, ADS1115 breakout | Raspberry Pi 4/5; ESP32/ESP32-C3; MCP2515 HAT or USB-CAN for RV-C; INA226/INA3221 for shunts |
-| **Nodes**                 | ESPHome relay firmware node, tank node (ADS1115 → Pi process), battery node (Victron remap → Pi process), [VE.Direct/VE.Can/VE.Bus](http://VE.Direct/VE.Can/VE.Bus), serial-BMS, BLE sensors, RV-C bridge, Modbus/RS-485, 1-Wire/I2C | ESPHome YAML (firmware); Python node processes (Pi); ADS1115 for analog senders |
-| **Message bus**           | Single broker, retained state, command topics, discovery                                                                       | Mosquitto; topic scheme `renewvan/<domain>/<device>/<property>`; Home Assistant MQTT discovery |
-| **Application services**  | Device registry, automation engine, alarms, logging, config, OTA                                                               | Docker Compose on Pi 4/5; InfluxDB + Grafana for history                                  |
-| **Presentation**          | Kiosk touchscreen, phone/tablet PWA, ESP32 panels, Grafana                                                                     | Web UI over WebSocket/MQTT-over-WS, offline-first                                         |
-
+| Layer                    | Components                                                                                                                                                                                                                           | Recommended tech                                                                               |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| **Physical devices**     | Batteries/BMS, inverter-charger, MPPT, pumps, heaters, lights, tanks, doors, gas/CO/smoke, vehicle CAN                                                                                                                               | —                                                                                              |
+| **Hosts**                | Pi (runs Pi-side nodes), ESP32 boards (run ESPHome firmware nodes), wall panels, CAN HAT, ADS1115 breakout                                                                                                                           | Raspberry Pi 4/5; ESP32/ESP32-C3; MCP2515 HAT or USB-CAN for RV-C; INA226/INA3221 for shunts   |
+| **Nodes**                | ESPHome relay firmware node, tank node (ADS1115 → Pi process), battery node (Victron remap → Pi process), [VE.Direct/VE.Can/VE.Bus](http://VE.Direct/VE.Can/VE.Bus), serial-BMS, BLE sensors, RV-C bridge, Modbus/RS-485, 1-Wire/I2C | ESPHome YAML (firmware); Python node processes (Pi); ADS1115 for analog senders                |
+| **Message bus**          | Single broker, retained state, command topics, discovery                                                                                                                                                                             | Mosquitto; topic scheme `renewvan/<domain>/<device>/<property>`; Home Assistant MQTT discovery |
+| **Application services** | Device registry, automation engine, alarms, logging, config, OTA                                                                                                                                                                     | Docker Compose on Pi 4/5; InfluxDB + Grafana for history                                       |
+| **Presentation**         | Kiosk touchscreen, phone/tablet PWA, ESP32 panels, Grafana                                                                                                                                                                           | Web UI over WebSocket/MQTT-over-WS, offline-first                                              |
 
 ## The unified device model
 
@@ -75,4 +73,3 @@ Two hardware rules matter more than the rest: **never put mains or high-current 
 - An npm/PyPI-style plugin registry so nodes and UI panels are one-command installs
 - A hardware simulator (fake BMS, fake tank, fake CAN traffic on a virtual CAN interface) so contributors can build nodes without a van
 - Remote access via Tailscale rather than custom cloud infrastructure in v1
-

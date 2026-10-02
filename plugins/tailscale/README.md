@@ -10,9 +10,9 @@ Connects the Pi to your [Tailscale](https://tailscale.com) tailnet and publishes
 
 ## MQTT topic
 
-| Topic | Retained | Direction |
-|---|---|---|
-| `renewvan/tailscale/status` | yes | plugin → bus |
+| Topic                       | Retained | Direction    |
+| --------------------------- | -------- | ------------ |
+| `renewvan/tailscale/status` | yes      | plugin → bus |
 
 **Payload** (JSON):
 
@@ -26,13 +26,13 @@ Connects the Pi to your [Tailscale](https://tailscale.com) tailnet and publishes
 }
 ```
 
-| Field | Type | Description |
-|---|---|---|
-| `enabled` | bool | `tailscaled` is running |
-| `connected` | bool | Authenticated and online |
-| `ip` | string \| null | Tailscale IPv4 address |
-| `hostname` | string \| null | Machine name in the tailnet |
-| `peers` | integer | Online peer count |
+| Field       | Type           | Description                 |
+| ----------- | -------------- | --------------------------- |
+| `enabled`   | bool           | `tailscaled` is running     |
+| `connected` | bool           | Authenticated and online    |
+| `ip`        | string \| null | Tailscale IPv4 address      |
+| `hostname`  | string \| null | Machine name in the tailnet |
+| `peers`     | integer        | Online peer count           |
 
 When not connected, `ip` and `hostname` are `null` and `peers` is `0`.
 
@@ -65,9 +65,9 @@ Restart the service after changes: `sudo systemctl restart renewvan-tailscale`
 
 Once connected, all Pi services are reachable at the Tailscale IP:
 
-| Service | URL |
-|---|---|
-| Dashboard | `http://<tailscale-ip>:8080` |
-| SSH | `ssh alexsanzder@<tailscale-ip>` |
-| Grafana | `http://<tailscale-ip>:3000` |
-| MQTT | `<tailscale-ip>:1883` |
+| Service   | URL                              |
+| --------- | -------------------------------- |
+| Dashboard | `http://<tailscale-ip>:8080`     |
+| SSH       | `ssh alexsanzder@<tailscale-ip>` |
+| Grafana   | `http://<tailscale-ip>:3000`     |
+| MQTT      | `<tailscale-ip>:1883`            |

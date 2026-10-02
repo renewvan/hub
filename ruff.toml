@@ -1,0 +1,12 @@
+# hub has no Python package of its own (plugins/ are standalone systemd
+# scripts, not an installable project -- see each plugin's
+# requirements.txt) so this lives at the repo root rather than inside a
+# pyproject.toml. Line-length matches dashboard's Prettier printWidth
+# for cross-repo consistency (docs/adr/0007).
+line-length = 100
+target-version = "py311"
+
+[lint]
+# Defaults (pycodestyle + pyflakes) are enough for these small,
+# dependency-light scripts -- no need to opt into additional rule sets.
+select = ["E", "F", "W"]

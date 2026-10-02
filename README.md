@@ -24,7 +24,7 @@ source of truth, a unified device model for van-specific entities
 
 (batteries, tanks, heaters, pumps, safety sensors), and first-class
 
-bridges *into* the ecosystems that already exist — Venus OS, Home
+bridges _into_ the ecosystems that already exist — Venus OS, Home
 
 Assistant, Signal K, and RV-C — rather than competing with them. Any
 
@@ -54,7 +54,7 @@ Not yet ready for production van use — see \[Roadmap\](#roadmap).
    MQTT-WS URL) — see `.env.example`'s comments for what each value is
    and where it's used.
 2. **Pull and start everything:** `docker compose pull && docker
-   compose up -d`. This brings up the infra layer (Mosquitto, InfluxDB,
+compose up -d`. This brings up the infra layer (Mosquitto, InfluxDB,
    Grafana) alongside `node-tank`, `node-battery`, `logger`, and `dashboard` —
    each a pinned, independently-published image (own repo, own
    release; nothing built from source in `hub`, per
@@ -97,6 +97,7 @@ See \[`/docs/[architecture.md](http://architecture.md)`\](docs/[architecture.md]
 design (edge nodes → drivers → MQTT bus → application services →
 
 presentation).
+
 ## Tips
 
 ### Rotating the display 180° (Official Raspberry Pi 7" Touchscreen v1)

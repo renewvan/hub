@@ -50,13 +50,6 @@
       ]
     }
   },
-  "required": [
-    "soc_pct",
-    "voltage_v",
-    "current_a",
-    "power_w",
-    "temperature_c",
-    "charge_state"
-  ],
+  "required": ["soc_pct", "voltage_v", "current_a", "power_w", "temperature_c", "charge_state"],
   "additionalProperties": false
 }

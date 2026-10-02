@@ -113,9 +113,7 @@ def query_tailscale() -> dict:
     peers = 0
     if connected:
         peers_map = data.get("Peer", {}) or {}
-        peers = sum(
-            1 for p in peers_map.values() if p.get("Online", False)
-        )
+        peers = sum(1 for p in peers_map.values() if p.get("Online", False))
 
     return {
         "enabled": enabled or connected,
@@ -151,7 +149,9 @@ def on_disconnect(client: mqtt.Client, userdata, rc, properties=None):
 
 
 def main():
-    log.info("tailscale plugin starting (broker=%s:%d, poll=%ds)", MQTT_HOST, MQTT_PORT, POLL_INTERVAL)
+    log.info(
+        "tailscale plugin starting (broker=%s:%d, poll=%ds)", MQTT_HOST, MQTT_PORT, POLL_INTERVAL
+    )
 
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     client.on_connect = on_connect
