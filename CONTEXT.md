@@ -1,11 +1,11 @@
 # renewvan Hub
 
-An open-hardware, vendor-agnostic campervan control platform: a unified device model for van hardware (tanks, relays, batteries), published on a single MQTT bus by nodes, consumed by a read-only dashboard and logging. See `review/renewvan-hub-research-report.md` for the full research/architecture rationale, and `.scratch/renewvan-hub-v0/map.md` for the v0 spec effort.
+An open-hardware, vendor-agnostic campervan control platform: a unified device model for van hardware (tanks, relays, batteries, routers), published on a single MQTT bus by nodes, consumed by a read-only dashboard and logging. See `review/renewvan-hub-research-report.md` for the full research/architecture rationale, and `.scratch/renewvan-hub-v0/map.md` for the v0 spec effort.
 
 ## Language
 
 **Entity**:
-A category of van hardware in the unified device model (`tank`, `relay`, `battery`), each with a fixed field list published on the MQTT bus. The machine-checkable contract for each entity's fields is the JSON Schema under [`/schema`](schema/) (`tank.schema.json`, `relay.schema.json`, `battery.schema.json`).
+A category of van hardware in the unified device model (`tank`, `relay`, `battery`, `router`), each with a fixed field list published on the MQTT bus. The machine-checkable contract for each entity's fields is the JSON Schema under [`/schema`](schema/) (`tank.schema.json`, `relay.schema.json`, `battery.schema.json`, `router.schema.json`).
 _Avoid_: Device, thing, component (too generic — use the specific entity name).
 
 **Renewvan bus**:
@@ -27,6 +27,10 @@ _Avoid_: Switch, load (relay is the wire-schema entity name).
 **Battery**:
 The house battery bank, sourced from Victron's native Venus OS MQTT feed (`N/{portalId}/system/0/Batteries`) via the `renewvan/node-battery` node. Reports `soc_pct`, `voltage_v`, `current_a`, `power_w`, `temperature_c`, `charge_state`.
 _Avoid_: Shunt, BMS (those are the underlying hardware on the Victron side, not this project's entity name).
+
+**Router**:
+The van's uplink router — the single device connecting the van to the internet — reporting connectivity status: `signal_rsrp_dbm`/`signal_rsrq_db`/`signal_sinr_db`/`signal_rssi_dbm`, `operator`, `network_type`, `uptime_s`, and monthly SIM data usage (`data_used_month_tx_b`/`data_used_month_rx_b`). Sourced from the router vendor's push feed via the `renewvan/node-router` node, like the battery node remaps an existing feed.
+_Avoid_: Gateway, modem (hardware inside the router, not this entity), RUT (vendor name), WAN (networking jargon — the entity's field is `network_type`).
 
 **Node**:
 Anything that publishes one specific device or feed onto the renewvan bus, normalized into the device model — whether it's firmware on an ESP32 (the relay node) or a process on the Pi (the tank node), and whether it owns the sensing (the tank node's ADS1115 math) or remaps an _existing_ external feed (the battery node, remapping Victron's Venus OS MQTT feed onto `renewvan/battery/<id>/...`).

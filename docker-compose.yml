@@ -1,7 +1,7 @@
 # The single install/setup path for the hub (see README.md's Install
-# section): infra (Mosquitto, InfluxDB, Grafana) plus the four pinned,
+# section): infra (Mosquitto, InfluxDB, Grafana) plus the five pinned,
 # independently-published backend service images (`tank`, `battery`,
-# `logger`, `dashboard`) — per
+# `router`, `logger`, `dashboard`) — per
 # docs/adr/0001-compose-services-via-pinned-images-not-git-submodules.md,
 # none of them are built from local/submodule source here. Bumping a
 # service is a single-line `image:` tag edit below (git-tracked, no
@@ -32,7 +32,7 @@ services:
       - mosquitto-data:/mosquitto/data
       - mosquitto-log:/mosquitto/log
 
-  # History for tank/relay/battery topics (docs/architecture.md
+  # History for tank/relay/battery/router topics (docs/architecture.md
   # "Application services" row). Written by renewvan/logger, one point
   # per renewvan/# message.
   influxdb:
@@ -104,10 +104,27 @@ services:
       VICTRON_MQTT_PORT: ${VICTRON_MQTT_PORT:-1883}
       VICTRON_PORTAL_ID: ${VICTRON_PORTAL_ID}
 
+  # RUT-360 Data to Server MQTT -> renewvan-bus router remap. Single
+  # connection to this compose's own bus: subscribes the router's raw
+  # feed on renewvan/router/<id>/raw, republishes normalized retained
+  # fields. See .scratch/node-router/map.md.
+  node-router:
+    image: ghcr.io/renewvan/node-router:v0.1.0
+    container_name: renewvan-router
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    environment:
+      MQTT_HOST: ${RENEWVAN_HOST:-mosquitto}
+      MQTT_PORT: ${RENEWVAN_PORT:-1883}
+      MQTT_USERNAME: ${RENEWVAN_USERNAME:-}
+      MQTT_PASSWORD: ${RENEWVAN_PASSWORD:-}
+      ROUTER_ID: ${ROUTER_ID:-main}
+
   # renewvan/# -> InfluxDB point writer, one point per message. See
   # .scratch/renewvan-hub-v0-build/issues/05-influxdb-logger.md.
   logger:
-    image: ghcr.io/renewvan/logger:v0.1.1
+    image: ghcr.io/renewvan/logger:v0.1.3
     container_name: renewvan-logger
     restart: unless-stopped
     depends_on:

@@ -1,0 +1,11 @@
+{
+  "signal_rsrp_dbm": -95,
+  "signal_rsrq_db": -14,
+  "signal_sinr_db": 0,
+  "signal_rssi_dbm": -70,
+  "operator": "26201",
+  "network_type": "unknown",
+  "uptime_s": 4321,
+  "data_used_month_tx_b": 0,
+  "data_used_month_rx_b": 0
+}
