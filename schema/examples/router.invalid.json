@@ -1,0 +1,11 @@
+{
+  "signal_rsrp_dbm": -85,
+  "signal_rsrq_db": -10,
+  "signal_sinr_db": 6,
+  "signal_rssi_dbm": -54,
+  "operator": "26203",
+  "network_type": "LTE",
+  "uptime_s": 826671,
+  "data_used_month_tx_b": 140194858,
+  "data_used_month_rx_b": 385092522
+}

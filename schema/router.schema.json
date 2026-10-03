@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://renewvan.dev/schema/router.schema.json",
+  "title": "router",
+  "description": "v0.1 device-model entity: the van's uplink router (Teltonika RUT-360), bridged from the router's RutOS Data to Server MQTT feed. Published under renewvan/router/<id>/<property>.",
+  "type": "object",
+  "properties": {
+    "signal_rsrp_dbm": {
+      "type": "number",
+      "description": "Reference Signal Received Power in dBm; the primary cellular signal metric."
+    },
+    "signal_rsrq_db": {
+      "type": "number",
+      "description": "Reference Signal Received Quality in dB."
+    },
+    "signal_sinr_db": {
+      "type": "number",
+      "description": "Signal-to-Interference-plus-Noise Ratio in dB."
+    },
+    "signal_rssi_dbm": {
+      "type": "number",
+      "description": "Received Signal Strength Indicator in dBm."
+    },
+    "operator": {
+      "type": "string",
+      "description": "PLMN as reported by the modem: numeric MCC+MNC (e.g. \"26203\"), not a display name — mapping codes to operator names is presentation, not node business."
+    },
+    "network_type": {
+      "type": "string",
+      "description": "Mobile network technology. Normalized to lowercase from the modem's conntype (\"LTE\" → \"lte\", 5G forms → \"nr\"). `unknown` is the forward-compat fallback for any value not in this enum.",
+      "enum": ["2g", "3g", "lte", "nr", "unknown"]
+    },
+    "uptime_s": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Router uptime in seconds."
+    },
+    "data_used_month_tx_b": {
+      "type": "number",
+      "minimum": 0,
+      "description": "SIM data transmitted this calendar month, in bytes (device-scoped month window)."
+    },
+    "data_used_month_rx_b": {
+      "type": "number",
+      "minimum": 0,
+      "description": "SIM data received this calendar month, in bytes (device-scoped month window)."
+    }
+  },
+  "required": [
+    "signal_rsrp_dbm",
+    "signal_rsrq_db",
+    "signal_sinr_db",
+    "signal_rssi_dbm",
+    "operator",
+    "network_type",
+    "uptime_s",
+    "data_used_month_tx_b",
+    "data_used_month_rx_b"
+  ],
+  "additionalProperties": false
+}
