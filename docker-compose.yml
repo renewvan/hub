@@ -1,7 +1,7 @@
 # The single install/setup path for the hub (see README.md's Install
-# section): infra (Mosquitto, InfluxDB, Grafana) plus the five pinned,
+# section): infra (Mosquitto, InfluxDB, Grafana) plus the six pinned,
 # independently-published backend service images (`tank`, `battery`,
-# `router`, `logger`, `dashboard`) — per
+# `router`, `gps`, `logger`, `dashboard`) — per
 # docs/adr/0001-compose-services-via-pinned-images-not-git-submodules.md,
 # none of them are built from local/submodule source here. Bumping a
 # service is a single-line `image:` tag edit below (git-tracked, no
@@ -84,6 +84,28 @@ services:
       MQTT_PASSWORD: ${RENEWVAN_PASSWORD:-}
     volumes:
       - ${TANK_CONFIG_PATH:-./config/tank/config.ini}:/app/config.ini:ro
+
+  # Native MQTT GPS/GLONASS/BeiDou node (NMEA 0183 over USB-serial,
+  # u-blox-chip module) -- see node-gps's own README's "Topics published"
+  # section. Needs USB-serial device passthrough; layered config.ini
+  # override lives on the bind-mounted host path below (sets
+  # [mqtt] host = mosquitto; serial_port defaults to /dev/ttyACM0 in the
+  # image, correct for a u-blox-native USB GNSS receiver).
+  node-gps:
+    image: ghcr.io/renewvan/node-gps:v0.1.0
+    container_name: renewvan-gps
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    devices:
+      - "/dev/ttyACM0:/dev/ttyACM0"
+    environment:
+      MQTT_HOST: ${RENEWVAN_HOST:-mosquitto}
+      MQTT_PORT: ${RENEWVAN_PORT:-1883}
+      MQTT_USERNAME: ${RENEWVAN_USERNAME:-}
+      MQTT_PASSWORD: ${RENEWVAN_PASSWORD:-}
+    volumes:
+      - ${GPS_CONFIG_PATH:-./config/gps/config.ini}:/app/config.ini:ro
 
   # Victron Venus OS MQTT -> renewvan-bus battery remap. Subscribes against
   # the GX device's own broker (VICTRON_*), publishes onto this
