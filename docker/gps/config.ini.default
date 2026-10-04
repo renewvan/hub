@@ -1,0 +1,9 @@
+[mqtt]
+host = mosquitto
+
+[node]
+; serial_port defaults to /dev/ttyACM0 in the image's config.default.ini,
+; correct for a u-blox-native USB GNSS receiver (CDC-ACM). Uncomment and
+; edit if your module is a CP2102/CH340 USB-serial bridge clone
+; (usually /dev/ttyUSB0 instead) or you've pinned a udev symlink.
+; serial_port = /dev/ttyACM0

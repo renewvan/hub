@@ -38,7 +38,7 @@ ssh "${HOST}" bash -s <<REMOTE
 set -euo pipefail
 cd "${REMOTE_DIR}"
 
-mkdir -p /etc/renewvan/mosquitto /etc/renewvan/tank
+mkdir -p /etc/renewvan/mosquitto /etc/renewvan/tank /etc/renewvan/gps
 
 # plugin/kiosk: create venv (Bookworm externally-managed Python) and install deps
 python3 -m venv /opt/renewvan/venvs/kiosk
@@ -62,6 +62,7 @@ if [[ ! -f .env ]]; then
   echo "No .env found — seeding from .env.example."
   cp .env.example .env
   sed -i 's|^TANK_CONFIG_PATH=.*|TANK_CONFIG_PATH=/etc/renewvan/tank/config.ini|' .env
+  sed -i 's|^GPS_CONFIG_PATH=.*|GPS_CONFIG_PATH=/etc/renewvan/gps/config.ini|' .env
   sed -i 's|^MOSQUITTO_CONFIG_PATH=.*|MOSQUITTO_CONFIG_PATH=/etc/renewvan/mosquitto|' .env
   echo
   echo "==> Edit ${REMOTE_DIR}/.env on the Pi to fill in secrets (INFLUXDB_ADMIN_PASSWORD,"
@@ -73,6 +74,11 @@ fi
 if [[ ! -f /etc/renewvan/mosquitto/mosquitto.conf ]]; then
   echo "Seeding /etc/renewvan/mosquitto/mosquitto.conf from the repo default."
   cp docker/mosquitto/config/mosquitto.conf /etc/renewvan/mosquitto/mosquitto.conf
+fi
+
+if [[ ! -f /etc/renewvan/gps/config.ini ]]; then
+  echo "Seeding /etc/renewvan/gps/config.ini from the repo default (sets [mqtt] host = mosquitto; serial_port defaults to /dev/ttyACM0 in the image)."
+  cp docker/gps/config.ini.default /etc/renewvan/gps/config.ini
 fi
 
 if [[ ! -f /etc/renewvan/tank/config.ini ]]; then
