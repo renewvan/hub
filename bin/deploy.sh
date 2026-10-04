@@ -71,6 +71,11 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
+# GPS_CONFIG_PATH may be missing from a .env predating node-gps's addition
+# to .env.example (the branch above only seeds a brand-new .env) --
+# ensure it's present either way, idempotently.
+grep -q '^GPS_CONFIG_PATH=' .env || echo 'GPS_CONFIG_PATH=/etc/renewvan/gps/config.ini' >> .env
+
 if [[ ! -f /etc/renewvan/mosquitto/mosquitto.conf ]]; then
   echo "Seeding /etc/renewvan/mosquitto/mosquitto.conf from the repo default."
   cp docker/mosquitto/config/mosquitto.conf /etc/renewvan/mosquitto/mosquitto.conf
