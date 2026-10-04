@@ -1,0 +1,11 @@
+{
+  "fix_quality": "gps",
+  "satellites_in_use": 8,
+  "latitude": 45.4642,
+  "longitude": 9.19,
+  "altitude_m": 122.3,
+  "hdop": 0.9,
+  "speed_kmh": 62.4,
+  "course_deg": 184.7,
+  "fix_time": "2026-10-04T12:34:56+00:00"
+}

@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://renewvan.dev/schema/gps.schema.json",
+  "title": "gps",
+  "description": "v0.1 device-model entity: position fix from a USB GPS/GLONASS/BeiDou (NMEA 0183) module, read directly by the renewvan/node-gps node (sensing, not a feed remap). Published under renewvan/gps/<id>/<property>. Every field is live -- republished on every poll (default 3s), no identity/startup-only fields. fix_quality/satellites_in_use are unconditional; every other field is present only once a fix is acquired (fix_quality != no_fix).",
+  "type": "object",
+  "properties": {
+    "fix_quality": {
+      "type": "string",
+      "enum": [
+        "no_fix",
+        "gps",
+        "dgps",
+        "pps",
+        "rtk",
+        "float_rtk",
+        "estimated",
+        "manual",
+        "simulation"
+      ],
+      "description": "Mapped from the GGA sentence's fix-quality field (0-8). 'no_fix' means no satellite lock yet -- every other field is absent in that state."
+    },
+    "satellites_in_use": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of satellites used in the current fix, from the GGA sentence. 0 when fix_quality is no_fix. Unconditional live field."
+    },
+    "latitude": {
+      "type": "number",
+      "minimum": -90,
+      "maximum": 90,
+      "description": "Decimal degrees, WGS84, positive north. Present only when fix_quality != no_fix."
+    },
+    "longitude": {
+      "type": "number",
+      "minimum": -180,
+      "maximum": 180,
+      "description": "Decimal degrees, WGS84, positive east. Present only when fix_quality != no_fix."
+    },
+    "altitude_m": {
+      "type": "number",
+      "description": "Altitude above mean sea level, meters (GGA sentence). May be negative (below MSL). Present only when fix_quality != no_fix."
+    },
+    "hdop": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Horizontal dilution of precision from the GGA sentence; lower is better. Present only when fix_quality != no_fix."
+    },
+    "speed_kmh": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Ground speed in km/h, converted from the RMC sentence's knots field (1 knot = 1.852 km/h). Present only when fix_quality != no_fix."
+    },
+    "course_deg": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 360,
+      "description": "Track made good, degrees true (RMC sentence). Present only when fix_quality != no_fix."
+    },
+    "fix_time": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\+00:00$",
+      "description": "UTC timestamp of the fix (RMC sentence's date+time fields), ISO-8601 with explicit +00:00 offset -- the GPS clock is always UTC, never localized. Present only when fix_quality != no_fix."
+    }
+  },
+  "required": ["fix_quality", "satellites_in_use"],
+  "additionalProperties": false
+}
