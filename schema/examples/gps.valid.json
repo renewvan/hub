@@ -1,6 +1,7 @@
 {
   "fix_quality": "gps",
   "satellites_in_use": 8,
+  "avg_snr_db": 38.5,
   "latitude": 45.4642,
   "longitude": 9.19,
   "altitude_m": 122.3,

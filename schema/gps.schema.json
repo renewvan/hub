@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://renewvan.dev/schema/gps.schema.json",
   "title": "gps",
-  "description": "v0.1 device-model entity: position fix from a USB GPS/GLONASS/BeiDou (NMEA 0183) module, read directly by the renewvan/node-gps node (sensing, not a feed remap). Published under renewvan/gps/<id>/<property>. Every field is live -- republished on every poll (default 3s), no identity/startup-only fields. fix_quality/satellites_in_use are unconditional; every other field is present only once a fix is acquired (fix_quality != no_fix).",
+  "description": "v0.1 device-model entity: position fix from a USB GPS/GLONASS/BeiDou (NMEA 0183) module, read directly by the renewvan/node-gps node (sensing, not a feed remap). Published under renewvan/gps/<id>/<property>. Every field is live -- republished on every poll (default 3s), no identity/startup-only fields. fix_quality/satellites_in_use/avg_snr_db are unconditional (avg_snr_db absent only before the first GSV sentence is decoded); every position/motion field is present only once a fix is acquired (fix_quality != no_fix).",
   "type": "object",
   "properties": {
     "fix_quality": {
@@ -24,6 +24,11 @@
       "type": "integer",
       "minimum": 0,
       "description": "Number of satellites used in the current fix, from the GGA sentence. 0 when fix_quality is no_fix. Unconditional live field."
+    },
+    "avg_snr_db": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Mean carrier-to-noise ratio (C/N0, dB-Hz) across every satellite with a decoded SNR value in the GSV sentences seen during the poll, any constellation. Independent of fix_quality -- raw signal tracking is meaningful even before/without a fix, e.g. diagnosing \"I have satellites in view but not enough signal for a fix\". Not restricted to the fix_quality subset: it includes every tracked satellite, not only the ones GGA used for the fix. Absent only before the node has decoded its first GSV sentence."
     },
     "latitude": {
       "type": "number",
