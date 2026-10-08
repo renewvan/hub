@@ -104,6 +104,20 @@ if [[ ! -f /etc/renewvan/tank/config.ini ]]; then
   exit 1
 fi
 
+# node-gps is behind the \`gps\` compose profile because its \`devices:\` entry
+# makes Docker refuse to create the container (and compose abort the whole
+# \`up -d\`) when /dev/ttyACM0 does not exist. Enable the profile only when the
+# module is plugged in; re-running deploy after plugging it in starts the node.
+# Without the module, any previously created gps container is stopped so it
+# doesn't crash-loop on the missing device.
+if [[ -e /dev/ttyACM0 ]]; then
+  export COMPOSE_PROFILES="\${COMPOSE_PROFILES:+\${COMPOSE_PROFILES},}gps"
+  echo "==> GPS device /dev/ttyACM0 present: enabling the gps profile"
+else
+  echo "==> No /dev/ttyACM0: skipping node-gps (plug in the GPS module and re-run deploy to enable it)"
+  docker compose rm -sf node-gps >/dev/null 2>&1 || true
+fi
+
 echo "==> docker compose pull && up -d"
 docker compose pull
 docker compose up -d

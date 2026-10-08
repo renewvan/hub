@@ -60,6 +60,10 @@ compose up -d`. This brings up the infra layer (Mosquitto, InfluxDB,
    release; nothing built from source in `hub`, per
    `docs/adr/0001-compose-services-via-pinned-images-not-git-submodules.md`).
    Bumping a service later is a single `image:` tag edit in `docker-compose.yml`.
+   `node-gps` is behind the `gps` compose profile (its `/dev/ttyACM0`
+   passthrough would otherwise make Docker refuse to start and abort the
+   whole `up -d` on a host with no GPS module): add `--profile gps` when the
+   module is plugged in, or let `bin/deploy.sh` decide from the device.
 3. **Flash the ESP32 relay node**, once, per `renewvan/node-relay`'s own
    README (ESPHome YAML, no custom firmware).
 4. **Install the phone app** per `renewvan/mobile`'s own README (React

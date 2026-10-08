@@ -91,7 +91,15 @@ services:
   # override lives on the bind-mounted host path below (sets
   # [mqtt] host = mosquitto; serial_port defaults to /dev/ttyACM0 in the
   # image, correct for a u-blox-native USB GNSS receiver).
+  #
+  # Behind the `gps` profile: with a `devices:` entry, a missing
+  # /dev/ttyACM0 makes Docker refuse to create the container and aborts the
+  # whole `docker compose up -d`, taking every other service's deploy with
+  # it. bin/deploy.sh enables the profile only when the device exists. For a
+  # manual `docker compose up -d` on a Pi with the module, use
+  # `docker compose --profile gps up -d`.
   node-gps:
+    profiles: ["gps"]
     image: ghcr.io/renewvan/node-gps:v0.2.0
     container_name: renewvan-gps
     restart: unless-stopped
