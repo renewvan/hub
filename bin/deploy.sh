@@ -38,7 +38,7 @@ ssh "${HOST}" bash -s <<REMOTE
 set -euo pipefail
 cd "${REMOTE_DIR}"
 
-mkdir -p /etc/renewvan/mosquitto /etc/renewvan/tank /etc/renewvan/gps
+mkdir -p /etc/renewvan/mosquitto /etc/renewvan/tank /etc/renewvan/gps /etc/renewvan/temperature/state
 
 # plugin/kiosk: create venv (Bookworm externally-managed Python) and install deps
 python3 -m venv /opt/renewvan/venvs/kiosk
@@ -63,6 +63,8 @@ if [[ ! -f .env ]]; then
   cp .env.example .env
   sed -i 's|^TANK_CONFIG_PATH=.*|TANK_CONFIG_PATH=/etc/renewvan/tank/config.ini|' .env
   sed -i 's|^GPS_CONFIG_PATH=.*|GPS_CONFIG_PATH=/etc/renewvan/gps/config.ini|' .env
+  sed -i 's|^TEMPERATURE_CONFIG_PATH=.*|TEMPERATURE_CONFIG_PATH=/etc/renewvan/temperature/config.ini|' .env
+  sed -i 's|^TEMPERATURE_STATE_PATH=.*|TEMPERATURE_STATE_PATH=/etc/renewvan/temperature/state|' .env
   sed -i 's|^MOSQUITTO_CONFIG_PATH=.*|MOSQUITTO_CONFIG_PATH=/etc/renewvan/mosquitto|' .env
   echo
   echo "==> Edit ${REMOTE_DIR}/.env on the Pi to fill in secrets (INFLUXDB_ADMIN_PASSWORD,"
@@ -75,6 +77,9 @@ fi
 # to .env.example (the branch above only seeds a brand-new .env) --
 # ensure it's present either way, idempotently.
 grep -q '^GPS_CONFIG_PATH=' .env || echo 'GPS_CONFIG_PATH=/etc/renewvan/gps/config.ini' >> .env
+# Same for node-temperature's keys.
+grep -q '^TEMPERATURE_CONFIG_PATH=' .env || echo 'TEMPERATURE_CONFIG_PATH=/etc/renewvan/temperature/config.ini' >> .env
+grep -q '^TEMPERATURE_STATE_PATH=' .env || echo 'TEMPERATURE_STATE_PATH=/etc/renewvan/temperature/state' >> .env
 
 if [[ ! -f /etc/renewvan/mosquitto/mosquitto.conf ]]; then
   echo "Seeding /etc/renewvan/mosquitto/mosquitto.conf from the repo default."
@@ -84,6 +89,11 @@ fi
 if [[ ! -f /etc/renewvan/gps/config.ini ]]; then
   echo "Seeding /etc/renewvan/gps/config.ini from the repo default (sets [mqtt] host = mosquitto; serial_port defaults to /dev/ttyACM0 in the image)."
   cp docker/gps/config.ini.default /etc/renewvan/gps/config.ini
+fi
+
+if [[ ! -f /etc/renewvan/temperature/config.ini ]]; then
+  echo "Seeding /etc/renewvan/temperature/config.ini from the repo default (sets [mqtt] host = mosquitto and state_dir; map probes to ids/names there)."
+  cp docker/temperature/config.ini.default /etc/renewvan/temperature/config.ini
 fi
 
 if [[ ! -f /etc/renewvan/tank/config.ini ]]; then
