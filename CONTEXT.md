@@ -5,7 +5,7 @@ An open-hardware, vendor-agnostic campervan control platform: a unified device m
 ## Language
 
 **Entity**:
-A category of van hardware in the unified device model (`tank`, `relay`, `battery`, `router`, `gps`), each with a fixed field list published on the MQTT bus. The machine-checkable contract for each entity's fields is the JSON Schema under [`/schema`](schema/) (`tank.schema.json`, `relay.schema.json`, `battery.schema.json`, `router.schema.json`, `gps.schema.json`).
+A category of van hardware in the unified device model (`tank`, `relay`, `battery`, `router`, `gps`, `temperature`), each with a fixed field list published on the MQTT bus. The machine-checkable contract for each entity's fields is the JSON Schema under [`/schema`](schema/) (`tank.schema.json`, `relay.schema.json`, `battery.schema.json`, `router.schema.json`, `gps.schema.json`, `temperature.schema.json`).
 _Avoid_: Device, thing, component (too generic — use the specific entity name).
 
 **Renewvan bus**:
@@ -35,6 +35,10 @@ _Avoid_: Gateway, modem (hardware inside the router, not this entity), RUT (vend
 **GPS**:
 Live position telemetry (no identity/startup-only fields) from a USB GPS/GLONASS/BeiDou module read directly by the `renewvan/node-gps` node (NMEA 0183 over serial — sensing, not a feed remap). Reports `fix_quality`, `satellites_in_use`, `avg_snr_db` unconditionally (`avg_snr_db` is independent of fix status — mean per-satellite signal strength from GSV sentences, present even before a fix); `latitude`, `longitude`, `altitude_m`, `hdop`, `speed_kmh`, `course_deg`, `fix_time` only once `fix_quality != no_fix`.
 _Avoid_: Location, position (too generic — use the entity name); GNSS (the schema/topic name is `gps` even though the module also tracks GLONASS/BeiDou).
+
+**Temperature**:
+A standalone temperature sensor (1-Wire DS18B20 probe or the Pi's own SoC thermal zone) read directly by the `renewvan/node-temperature` node (sensing, not a feed remap), keyed by a user-assigned sensor id. Reports `name`, `unit`, `source` (and `serial` for 1-Wire) as retained identity fields, and `temperature_c`/`status` live. `temperature_c` is always Celsius on the wire; `unit` (`C`/`F`) is a display preference the dashboard applies. `name` and `unit` are user-editable via `<field>/set` command topics and persisted node-side, overriding the `config.ini` default. Temperatures that belong to another entity's hardware (tank water temperature, battery temperature) stay on that entity's own `temperature_c` and are not republished here.
+_Avoid_: Thermometer, probe (the hardware, not the entity); sensor (too generic, see Entity); publishing the same reading under two entities.
 
 **Node**:
 Anything that publishes one specific device or feed onto the renewvan bus, normalized into the device model — whether it's firmware on an ESP32 (the relay node) or a process on the Pi (the tank node), and whether it owns the sensing (the tank node's ADS1115 math) or remaps an _existing_ external feed (the battery node, remapping Victron's Venus OS MQTT feed onto `renewvan/battery/<id>/...`).
