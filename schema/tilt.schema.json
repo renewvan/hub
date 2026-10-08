@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://renewvan.dev/schema/tilt.schema.json",
+  "title": "tilt",
+  "description": "v0.1 device-model entity: van inclination (roll/pitch) from a GY-521 / MPU-6050 accelerometer, read directly by the renewvan/node-tilt node (sensing, not a feed remap). Published under renewvan/tilt/<id>/<property>. Every field is live (retained), republished when roll or pitch moves past a deadband and on a heartbeat; there are no identity/startup-only fields. Angles are in the van frame (x forward, y left, z up), smoothed, and corrected by the install-time level zero set via renewvan/tilt/<id>/level_zero/set. Whether the van counts as 'level' is a presentation tolerance applied by the consumer, not published here.",
+  "type": "object",
+  "properties": {
+    "roll_deg": {
+      "type": "number",
+      "minimum": -180,
+      "maximum": 180,
+      "description": "Roll about the van's forward axis, degrees. Positive = left side down. 0 = level (after level zero)."
+    },
+    "pitch_deg": {
+      "type": "number",
+      "minimum": -180,
+      "maximum": 180,
+      "description": "Pitch about the van's lateral axis, degrees. Positive = nose up. 0 = level (after level zero)."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["ok", "sensor_error"],
+      "description": "IMU health. sensor_error after N consecutive failed I2C reads (or an all-zero accelerometer read); roll_deg/pitch_deg retain their last published values while in error."
+    }
+  },
+  "required": ["roll_deg", "pitch_deg", "status"],
+  "additionalProperties": false
+}

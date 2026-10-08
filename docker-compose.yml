@@ -146,6 +146,30 @@ services:
       - /sys/devices:/sys/devices:ro
       - /sys/class/thermal:/sys/class/thermal:ro
 
+  # Native MQTT van-inclination node: reads a GY-521 / MPU-6050 accelerometer
+  # on the same I2C bus as the tank node's ADS1115 (different address, no
+  # conflict) -- see node-tilt's own README's "Topics published" section.
+  # Needs I2C device passthrough. The axis mapping for how the board is
+  # mounted lives in the bind-mounted config.ini. /app/state is writable and
+  # persistent: the install level zero (set from renewvan/tilt/<id>/level_zero/set)
+  # lives there and is lost on a container recreate if it isn't a mounted volume.
+  node-tilt:
+    image: ghcr.io/renewvan/node-tilt:v0.1.1
+    container_name: renewvan-tilt
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    devices:
+      - "/dev/i2c-1:/dev/i2c-1"
+    environment:
+      MQTT_HOST: ${RENEWVAN_HOST:-mosquitto}
+      MQTT_PORT: ${RENEWVAN_PORT:-1883}
+      MQTT_USERNAME: ${RENEWVAN_USERNAME:-}
+      MQTT_PASSWORD: ${RENEWVAN_PASSWORD:-}
+    volumes:
+      - ${TILT_CONFIG_PATH:-./config/tilt/config.ini}:/app/config.ini:ro
+      - ${TILT_STATE_PATH:-./config/tilt/state}:/app/state
+
   # Victron Venus OS MQTT -> renewvan-bus battery remap. Subscribes against
   # the GX device's own broker (VICTRON_*), publishes onto this
   # compose's renewvan bus (mosquitto). See
@@ -206,7 +230,7 @@ services:
   # not a polling backend. See
   # .scratch/renewvan-hub-v0-build/issues/06-dashboard-web-app.md.
   dashboard:
-    image: ghcr.io/renewvan/dashboard:v0.1.28
+    image: ghcr.io/renewvan/dashboard:v0.1.29
     container_name: renewvan-dashboard
     restart: unless-stopped
     ports:

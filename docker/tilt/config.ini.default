@@ -1,0 +1,17 @@
+[mqtt]
+host = mosquitto
+
+[node]
+; The level zero (renewvan/tilt/<id>/level_zero/set) persists here; the
+; compose service mounts /etc/renewvan/tilt/state at this path so it survives
+; a container recreate.
+state_dir = /app/state
+
+; How the GY-521 is mounted: which sensor axis supplies each van axis
+; (x forward, y left, z up). This is the board FACE-DOWN with X toward the
+; front of the van -- change it to match your mounting (see node-tilt's
+; README, "Mounting orientation"), then
+; `docker compose restart node-tilt`.
+axis_x = +x
+axis_y = -y
+axis_z = -z
