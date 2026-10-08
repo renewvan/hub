@@ -92,7 +92,7 @@ services:
   # [mqtt] host = mosquitto; serial_port defaults to /dev/ttyACM0 in the
   # image, correct for a u-blox-native USB GNSS receiver).
   node-gps:
-    image: ghcr.io/renewvan/node-gps:v0.1.0
+    image: ghcr.io/renewvan/node-gps:v0.2.0
     container_name: renewvan-gps
     restart: unless-stopped
     depends_on:
@@ -106,6 +106,32 @@ services:
       MQTT_PASSWORD: ${RENEWVAN_PASSWORD:-}
     volumes:
       - ${GPS_CONFIG_PATH:-./config/gps/config.ini}:/app/config.ini:ro
+
+  # Native MQTT temperature node: 1-Wire DS18B20 probes + the Pi's own CPU
+  # thermal zone -- see node-temperature's own README's "Topics published"
+  # section. The 1-Wire kernel driver must be enabled on the host
+  # (dtoverlay=w1-gpio,gpiopin=<N> in /boot/firmware/config.txt). The probe
+  # entries under /sys/bus/w1/devices are symlinks into
+  # /sys/devices/w1_bus_master1, so both trees are bind-mounted read-only at
+  # the same paths or the links dangle. /app/state is writable and persistent:
+  # name/unit edits from the dashboard live there.
+  node-temperature:
+    image: ghcr.io/renewvan/node-temperature:v0.1.0
+    container_name: renewvan-temperature
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    environment:
+      MQTT_HOST: ${RENEWVAN_HOST:-mosquitto}
+      MQTT_PORT: ${RENEWVAN_PORT:-1883}
+      MQTT_USERNAME: ${RENEWVAN_USERNAME:-}
+      MQTT_PASSWORD: ${RENEWVAN_PASSWORD:-}
+    volumes:
+      - ${TEMPERATURE_CONFIG_PATH:-./config/temperature/config.ini}:/app/config.ini:ro
+      - ${TEMPERATURE_STATE_PATH:-./config/temperature/state}:/app/state
+      - /sys/bus/w1/devices:/sys/bus/w1/devices:ro
+      - /sys/devices/w1_bus_master1:/sys/devices/w1_bus_master1:ro
+      - /sys/class/thermal:/sys/class/thermal:ro
 
   # Victron Venus OS MQTT -> renewvan-bus battery remap. Subscribes against
   # the GX device's own broker (VICTRON_*), publishes onto this
@@ -167,7 +193,7 @@ services:
   # not a polling backend. See
   # .scratch/renewvan-hub-v0-build/issues/06-dashboard-web-app.md.
   dashboard:
-    image: ghcr.io/renewvan/dashboard:v0.1.25
+    image: ghcr.io/renewvan/dashboard:v0.1.27
     container_name: renewvan-dashboard
     restart: unless-stopped
     ports:
