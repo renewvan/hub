@@ -6,13 +6,19 @@ host = mosquitto
 ; /etc/renewvan/temperature/state at this path so they survive a container
 ; recreate.
 state_dir = /app/state
+; The 1-Wire bus is reached through the /sys/bus parent mount in the compose
+; service, which is the image default location -- no w1_base_path override.
 
-; Map each DS18B20 probe to an id and label (find serials with
-; `ls /sys/bus/w1/devices` on the Pi). Probes left unmapped are still
-; published, under their serial. Uncomment and edit, then
-; `docker compose restart node-temperature`:
-;
-; [sensor.fridge]
-; serial = 28-0000075a1b2c
-; name = Fridge
-; unit = C
+; DS18B20 probes on this van's bus. Find serials with
+; `ls /sys/bus/w1/devices` on the Pi. Probes left unmapped are still
+; published under their serial. Edit, then
+; `docker compose restart node-temperature`.
+[sensor.outdoor]
+serial = 28-000000259026
+name = Outdoor
+unit = C
+
+[sensor.indoor]
+serial = 28-0623641a2877
+name = Indoor
+unit = C

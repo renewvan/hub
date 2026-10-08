@@ -112,9 +112,14 @@ services:
   # section. The 1-Wire kernel driver must be enabled on the host
   # (dtoverlay=w1-gpio,gpiopin=<N> in /boot/firmware/config.txt). The probe
   # entries under /sys/bus/w1/devices are symlinks into
-  # /sys/devices/w1_bus_master1, so both trees are bind-mounted read-only at
-  # the same paths or the links dangle. /app/state is writable and persistent:
-  # name/unit edits from the dashboard live there.
+  # /sys/devices/w1_bus_master1, so both trees must be visible at the same
+  # paths or the links dangle. The PARENTS (/sys/bus, /sys/devices) are
+  # mounted read-only, not w1/ or w1_bus_master1 themselves: those only exist
+  # once the overlay is loaded, and Docker refuses to start a container whose
+  # bind-mount source is missing -- that would take every `compose up -d` down
+  # on a Pi without 1-Wire, though the CPU sensor needs none of it.
+  # /app/state is writable and persistent: name/unit edits from the dashboard
+  # live there.
   node-temperature:
     image: ghcr.io/renewvan/node-temperature:v0.1.0
     container_name: renewvan-temperature
@@ -129,8 +134,8 @@ services:
     volumes:
       - ${TEMPERATURE_CONFIG_PATH:-./config/temperature/config.ini}:/app/config.ini:ro
       - ${TEMPERATURE_STATE_PATH:-./config/temperature/state}:/app/state
-      - /sys/bus/w1/devices:/sys/bus/w1/devices:ro
-      - /sys/devices/w1_bus_master1:/sys/devices/w1_bus_master1:ro
+      - /sys/bus:/sys/bus:ro
+      - /sys/devices:/sys/devices:ro
       - /sys/class/thermal:/sys/class/thermal:ro
 
   # Victron Venus OS MQTT -> renewvan-bus battery remap. Subscribes against
