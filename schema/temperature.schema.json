@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://renewvan.dev/schema/temperature.schema.json",
+  "title": "temperature",
+  "description": "v0.1 device-model entity: a standalone temperature sensor (1-Wire DS18B20 probe or the Pi's own CPU thermal zone) read directly by the renewvan/node-temperature node (sensing, not a feed remap). Published under renewvan/temperature/<id>/<property>, where <id> is the user-assigned sensor id from config.ini (or the probe's serial when unconfigured). temperature_c is ALWAYS degrees Celsius on the wire; 'unit' is a display preference only -- consumers convert for rendering. Identity fields (name, unit, source, serial) are retained and published once at startup and again whenever a user edit lands on the <field>/set command topic; live fields (temperature_c, status) are republished every poll (default 3s). Sensors that sit on another entity's hardware (tank water temperature, battery temperature) stay on that entity's own temperature_c field and are not duplicated here.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable label shown on the dashboard (e.g. 'Fridge'). User-editable via renewvan/temperature/<id>/name/set; persisted by the node and overrides the config.ini default. Identity field."
+    },
+    "unit": {
+      "type": "string",
+      "enum": ["C", "F"],
+      "description": "Display unit preference for this sensor. Does NOT change the unit of temperature_c (always Celsius). User-editable via renewvan/temperature/<id>/unit/set; persisted by the node and overrides the config.ini default. Identity field."
+    },
+    "source": {
+      "type": "string",
+      "enum": ["w1", "cpu"],
+      "description": "Where the reading comes from: 'w1' = 1-Wire DS18B20 probe, 'cpu' = Raspberry Pi SoC thermal zone. Identity field."
+    },
+    "serial": {
+      "type": "string",
+      "pattern": "^28-[0-9a-f]{12}$",
+      "description": "1-Wire device id (e.g. '28-0000075a1b2c'), the stable hardware identity of the probe. Present only when source is 'w1'. Identity field."
+    },
+    "temperature_c": {
+      "type": "number",
+      "minimum": -55,
+      "maximum": 150,
+      "description": "Temperature in degrees Celsius. Only republished while status is 'ok'; when status is not 'ok' the node skips the publish (same as node-tank's NTC failure behavior) and the LAST retained value stays on the broker, so consumers MUST gate on status == 'ok' before rendering it. Range is the DS18B20 operating range (-55..125) widened to cover the Pi SoC. Live field."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["ok", "no_reading", "disconnected"],
+      "description": "Sensor health. 'ok' = fresh valid reading; 'no_reading' = the sensor is present but the read failed or was out of range (CRC failure, 85.0 C power-on default, unparseable file); 'disconnected' = a previously-seen 1-Wire probe has vanished from the bus. Live field."
+    }
+  },
+  "required": ["name", "unit", "source", "status"],
+  "additionalProperties": false
+}

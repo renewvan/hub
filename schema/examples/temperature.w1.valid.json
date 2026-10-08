@@ -1,0 +1,8 @@
+{
+  "name": "Fridge",
+  "unit": "C",
+  "source": "w1",
+  "serial": "28-0000075a1b2c",
+  "temperature_c": 4.2,
+  "status": "ok"
+}
