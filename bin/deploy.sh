@@ -38,7 +38,7 @@ ssh "${HOST}" bash -s <<REMOTE
 set -euo pipefail
 cd "${REMOTE_DIR}"
 
-mkdir -p /etc/renewvan/mosquitto /etc/renewvan/tank /etc/renewvan/gps /etc/renewvan/temperature/state
+mkdir -p /etc/renewvan/mosquitto /etc/renewvan/tank /etc/renewvan/gps /etc/renewvan/temperature/state /etc/renewvan/tilt/state
 
 # plugin/kiosk: create venv (Bookworm externally-managed Python) and install deps
 python3 -m venv /opt/renewvan/venvs/kiosk
@@ -65,6 +65,8 @@ if [[ ! -f .env ]]; then
   sed -i 's|^GPS_CONFIG_PATH=.*|GPS_CONFIG_PATH=/etc/renewvan/gps/config.ini|' .env
   sed -i 's|^TEMPERATURE_CONFIG_PATH=.*|TEMPERATURE_CONFIG_PATH=/etc/renewvan/temperature/config.ini|' .env
   sed -i 's|^TEMPERATURE_STATE_PATH=.*|TEMPERATURE_STATE_PATH=/etc/renewvan/temperature/state|' .env
+  sed -i 's|^TILT_CONFIG_PATH=.*|TILT_CONFIG_PATH=/etc/renewvan/tilt/config.ini|' .env
+  sed -i 's|^TILT_STATE_PATH=.*|TILT_STATE_PATH=/etc/renewvan/tilt/state|' .env
   sed -i 's|^MOSQUITTO_CONFIG_PATH=.*|MOSQUITTO_CONFIG_PATH=/etc/renewvan/mosquitto|' .env
   echo
   echo "==> Edit ${REMOTE_DIR}/.env on the Pi to fill in secrets (INFLUXDB_ADMIN_PASSWORD,"
@@ -80,6 +82,9 @@ grep -q '^GPS_CONFIG_PATH=' .env || echo 'GPS_CONFIG_PATH=/etc/renewvan/gps/conf
 # Same for node-temperature's keys.
 grep -q '^TEMPERATURE_CONFIG_PATH=' .env || echo 'TEMPERATURE_CONFIG_PATH=/etc/renewvan/temperature/config.ini' >> .env
 grep -q '^TEMPERATURE_STATE_PATH=' .env || echo 'TEMPERATURE_STATE_PATH=/etc/renewvan/temperature/state' >> .env
+# Same for node-tilt's keys.
+grep -q '^TILT_CONFIG_PATH=' .env || echo 'TILT_CONFIG_PATH=/etc/renewvan/tilt/config.ini' >> .env
+grep -q '^TILT_STATE_PATH=' .env || echo 'TILT_STATE_PATH=/etc/renewvan/tilt/state' >> .env
 
 if [[ ! -f /etc/renewvan/mosquitto/mosquitto.conf ]]; then
   echo "Seeding /etc/renewvan/mosquitto/mosquitto.conf from the repo default."
@@ -94,6 +99,11 @@ fi
 if [[ ! -f /etc/renewvan/temperature/config.ini ]]; then
   echo "Seeding /etc/renewvan/temperature/config.ini from the repo default (sets [mqtt] host = mosquitto and state_dir; map probes to ids/names there)."
   cp docker/temperature/config.ini.default /etc/renewvan/temperature/config.ini
+fi
+
+if [[ ! -f /etc/renewvan/tilt/config.ini ]]; then
+  echo "Seeding /etc/renewvan/tilt/config.ini from the repo default (sets [mqtt] host = mosquitto, state_dir, and the face-down axis mapping; edit axis_* to match how the GY-521 is mounted)."
+  cp docker/tilt/config.ini.default /etc/renewvan/tilt/config.ini
 fi
 
 if [[ ! -f /etc/renewvan/tank/config.ini ]]; then

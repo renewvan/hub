@@ -5,7 +5,7 @@ An open-hardware, vendor-agnostic campervan control platform: a unified device m
 ## Language
 
 **Entity**:
-A category of van hardware in the unified device model (`tank`, `relay`, `battery`, `router`, `gps`, `temperature`), each with a fixed field list published on the MQTT bus. The machine-checkable contract for each entity's fields is the JSON Schema under [`/schema`](schema/) (`tank.schema.json`, `relay.schema.json`, `battery.schema.json`, `router.schema.json`, `gps.schema.json`, `temperature.schema.json`).
+A category of van hardware in the unified device model (`tank`, `relay`, `battery`, `router`, `gps`, `temperature`, `tilt`), each with a fixed field list published on the MQTT bus. The machine-checkable contract for each entity's fields is the JSON Schema under [`/schema`](schema/) (`tank.schema.json`, `relay.schema.json`, `battery.schema.json`, `router.schema.json`, `gps.schema.json`, `temperature.schema.json`, `tilt.schema.json`).
 _Avoid_: Device, thing, component (too generic — use the specific entity name).
 
 **Renewvan bus**:
@@ -39,6 +39,10 @@ _Avoid_: Location, position (too generic — use the entity name); GNSS (the sch
 **Temperature**:
 A standalone temperature sensor (1-Wire DS18B20 probe or the Pi's own SoC thermal zone) read directly by the `renewvan/node-temperature` node (sensing, not a feed remap), keyed by a user-assigned sensor id. Reports `name`, `unit`, `source` (and `serial` for 1-Wire) as retained identity fields, and `temperature_c`/`status` live. `temperature_c` is always Celsius on the wire; `unit` (`C`/`F`) is a display preference the dashboard applies. `name` and `unit` are user-editable via `<field>/set` command topics and persisted node-side, overriding the `config.ini` default. Temperatures that belong to another entity's hardware (tank water temperature, battery temperature) stay on that entity's own `temperature_c` and are not republished here.
 _Avoid_: Thermometer, probe (the hardware, not the entity); sensor (too generic, see Entity); publishing the same reading under two entities.
+
+**Tilt**:
+Van inclination from a GY-521 / MPU-6050 accelerometer read directly by the `renewvan/node-tilt` node (sensing, not a feed remap). Live fields only, no identity fields: `roll_deg` (positive = left side down), `pitch_deg` (positive = nose up), both in the van frame (x forward, y left, z up), smoothed and corrected by an install-time **level zero** captured via `renewvan/tilt/<id>/level_zero/set` (`reset` clears it) and persisted node-side; `status` (`ok`/`sensor_error`). Whether the van counts as "level" is a tolerance the dashboard applies — the node publishes angles, not a level flag.
+_Avoid_: Level, inclination, slope (the entity/topic name is `tilt`); an `is_level` boolean on the wire (a presentation threshold would force a node release to retune).
 
 **Node**:
 Anything that publishes one specific device or feed onto the renewvan bus, normalized into the device model — whether it's firmware on an ESP32 (the relay node) or a process on the Pi (the tank node), and whether it owns the sensing (the tank node's ADS1115 math) or remaps an _existing_ external feed (the battery node, remapping Victron's Venus OS MQTT feed onto `renewvan/battery/<id>/...`).
