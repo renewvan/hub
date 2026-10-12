@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://renewvan.dev/schema/solar.schema.json",
+  "title": "solar",
+  "description": "v0.1 device-model entity: a solar charge controller (MPPT/PWM), regardless of vendor. Published under renewvan/solar/<id>/<property>. One entity per controller. `power_w` and `battery_voltage_v` are required of every source; the rest is optional because cheap controllers do not report it.",
+  "type": "object",
+  "properties": {
+    "power_w": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Instantaneous power harvested from the panels, in watts."
+    },
+    "battery_voltage_v": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Voltage on the controller's battery (output) side."
+    },
+    "battery_current_a": {
+      "type": "number",
+      "description": "Optional: current delivered to the battery. Positive = into the battery."
+    },
+    "pv_voltage_v": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Optional: voltage on the panel (input) side."
+    },
+    "pv_current_a": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Optional: current from the panels."
+    },
+    "yield_today_wh": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Optional: energy harvested since local midnight (or the controller's own day boundary), in watt-hours."
+    },
+    "charge_state": {
+      "type": "string",
+      "description": "Optional: the controller's own charge stage. `unknown` is the forward-compat fallback for any code not in this enum.",
+      "enum": [
+        "off",
+        "fault",
+        "bulk",
+        "absorption",
+        "float",
+        "storage",
+        "equalize",
+        "external_control",
+        "unknown"
+      ]
+    }
+  },
+  "required": ["power_w", "battery_voltage_v"],
+  "additionalProperties": false
+}

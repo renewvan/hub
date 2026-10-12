@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://renewvan.dev/schema/battery.schema.json",
   "title": "battery",
-  "description": "v0.1 device-model entity: the house battery bank, bridged from Victron's native Venus OS MQTT feed. Published under renewvan/battery/<id>/<property>.",
+  "description": "v0.2 device-model entity: a battery bank as seen by a shunt, BMS, or inverter-charger, regardless of vendor. Published under renewvan/battery/<id>/<property>. The four core measurements are required of every source; everything else is optional because not every source can supply it (a shunt has no charge stage, a BMS-less lead-acid bank has no temperature probe). Consumers MUST tolerate absent optional properties.",
   "type": "object",
   "properties": {
     "soc_pct": {
@@ -23,11 +23,22 @@
       "description": "Signed: positive = charging, negative = discharging."
     },
     "temperature_c": {
-      "type": "number"
+      "type": "number",
+      "description": "Optional: only sources with a temperature probe publish it."
+    },
+    "time_to_go_s": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Optional: estimated seconds until empty at the present discharge rate. Absent while charging or idle (no meaningful estimate)."
+    },
+    "time_since_full_charge_s": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Optional: seconds since the bank was last fully charged, as tracked by the source."
     },
     "charge_state": {
       "type": "string",
-      "description": "Sourced from Venus OS's system-wide SystemState/State, fanned out to every battery id. `unknown` is the forward-compat fallback for any code not in this enum.",
+      "description": "Optional: charge stage of the system that is charging this bank. Only sources that know the stage publish it (e.g. an aggregated charger/system state); a plain shunt does not. `unknown` is the forward-compat fallback for any code not in this enum.",
       "enum": [
         "off",
         "low_power",
@@ -50,6 +61,6 @@
       ]
     }
   },
-  "required": ["soc_pct", "voltage_v", "current_a", "power_w", "temperature_c", "charge_state"],
+  "required": ["soc_pct", "voltage_v", "current_a", "power_w"],
   "additionalProperties": false
 }

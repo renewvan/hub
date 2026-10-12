@@ -170,13 +170,14 @@ services:
       - ${TILT_CONFIG_PATH:-./config/tilt/config.ini}:/app/config.ini:ro
       - ${TILT_STATE_PATH:-./config/tilt/state}:/app/state
 
-  # Victron Venus OS MQTT -> renewvan-bus battery remap. Subscribes against
-  # the GX device's own broker (VICTRON_*), publishes onto this
-  # compose's renewvan bus (mosquitto). See
-  # .scratch/renewvan-hub-v0-build/issues/04-victron-battery-bridge.md.
-  node-battery:
-    image: ghcr.io/renewvan/node-battery:v0.1.3
-    container_name: renewvan-battery
+  # Venus OS MQTT -> renewvan bus remap (battery, solar, charger). Only for
+  # vans that already run Venus OS (Cerbo GX, Pi with Venus): subscribes
+  # against that device's own broker (VENUS_*), publishes onto this
+  # compose's renewvan bus (mosquitto). Entity ids are Venus device
+  # instances. See docs/adr/0008-node-naming-and-entity-neutrality.md.
+  node-venus:
+    image: ghcr.io/renewvan/node-venus:v0.2.0
+    container_name: renewvan-venus
     restart: unless-stopped
     depends_on:
       - mosquitto
@@ -185,9 +186,9 @@ services:
       MQTT_PORT: ${RENEWVAN_PORT:-1883}
       MQTT_USERNAME: ${RENEWVAN_USERNAME:-}
       MQTT_PASSWORD: ${RENEWVAN_PASSWORD:-}
-      VICTRON_MQTT_HOST: ${VICTRON_MQTT_HOST}
-      VICTRON_MQTT_PORT: ${VICTRON_MQTT_PORT:-1883}
-      VICTRON_PORTAL_ID: ${VICTRON_PORTAL_ID}
+      VENUS_MQTT_HOST: ${VENUS_MQTT_HOST}
+      VENUS_MQTT_PORT: ${VENUS_MQTT_PORT:-1883}
+      VENUS_PORTAL_ID: ${VENUS_PORTAL_ID}
 
   # RUT-360 Data to Server MQTT -> renewvan-bus router remap. Single
   # connection to this compose's own bus: subscribes the router's raw
@@ -230,7 +231,7 @@ services:
   # not a polling backend. See
   # .scratch/renewvan-hub-v0-build/issues/06-dashboard-web-app.md.
   dashboard:
-    image: ghcr.io/renewvan/dashboard:v0.1.30
+    image: ghcr.io/renewvan/dashboard:v0.1.31-beta.1
     container_name: renewvan-dashboard
     restart: unless-stopped
     ports:

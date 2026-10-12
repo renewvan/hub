@@ -8,9 +8,10 @@ pattern decided in [dbus-ads1115 bridge interface](../.scratch/renewvan-hub-v0/i
 
 Applies to **community/non-Victron hardware** — anything the project
 itself owns the sensing for. Genuine Victron gear (VE.Direct/VE.Can)
-stays on Venus OS and gets a remap-shaped `Node` instead — same term,
-different shape (see [Battery SoC topic mapping](../.scratch/renewvan-hub-v0/issues/04-battery-soc-topic-mapping.md)
-for that counterpart), not this recipe.
+stays on Venus OS and gets a remap-shaped `Node` instead (`node-venus`) —
+same term, different shape, not this recipe. A node is named for its source,
+not the entity it publishes (see
+[ADR 0008](adr/0008-node-naming-and-entity-neutrality.md)).
 
 Worked example throughout: `dbus-ads1115` → `renewvan/tank`.
 
