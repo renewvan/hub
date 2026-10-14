@@ -22,7 +22,7 @@ Every `renewvan/*` repo formats/lints on every commit via a pre-commit hook — 
 
 ### Issue tracker
 
-Local markdown files under `.scratch/<feature-slug>/`. See `docs/agents/issue-tracker.md`.
+Issues live in GitHub Issues. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

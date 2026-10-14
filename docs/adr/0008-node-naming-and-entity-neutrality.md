@@ -20,7 +20,7 @@ Concretely, this change:
 - **The old name was wrong, not just narrow.** `node-battery` was the Venus bridge. Someone with a JK BMS would reasonably assume it reads their BMS. Naming the node for its source removes the false promise.
 - **The schema has to be the lowest common denominator, with optional extras.** A Victron SmartShunt (a real one, captured from a live Venus OS device) publishes no temperature and no charge stage, and the dashboard silently showed no battery because `isCompleteBattery` required both. An open-source schema that needs a vendor-specific field to be present excludes the simple hardware it exists to include. Required properties are only what every source can supply; consumers tolerate the rest being absent.
 - **Venus device instances are stable and need no maintenance.** A static map can't work for a project that doesn't know which instances a given van has, and the user-editable `name` can change at any time.
-- **A node clears a retained topic when its reading goes invalid.** Venus reports "no estimate" as `null` or a ~10-day `TimeToGo` sentinel; leaving the last retained value would show a stale ETA. The node publishes an empty retained payload, and consumers (the logger) treat an empty payload as "no value".
+- **A node clears a retained topic when its reading goes invalid.** Venus reports "no estimate" as `null`; leaving the last retained value would show a stale ETA. The node publishes an empty retained payload, and consumers (the logger) treat an empty payload as "no value". Venus's ~10-day cap on `TimeToGo` is a real value on the Venus screen (`9d 23h`), so it is published as-is.
 
 ## Rules this sets
 

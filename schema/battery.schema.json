@@ -29,7 +29,7 @@
     "time_to_go_s": {
       "type": "number",
       "minimum": 0,
-      "description": "Optional: estimated seconds until empty at the present discharge rate. Absent while charging or idle (no meaningful estimate)."
+      "description": "Optional: estimated seconds until empty at the present discharge rate, as the source reports it (Venus caps this at ~864000 s). Absent only when the source reports no estimate (Venus null)."
     },
     "time_since_full_charge_s": {
       "type": "number",

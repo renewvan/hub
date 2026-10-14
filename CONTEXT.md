@@ -26,7 +26,7 @@ A binary on/off load switched by the relay node (ESPHome firmware on an ESP32 ho
 _Avoid_: Switch, load (relay is the wire-schema entity name).
 
 **Battery**:
-A battery bank as seen by a shunt, BMS, or inverter-charger, whatever the vendor. Always reports `soc_pct`, `voltage_v`, `current_a`, `power_w`; optionally `temperature_c` (only with a probe), `time_to_go_s` (absent while charging or idle), `time_since_full_charge_s`, and `charge_state` (only from a source that knows the charge stage — a plain shunt does not). Today sourced from Venus OS via `renewvan/node-venus` (`system/0/Batteries`, id = Venus device instance); other sources publish the same entity from their own node.
+A battery bank as seen by a shunt, BMS, or inverter-charger, whatever the vendor. Always reports `soc_pct`, `voltage_v`, `current_a`, `power_w`; optionally `temperature_c` (only with a probe), `time_to_go_s` (present whenever the source reports a usable estimate, regardless of charge state; absent when it reports none), `time_since_full_charge_s`, and `charge_state` (only from a source that knows the charge stage — a plain shunt does not). Today sourced from Venus OS via `renewvan/node-venus` (`system/0/Batteries`, id = Venus device instance); other sources publish the same entity from their own node.
 _Avoid_: Shunt, BMS (the underlying hardware, not this project's entity name). A BMS's per-cell data is not `battery`; it gets its own `bms` entity when a BMS node exists.
 
 **Solar**:
