@@ -4,7 +4,7 @@
 
 A few terms get used a lot below and across the split-out node repos, so worth pinning down once:
 
-- **Node** — anything that publishes one specific device or feed onto the renewvan bus, normalized into the device model. This covers both ESPHome firmware on an ESP32 host (the relay node) and a Python process on the Pi (the tank and battery nodes). The term matches ESPHome nodes and Node-RED nodes. _Avoid: Driver (superseded)._
+- **Node** — anything that publishes one specific device or feed onto the renewvan bus, normalized into the device model. This covers both ESPHome firmware on an ESP32 host (the relay node) and a Python process on the Pi (the tank and Venus nodes). The term matches ESPHome nodes and Node-RED nodes. _Avoid: Driver (superseded)._
 - **Host** — the physical hardware a node runs on: the Raspberry Pi, an ESP32 board, a wall panel. One host may run several nodes; a node is never a host. _Avoid: Node (for the hardware), board, device._
 - **Plugin** — the broader installable-extension concept: nodes are one kind of plugin, but so are UI panels and (eventually) automation rule-packs. This is the term used specifically for the registry described under **Delivery and distribution** — not a synonym for "node."
 - **Package** — the distribution mechanism only (how a node or plugin ships — e.g. as its own PyPI or npm package). Says nothing about what the thing does; use node/plugin/host for that.
@@ -16,24 +16,27 @@ A few terms get used a lot below and across the split-out node repos, so worth p
 
 **Compute at the edges, intelligence at the center, safety in hardware.** Cheap ESP32 nodes own time-critical, safety-adjacent local behavior — pump dry-run cutoffs, dimmer PWM, thermostat hysteresis — and degrade gracefully if the Pi or network goes down. The Pi owns state, history, rules, and UI. Hard safety (over-current, gas shutoff, charge-disconnect) lives in dedicated hardware — fuses, BMS, thermal cutoffs — never solely in software.
 
-**Plugin-first.** A node speaks the bus contract. Each device type gets its own node, cleanly separated from the publisher logic, so adding hardware support means writing a node, not touching the core.
+**Plugin-first.** A node speaks the bus contract. Each _source_ (a protocol or brand) gets its own node, cleanly separated from the publisher logic, so adding hardware support means writing a node, not touching the core. Entities are vendor-neutral and nodes are named for their source: a Victron shunt (via `node-venus`) and a JK BMS (via a BMS node) both publish `battery`, and a consumer cannot tell which. A schema requires only what every source can supply; everything else is optional. See `docs/adr/0008-node-naming-and-entity-neutrality.md`.
 
 ## Layered architecture
 
-| Layer                    | Components                                                                                                                                                                                                                           | Recommended tech                                                                               |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
-| **Physical devices**     | Batteries/BMS, inverter-charger, MPPT, pumps, heaters, lights, tanks, doors, gas/CO/smoke, vehicle CAN                                                                                                                               | —                                                                                              |
-| **Hosts**                | Pi (runs Pi-side nodes), ESP32 boards (run ESPHome firmware nodes), wall panels, CAN HAT, ADS1115 breakout                                                                                                                           | Raspberry Pi 4/5; ESP32/ESP32-C3; MCP2515 HAT or USB-CAN for RV-C; INA226/INA3221 for shunts   |
-| **Nodes**                | ESPHome relay firmware node, tank node (ADS1115 → Pi process), battery node (Victron remap → Pi process), [VE.Direct/VE.Can/VE.Bus](http://VE.Direct/VE.Can/VE.Bus), serial-BMS, BLE sensors, RV-C bridge, Modbus/RS-485, 1-Wire/I2C | ESPHome YAML (firmware); Python node processes (Pi); ADS1115 for analog senders                |
-| **Message bus**          | Single broker, retained state, command topics, discovery                                                                                                                                                                             | Mosquitto; topic scheme `renewvan/<domain>/<device>/<property>`; Home Assistant MQTT discovery |
-| **Application services** | Device registry, automation engine, alarms, logging, config, OTA                                                                                                                                                                     | Docker Compose on Pi 4/5; InfluxDB + Grafana for history                                       |
-| **Presentation**         | Kiosk touchscreen, phone/tablet PWA, ESP32 panels, Grafana                                                                                                                                                                           | Web UI over WebSocket/MQTT-over-WS, offline-first                                              |
+| Layer                    | Components                                                                                                                                                                                                                                  | Recommended tech                                                                               |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| **Physical devices**     | Batteries/BMS, inverter-charger, MPPT, pumps, heaters, lights, tanks, doors, gas/CO/smoke, vehicle CAN                                                                                                                                      | —                                                                                              |
+| **Hosts**                | Pi (runs Pi-side nodes), ESP32 boards (run ESPHome firmware nodes), wall panels, CAN HAT, ADS1115 breakout                                                                                                                                  | Raspberry Pi 4/5; ESP32/ESP32-C3; MCP2515 HAT or USB-CAN for RV-C; INA226/INA3221 for shunts   |
+| **Nodes**                | ESPHome relay firmware node, tank node (ADS1115 → Pi process), Venus node (Victron Venus OS remap → Pi process), [VE.Direct/VE.Can/VE.Bus](http://VE.Direct/VE.Can/VE.Bus), serial-BMS, BLE sensors, RV-C bridge, Modbus/RS-485, 1-Wire/I2C | ESPHome YAML (firmware); Python node processes (Pi); ADS1115 for analog senders                |
+| **Message bus**          | Single broker, retained state, command topics, discovery                                                                                                                                                                                    | Mosquitto; topic scheme `renewvan/<domain>/<device>/<property>`; Home Assistant MQTT discovery |
+| **Application services** | Device registry, automation engine, alarms, logging, config, OTA                                                                                                                                                                            | Docker Compose on Pi 4/5; InfluxDB + Grafana for history                                       |
+| **Presentation**         | Kiosk touchscreen, phone/tablet PWA, ESP32 panels, Grafana                                                                                                                                                                                  | Web UI over WebSocket/MQTT-over-WS, offline-first                                              |
 
 ## The unified device model
 
-The single most valuable artifact this project produces isn't code — it's the versioned JSON schema in `/schema` that every node normalizes into and every consumer reads from. v0 formalizes three of these entities as JSON Schema files (`tank.schema.json`, `relay.schema.json`, `battery.schema.json`, plus validating example fixtures under `schema/examples/`); the rest of this list is the longer-term v1+ shape the same schema directory will grow into:
+The single most valuable artifact this project produces isn't code — it's the versioned JSON schema in `/schema` that every node normalizes into and every consumer reads from. v0 formalizes these entities as JSON Schema files (`tank.schema.json`, `relay.schema.json`, `battery.schema.json`, `solar.schema.json`, `charger.schema.json`, and others, plus validating example fixtures under `schema/examples/`); the rest of this list is the longer-term v1+ shape the same schema directory will grow into:
 
-- **battery** — voltage, current, SoC, charge/discharge limits, cell data
+- **battery** — SoC, voltage, current, power; optional temperature, time-to-go, charge stage
+- **solar** — a solar charge controller: PV power and voltage, battery-side voltage/current, yield today
+- **charger** — a non-solar charger (AC or alternator DC-DC): output voltage/current, input voltage
+- **bms** _(planned)_ — per-cell voltages and temperatures, protection flags, linked to a `battery` by id
 - **tank** — level %, liters, calibration curve, type (fresh/grey/black/LPG)
 - **shunt** — coulomb-counted SoC, optional fusion with BMS-reported SoC
 - **heater** — fuel type, safety state
@@ -62,7 +65,7 @@ Two hardware rules matter more than the rest: **never put mains or high-current 
 
 ## Integration strategy: bridge, don't fight
 
-- **Venus OS** — consume Venus's MQTT feed for full device coverage on a Victron-equipped van, and package normalized devices back into Venus OS using established dbus-mqtt driver patterns
+- **Venus OS** — `node-venus` consumes Venus's MQTT feed (battery, solar controllers, chargers) on a Victron-equipped van that already runs Venus OS. A van without a GX device reads VE.Direct directly with a different node that publishes the same entities (planned). Normalized devices can be packaged back into Venus OS using established dbus-mqtt driver patterns
 - **Home Assistant** — emit MQTT discovery messages so every van entity appears automatically
 - **Signal K** — export the overlapping schema (tanks, batteries, environment) for vanlifers who are also sailors
 - **RV-C** — an in/out CAN bridge for factory multiplex systems

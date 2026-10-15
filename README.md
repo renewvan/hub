@@ -43,19 +43,19 @@ vendor-agnostic glue between them.
 Early / hobby-scale (v0). This repo (`hub`) hosts the shared device-model
 schema, the MQTT/InfluxDB/Grafana deployment (docker-compose), and
 project docs. Drivers, bridges, the logger, and the dashboard each live
-in their own repo under the `renewvan` GitHub org (`node-tank`, `node-battery`,
+in their own repo under the `renewvan` GitHub org (`node-tank`, `node-venus`,
 `logger`) — see `.scratch/renewvan-hub-v0-build/` for the v0 build spec.
 Not yet ready for production van use — see \[Roadmap\](#roadmap).
 
 ## Install
 
 1. **Copy `.env.example` to `.env`** and fill in the required values
-   (Victron GX device reachability, the dashboard's browser-reachable
+   (Venus OS device reachability, if the van has one; the dashboard's browser-reachable
    MQTT-WS URL) — see `.env.example`'s comments for what each value is
    and where it's used.
 2. **Pull and start everything:** `docker compose pull && docker
 compose up -d`. This brings up the infra layer (Mosquitto, InfluxDB,
-   Grafana) alongside `node-tank`, `node-battery`, `logger`, and `dashboard` —
+   Grafana) alongside `node-tank`, `node-venus`, `logger`, and `dashboard` —
    each a pinned, independently-published image (own repo, own
    release; nothing built from source in `hub`, per
    `docs/adr/0001-compose-services-via-pinned-images-not-git-submodules.md`).
