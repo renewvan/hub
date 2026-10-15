@@ -1,11 +1,12 @@
 # renewvan Hub
 
-An open-hardware, vendor-agnostic campervan control platform: a unified device model for van hardware (tanks, relays, batteries, routers), published on a single MQTT bus by nodes, consumed by a read-only dashboard and logging. See `review/renewvan-hub-research-report.md` for the full research/architecture rationale, and `.scratch/renewvan-hub-v0/map.md` for the v0 spec effort.
+An open-hardware, vendor-agnostic campervan control platform: a unified device model for van hardware (tanks, relays, batteries, solar controllers, chargers, routers), published on a single MQTT bus by nodes, consumed by a read-only dashboard and logging. See `review/renewvan-hub-research-report.md` for the full research/architecture rationale, and `.scratch/renewvan-hub-v0/map.md` for the v0 spec effort.
 
 ## Language
 
 **Entity**:
-A category of van hardware in the unified device model (`tank`, `relay`, `battery`, `router`, `gps`, `temperature`, `tilt`), each with a fixed field list published on the MQTT bus. The machine-checkable contract for each entity's fields is the JSON Schema under [`/schema`](schema/) (`tank.schema.json`, `relay.schema.json`, `battery.schema.json`, `router.schema.json`, `gps.schema.json`, `temperature.schema.json`, `tilt.schema.json`).
+A category of van hardware in the unified device model (`tank`, `relay`, `battery`, `solar`, `charger`, `router`, `gps`, `temperature`, `tilt`), each with a field list published on the MQTT bus. The machine-checkable contract for each entity's fields is the JSON Schema under [`/schema`](schema/) (`tank.schema.json`, `relay.schema.json`, `battery.schema.json`, `solar.schema.json`, `charger.schema.json`, `router.schema.json`, `gps.schema.json`, `temperature.schema.json`, `tilt.schema.json`).
+An entity is named for what the hardware _is_, never for a brand or protocol (`battery`, not `victron-battery`): the schema is where vendor-neutrality lives. Each schema requires only the properties every source can supply and marks the rest optional, so consumers must tolerate an optional property being absent. See `docs/adr/0008-node-naming-and-entity-neutrality.md`.
 _Avoid_: Device, thing, component (too generic — use the specific entity name).
 
 **Renewvan bus**:
@@ -25,11 +26,19 @@ A binary on/off load switched by the relay node (ESPHome firmware on an ESP32 ho
 _Avoid_: Switch, load (relay is the wire-schema entity name).
 
 **Battery**:
-The house battery bank, sourced from Victron's native Venus OS MQTT feed (`N/{portalId}/system/0/Batteries`) via the `renewvan/node-battery` node. Reports `soc_pct`, `voltage_v`, `current_a`, `power_w`, `temperature_c`, `charge_state`.
-_Avoid_: Shunt, BMS (those are the underlying hardware on the Victron side, not this project's entity name).
+A battery bank as seen by a shunt, BMS, or inverter-charger, whatever the vendor. Always reports `soc_pct`, `voltage_v`, `current_a`, `power_w`; optionally `temperature_c` (only with a probe), `time_to_go_s` (present whenever the source reports a usable estimate, regardless of charge state; absent when it reports none), `time_since_full_charge_s`, and `charge_state` (only from a source that knows the charge stage — a plain shunt does not). Today sourced from Venus OS via `renewvan/node-venus` (`system/0/Batteries`, id = Venus device instance); other sources publish the same entity from their own node.
+_Avoid_: Shunt, BMS (the underlying hardware, not this project's entity name). A BMS's per-cell data is not `battery`; it gets its own `bms` entity when a BMS node exists.
+
+**Solar**:
+A solar charge controller (MPPT/PWM), whatever the vendor, one entity per controller. Always reports `power_w` and `battery_voltage_v`; optionally `battery_current_a`, `pv_voltage_v`, `pv_current_a`, `yield_today_wh`, `yield_history_wh` (the controller's own daily yield log as one retained array, newest first, index 0 = today, `null` = a day with no data; see `docs/adr/0009-solar-yield-history-as-one-retained-array.md`), and the controller's own `charge_state`. Sourced from Venus OS `solarcharger/<instance>/*` via `renewvan/node-venus`.
+_Avoid_: MPPT, PV (hardware/jargon, not the entity name); `charger` (that entity is for non-solar chargers).
+
+**Charger**:
+A non-solar battery charger, whatever the vendor: an AC mains charger (e.g. a Victron BlueSmart) or a DC-DC charger fed by the alternator (e.g. an Orion). Only `voltage_v` is required; optionally `current_a`, `power_w`, `input_voltage_v`, `source` (`ac`/`alternator`/`dc`) and `charge_state`. Sourced from Venus OS `charger/<instance>` and `alternator/<instance>` via `renewvan/node-venus`.
+_Avoid_: Booster, orion (a product line, and "booster" names no vendor-neutral thing); alternator charger (that is a `source` value, not the entity).
 
 **Router**:
-The van's uplink router — the single device connecting the van to the internet — reporting connectivity status: `signal_rsrp_dbm`/`signal_rsrq_db`/`signal_sinr_db`/`signal_rssi_dbm`, `operator`, `network_type`, `uptime_s`, and monthly SIM data usage (`data_used_month_tx_b`/`data_used_month_rx_b`). Sourced from the router vendor's push feed via the `renewvan/node-router` node, like the battery node remaps an existing feed.
+The van's uplink router — the single device connecting the van to the internet — reporting connectivity status: `signal_rsrp_dbm`/`signal_rsrq_db`/`signal_sinr_db`/`signal_rssi_dbm`, `operator`, `network_type`, `uptime_s`, and monthly SIM data usage (`data_used_month_tx_b`/`data_used_month_rx_b`). Sourced from the router vendor's push feed via the `renewvan/node-router` node, like the Venus node remaps an existing feed.
 _Avoid_: Gateway, modem (hardware inside the router, not this entity), RUT (vendor name), WAN (networking jargon — the entity's field is `network_type`).
 
 **GPS**:
@@ -45,7 +54,7 @@ Van inclination from a GY-521 / MPU-6050 accelerometer read directly by the `ren
 _Avoid_: Level, inclination, slope (the entity/topic name is `tilt`); an `is_level` boolean on the wire (a presentation threshold would force a node release to retune).
 
 **Node**:
-Anything that publishes one specific device or feed onto the renewvan bus, normalized into the device model — whether it's firmware on an ESP32 (the relay node) or a process on the Pi (the tank node), and whether it owns the sensing (the tank node's ADS1115 math) or remaps an _existing_ external feed (the battery node, remapping Victron's Venus OS MQTT feed onto `renewvan/battery/<id>/...`).
+Anything that publishes one specific device or feed onto the renewvan bus, normalized into the device model — whether it's firmware on an ESP32 (the relay node) or a process on the Pi (the tank node), and whether it owns the sensing (the tank node's ADS1115 math) or remaps an _existing_ external feed (the Venus node, remapping Venus OS's MQTT feed onto `renewvan/battery|solar|charger/<id>/...`). A node is named for its _source_ (`node-venus`, `node-wattcycle`), not for the entity it publishes: one node may publish several entities, and several nodes may publish the same entity.
 _Avoid_: Driver (superseded — one term for firmware and process alike), Bridge (a node that remaps an existing feed is still a Node).
 
 **Host**:
@@ -53,7 +62,7 @@ The physical hardware a node runs on (the Raspberry Pi, an ESP32 board, a wall p
 _Avoid_: Node (for the hardware), board, device.
 
 **Naming convention**:
-Repos are named plainly, scoped by the `renewvan` GitHub org — not a stuttering `renewvan-<name>`; the org already provides the namespace, so re-prefixing every repo restates it. Exception: Node repos carry a `node-` role prefix (`renewvan/node-tank`, `renewvan/node-battery`, `renewvan/node-relay`), because bare `tank`/`battery`/`relay` collides with the **Entity** name the moment repo, image, and env var are referenced side by side. `logger`, `dashboard`, and `mobile` aren't Nodes, so they stay bare.
+Repos are named plainly, scoped by the `renewvan` GitHub org — not a stuttering `renewvan-<name>`; the org already provides the namespace, so re-prefixing every repo restates it. Exception: Node repos carry a `node-` role prefix (`renewvan/node-tank`, `renewvan/node-venus`, `renewvan/node-relay`), because bare `tank`/`relay` collides with the **Entity** name the moment repo, image, and env var are referenced side by side. `logger`, `dashboard`, and `mobile` aren't Nodes, so they stay bare.
 
 **Kiosk plugin** (`plugins/kiosk`):
 A Pi-host process (systemd service `renewvan-node-kiosk`, not a Docker container) in `plugins/kiosk/` that bridges the renewvan bus to OS-level backlight control via the `bl_power` sysfs interface. Subscribes to `renewvan/kiosk/display/power/set`; publishes current state retained to `renewvan/kiosk/display/power`. `power/set` applies unconditionally — no remote/local gating, see `docs/kiosk-display-sleep-wake.md`'s Design decisions for why a prior remote-sleep-allowed gate was removed. Also monitors the touch device via evdev and wakes the display on any touch event while the backlight is off, and drives an opt-in auto-sleep idle timer off the same touch stream, scoped to host-local sessions only (`_display_on_origin`). Also owns brightness (`renewvan/kiosk/display/brightness`[`/set`], the sibling backlight sysfs file to `bl_power`, normalized 0-100 on the wire). See `plugins/kiosk/README.md` for the full topic table.
@@ -66,4 +75,4 @@ _Avoid_: "VPN node", "Tailscale node" (plugins are not MQTT nodes — they run o
 **Display power state** (`renewvan/kiosk/display/power`):
 A retained MQTT topic carrying `"on"` or `"off"` (see `schema/kiosk-display-power.schema.json`). Published by the kiosk plugin after each successful `vcgencmd display_power` call, and initialised from the live hardware state on startup. The dashboard reflects it via `DisplaySleepButton`'s icon only — no on-screen "sleeping" overlay (removed, see `docs/kiosk-display-sleep-wake.md`'s Design decisions: redundant with the physical backlight cut and with `node_kiosk.py`'s own touch grab, and it needed increasingly complex machinery to avoid also rendering on remote viewers). The only visible effect of `"off"` is the Pi's own backlight cutting. The matching command topic (`renewvan/kiosk/display/power/set`) carries the same payload but is not retained.
 
-**Node artifact naming** (blanket rule, not a per-repo call): a node's repo, Docker image, and `hub`-side pin all carry the same role qualifier. Pattern: repo `renewvan/node-<entity>`, image `ghcr.io/renewvan/node-<entity>`. The role prefix comes first in every artifact name. `logger` and `dashboard` are exempt (bare `renewvan/logger`, `renewvan/dashboard`). The `hub`-side pin is the `image:` tag in `docker-compose.yml` itself (git-tracked, no env var indirection — see `docs/adr/0001-compose-services-via-pinned-images-not-git-submodules.md`), not an `.env` value.
+**Node artifact naming** (blanket rule, not a per-repo call): a node's repo, Docker image, and `hub`-side pin all carry the same role qualifier. Pattern: repo `renewvan/node-<source>`, image `ghcr.io/renewvan/node-<source>`, where `<source>` is the entity for a node that owns the sensing of one kind of hardware (`node-tank`, `node-tilt`) and the protocol or brand for a node that bridges a source (`node-venus`); see `docs/adr/0008-node-naming-and-entity-neutrality.md`. The role prefix comes first in every artifact name. `logger` and `dashboard` are exempt (bare `renewvan/logger`, `renewvan/dashboard`). The `hub`-side pin is the `image:` tag in `docker-compose.yml` itself (git-tracked, no env var indirection — see `docs/adr/0001-compose-services-via-pinned-images-not-git-submodules.md`), not an `.env` value.

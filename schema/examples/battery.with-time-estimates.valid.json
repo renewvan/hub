@@ -1,0 +1,8 @@
+{
+  "soc_pct": 62.0,
+  "voltage_v": 12.9,
+  "current_a": -8.4,
+  "power_w": -108.4,
+  "time_to_go_s": 98400,
+  "time_since_full_charge_s": 168723
+}
