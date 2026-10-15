@@ -176,7 +176,7 @@ services:
   # compose's renewvan bus (mosquitto). Entity ids are Venus device
   # instances. See docs/adr/0008-node-naming-and-entity-neutrality.md.
   node-venus:
-    image: ghcr.io/renewvan/node-venus:v0.2.1
+    image: ghcr.io/renewvan/node-venus:v0.3.0
     container_name: renewvan-venus
     restart: unless-stopped
     depends_on:

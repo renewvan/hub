@@ -30,7 +30,7 @@ A battery bank as seen by a shunt, BMS, or inverter-charger, whatever the vendor
 _Avoid_: Shunt, BMS (the underlying hardware, not this project's entity name). A BMS's per-cell data is not `battery`; it gets its own `bms` entity when a BMS node exists.
 
 **Solar**:
-A solar charge controller (MPPT/PWM), whatever the vendor, one entity per controller. Always reports `power_w` and `battery_voltage_v`; optionally `battery_current_a`, `pv_voltage_v`, `pv_current_a`, `yield_today_wh`, and the controller's own `charge_state`. Sourced from Venus OS `solarcharger/<instance>/*` via `renewvan/node-venus`.
+A solar charge controller (MPPT/PWM), whatever the vendor, one entity per controller. Always reports `power_w` and `battery_voltage_v`; optionally `battery_current_a`, `pv_voltage_v`, `pv_current_a`, `yield_today_wh`, `yield_history_wh` (the controller's own daily yield log as one retained array, newest first, index 0 = today, `null` = a day with no data; see `docs/adr/0009-solar-yield-history-as-one-retained-array.md`), and the controller's own `charge_state`. Sourced from Venus OS `solarcharger/<instance>/*` via `renewvan/node-venus`.
 _Avoid_: MPPT, PV (hardware/jargon, not the entity name); `charger` (that entity is for non-solar chargers).
 
 **Charger**:
