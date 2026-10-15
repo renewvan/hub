@@ -41,10 +41,10 @@ The non-scalar was checked against the consumers that read the bus, not assumed:
 
 Option A means `node-venus` must fold Venus's one-message-per-slot feed into one array, the first state in an otherwise stateless mapper (`SolarYieldHistory` in `mapping.py`, still pure: no network, no clock). The first version published as slots arrived, and measured against the captured data a single rollover burst produced **18 intermediate arrays**, each a mix of old and new slots. That is exactly the non-atomic state Option A was chosen to avoid, so the design does not publish from the message handler. The subscriber publishes once the burst of history messages has been quiet for two seconds, and only when:
 
-- the array is complete: every slot `DaysAvailable` promises has arrived, so a node that has just started never publishes a half-filled history; and
+- the array is complete: every slot `DaysAvailable` promises has been received _since the last publish_, not merely at some point. A node that has just started never publishes a half-filled history, and a burst that stalls part way (a slow link to the GX) waits for the rest instead of publishing its new slots beside the previous burst's old ones, which is the half-shifted array again. A review of the first version found exactly that gap; and
 - it differs from the last one published, so the keepalive re-send does not republish every 30 s.
 
-A Venus `null` slot becomes a `null` entry in the array and the array still publishes. This differs from the scalar mapping, where a `null` clears the retained topic: clearing the whole history because one day is unknown would discard the other 30 days. If a controller stops reporting its days entirely, the last array stays retained; `node-venus` does not clear it.
+A controller reporting `DaysAvailable` of 0 publishes nothing: no days logged means no history, which is the property being absent (no chart), not an empty array (a chart with no bars). A negative yield is not a reading the schema allows, so it is published as `null`. A Venus `null` slot becomes a `null` entry in the array and the array still publishes. This differs from the scalar mapping, where a `null` clears the retained topic: clearing the whole history because one day is unknown would discard the other 30 days. If a controller stops reporting its days entirely, the last array stays retained; `node-venus` does not clear it.
 
 ## Why this is an ADR
 
