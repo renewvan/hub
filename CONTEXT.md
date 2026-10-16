@@ -63,19 +63,19 @@ The physical hardware a node runs on (the Raspberry Pi, an ESP32 board, a wall p
 _Avoid_: Node (for the hardware), board, device.
 
 **Demo mode**:
-A simulated van on the renewvan bus, so the dashboard (and any other consumer) can be built and shown without a van or hardware. Modelled on Venus OS's Demo mode. One switch shared by every client: any client publishes `renewvan-demo/enabled/set`, **node-demo** answers with the retained `renewvan-demo/enabled` and starts or clears the simulated van, and every dashboard follows that flag (off by default). Real nodes keep publishing on `renewvan/`, ignored while it is on. Read-only: command topics are not simulated. See `docs/demo-mode.md` and `docs/adr/0010-demo-mode-on-a-separate-topic-root.md`.
+A simulated van on the renewvan bus, so the dashboard (and any other consumer) can be built and shown without a van or hardware. Modelled on Venus OS's Demo mode. One switch shared by every client: any client publishes `renewvan/demo/enabled/set`, **node-demo** answers with the retained `renewvan/demo/enabled` and starts or clears the simulated van, and every dashboard follows that flag (off by default). Real nodes and the logger keep running, and the dashboard ignores the real van while it is on. Nothing simulated is ever persisted. Read-only: command topics are not simulated. See `docs/demo-mode.md` and `docs/adr/0010-demo-mode-publishes-under-renewvan-demo.md`.
 _Avoid_: Simulation mode, test mode, mock mode.
 
-**Demo root** (`renewvan-demo/`):
-The topic root `node-demo` publishes under, parallel to `renewvan/`: `renewvan-demo/<entity>/<id>/<property>`, with the same property names, JSON encoding and retained flag, plus `renewvan-demo/health` (`online`/`offline`, LWT). Never published on `renewvan/`, because real retained state would be overwritten and the logger (which subscribes `renewvan/#`) would write fake data to InfluxDB.
-_Avoid_: Demo bus, demo broker (it is the same broker, a different root), `renewvan/demo/...` (it must not match `renewvan/#`).
+**Demo namespace** (`renewvan/demo/`):
+The topic namespace `node-demo` publishes under, one level inside the real root: `renewvan/demo/<entity>/<id>/<property>`, with the same property names, JSON encoding and retained flag, plus `renewvan/demo/health` (`online`/`offline`, LWT) and the shared switch `renewvan/demo/enabled` (+ `/set`). It is inside `renewvan/#`, so every subscriber of the real root receives it. That is safe for the logger because it only writes four-segment topics whose domain is an entity, and a demo entity topic has five segments; `demo` is never an entity domain. Never published on a real entity topic, because real retained state would be overwritten.
+_Avoid_: Demo root, demo bus, demo broker (it is the same broker and a sub-namespace of the same root), `renewvan-demo/` (the first version's sibling root, superseded by ADR 0010).
 
 **Demo scenario** (`schema/demo/<entity>[.<name>].demo.json`):
 A hub-owned file describing one simulated entity instance: an `initial` record plus a `timeline` of `set` overlays over a `loop_s` loop, validated by `schema/validate-demo.py` against the entity's schema. Scenarios are per entity, not per source, and share one clock so entities stay coherent. Venus analogue: a `dbus-recorder` recording.
 _Avoid_: Fixture (those are `schema/examples/`, static valid/invalid payloads), recording (nothing is captured live), mock.
 
 **node-demo**:
-The process that replays every demo scenario onto the **Demo root**. A Node in mechanism (a Pi-side process with an LWT health topic) that always runs but is idle until `renewvan-demo/enabled` is `true`, so a real van shows nothing fake unless someone switches it on but a simulator in purpose: it owns no hardware and remaps no feed, so it is named for what it is, not for a source.
+The process that replays every demo scenario into the **Demo namespace**. A Node in mechanism (a Pi-side process with an LWT health topic) that always runs but is idle until `renewvan/demo/enabled` is `true`, so a real van shows nothing fake unless someone switches it on, but a simulator in purpose: it owns no hardware and remaps no feed, so it is named for what it is, not for a source.
 _Avoid_: Mock node, fake driver, simulator node.
 
 **Naming convention**:

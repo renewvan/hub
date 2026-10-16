@@ -4,18 +4,20 @@ A simulated van on the renewvan bus, so the dashboard (and any other consumer) c
 
 ## Contract
 
-**Separate topic root.** Demo data is published under `renewvan-demo/`, never `renewvan/`. The property names, JSON encoding, retained flag and `<entity>/<id>/<property>` shape are identical to the real bus, so a consumer reads demo data with the same code and only swaps the root. Reasons it is not published on `renewvan/`:
+**A namespace inside the real root.** Demo data is published under `renewvan/demo/`, one level inside `renewvan/`, and never on a real entity topic. The property names, JSON encoding, retained flag and `<entity>/<id>/<property>` shape are identical to the real bus, so a consumer reads demo data with the same code and only adds the `demo/` segment. `demo` is not an entity domain, so nothing that recognises `renewvan/<domain>/<id>/<property>` can read a demo topic as a real entity. Reasons it is not published on the real entity topics:
 
 - Real nodes publish _retained_ topics there (ADR 0008: one source per entity id). Demo values would overwrite real state and outlive the demo.
 - The logger subscribes `renewvan/#`; fake readings must never reach InfluxDB.
 
-| Topic                                    | Direction         | Payload                                                                         |
-| ---------------------------------------- | ----------------- | ------------------------------------------------------------------------------- |
-| `renewvan-demo/enabled/set`              | client → bus      | JSON `true` / `false`, not retained: the command                                |
-| `renewvan-demo/enabled`                  | `node-demo` → bus | JSON `true` / `false`, retained: the shared state every client follows          |
-| `renewvan-demo/<entity>/<id>/<property>` | `node-demo` → bus | same JSON value as `renewvan/<entity>/<id>/<property>`, retained, only while on |
-| `renewvan-demo/health`                   | `node-demo` → bus | bare `online` / `offline` (not JSON-quoted; LWT), retained                      |
-| `renewvan-demo/router/health`            | `node-demo` → bus | bare `online` while on and a router scenario exists; cleared when switched off  |
+**Consequence of sharing the root.** Anything that subscribes `renewvan/#` (a plain `mosquitto_sub`, Grafana's MQTT source, the dashboard, the logger) also receives `renewvan/demo/#`. The logger is safe by construction: it only writes four-segment topics whose domain is an entity, and a demo entity topic has five segments (`renewvan/demo/<entity>/<id>/<property>`) while every other demo topic has `demo` in the domain slot. That is pinned by a regression test in `logger`. Any other consumer that writes or acts on bus data must skip the `demo/` segment itself.
+
+| Topic                                    | Direction         | Payload                                                                                        |
+| ---------------------------------------- | ----------------- | ---------------------------------------------------------------------------------------------- |
+| `renewvan/demo/enabled/set`              | client → bus      | JSON `true` / `false`, not retained: the command                                               |
+| `renewvan/demo/enabled`                  | `node-demo` → bus | JSON `true` / `false`, retained: the shared state every client follows                         |
+| `renewvan/demo/<entity>/<id>/<property>` | `node-demo` → bus | same JSON value as `renewvan/<entity>/<id>/<property>`, retained, only while on; five segments |
+| `renewvan/demo/health`                   | `node-demo` → bus | bare `online` / `offline` (not JSON-quoted; LWT), retained                                     |
+| `renewvan/demo/router/health`            | `node-demo` → bus | bare `online` while on and a router scenario exists; cleared when switched off                 |
 
 **One shared switch.** `enabled` / `enabled/set` follow the same `<topic>` / `<topic>/set` convention as the kiosk settings. Any client publishes the command; `node-demo` applies it, republishes the retained state, and starts or clears the simulated van. Every dashboard follows the retained `enabled`, so toggling it in one client shows the demo in all of them, and it survives a reload and a `node-demo` restart. A client never flips its own view: it asks, and the view changes when the bus reports the change. With no `node-demo` running the command is never answered and the switch does nothing.
 
@@ -69,7 +71,7 @@ Command topics (`<field>/set`, e.g. temperature `name`/`unit`) are not simulated
 `node-demo` is part of the compose stack and starts with it; there is nothing to start by hand. Turn demo mode on from any dashboard: Settings → General → System → Demo mode. To drive it without a dashboard:
 
 ```sh
-mosquitto_pub -t renewvan-demo/enabled/set -m true    # on, for every client
-mosquitto_pub -t renewvan-demo/enabled/set -m false   # off
-mosquitto_sub -t renewvan-demo/enabled -v             # current shared state (retained)
+mosquitto_pub -t renewvan/demo/enabled/set -m true    # on, for every client
+mosquitto_pub -t renewvan/demo/enabled/set -m false   # off
+mosquitto_sub -t renewvan/demo/enabled -v             # current shared state (retained)
 ```
