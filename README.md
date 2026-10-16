@@ -78,9 +78,9 @@ tracks — keep your own compose override outside version control.
 
 To try the dashboard without a van, turn on Settings → General → System → Demo mode in any
 dashboard. `node-demo` is part of the compose stack and idle until asked; the switch is shared on
-the bus (`renewvan-demo/enabled`), so every client then shows a looping simulated van published
-under the separate `renewvan-demo/` topic root (see `docs/demo-mode.md`). Real nodes keep running
-alongside it and nothing real is overwritten or logged. Writing a node for an entity that already
+the bus (`renewvan/demo/enabled`), so every client then shows a looping simulated van published
+under the `renewvan/demo/` namespace (see `docs/demo-mode.md`). Real nodes and the logger keep
+running alongside it; nothing real is overwritten and nothing simulated is ever stored. Writing a node for an entity that already
 exists? You ship no demo: see `docs/porting-dbus-to-mqtt-node.md` ("Adding a node for an
 existing entity").
 

@@ -74,5 +74,5 @@ Two hardware rules matter more than the rest: **never put mains or high-current 
 
 - A flashable Raspberry Pi OS image, plus Docker Compose for the already-have-a-Pi crowd
 - An npm/PyPI-style plugin registry so nodes and UI panels are one-command installs
-- A hardware simulator so contributors can build nodes and the dashboard without a van: implemented as [demo mode](demo-mode.md), a `node-demo` that replays per-entity scenarios on the separate `renewvan-demo/` topic root (fake CAN traffic on a virtual CAN interface is still future work)
+- A hardware simulator so contributors can build nodes and the dashboard without a van: implemented as [demo mode](demo-mode.md), a `node-demo` that replays per-entity scenarios under the `renewvan/demo/` namespace (fake CAN traffic on a virtual CAN interface is still future work)
 - Remote access via Tailscale rather than custom cloud infrastructure in v1

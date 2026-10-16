@@ -1,6 +1,6 @@
 {
   "entity": "tilt",
-  "id": "demo",
+  "id": "van",
   "description": "Van settles level after parking",
   "loop_s": 120,
   "initial": {
