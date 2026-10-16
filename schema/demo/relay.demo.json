@@ -1,0 +1,17 @@
+{
+  "entity": "relay",
+  "id": "galley",
+  "description": "Galley light toggling",
+  "loop_s": 120,
+  "initial": {
+    "state": true
+  },
+  "timeline": [
+    {
+      "t": 60,
+      "set": {
+        "state": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,75 @@
+{
+  "entity": "tank",
+  "id": "grey",
+  "description": "grey_water tank, 38% -> 93% over the loop",
+  "loop_s": 120,
+  "initial": {
+    "fluid_type": "grey_water",
+    "capacity_l": 70,
+    "level_pct": 38,
+    "status": "ok",
+    "volume_since_full_l": 43.4,
+    "volume_since_empty_l": 26.6,
+    "alarm_direction": "high",
+    "alarm_threshold_pct": 90,
+    "alarm_restore_pct": 80,
+    "alarm_state": "ok",
+    "temperature_c": 17.5
+  },
+  "timeline": [
+    {
+      "t": 10,
+      "set": {
+        "level_pct": 47.2,
+        "volume_since_full_l": 37.0,
+        "volume_since_empty_l": 33.0,
+        "alarm_state": "ok"
+      }
+    },
+    {
+      "t": 30,
+      "set": {
+        "level_pct": 56.3,
+        "volume_since_full_l": 30.6,
+        "volume_since_empty_l": 39.4,
+        "alarm_state": "ok"
+      }
+    },
+    {
+      "t": 50,
+      "set": {
+        "level_pct": 65.5,
+        "volume_since_full_l": 24.1,
+        "volume_since_empty_l": 45.9,
+        "alarm_state": "ok"
+      }
+    },
+    {
+      "t": 70,
+      "set": {
+        "level_pct": 74.7,
+        "volume_since_full_l": 17.7,
+        "volume_since_empty_l": 52.3,
+        "alarm_state": "ok"
+      }
+    },
+    {
+      "t": 90,
+      "set": {
+        "level_pct": 83.8,
+        "volume_since_full_l": 11.3,
+        "volume_since_empty_l": 58.7,
+        "alarm_state": "ok"
+      }
+    },
+    {
+      "t": 110,
+      "set": {
+        "level_pct": 93.0,
+        "volume_since_full_l": 4.9,
+        "volume_since_empty_l": 65.1,
+        "alarm_state": "alarm"
+      }
+    }
+  ]
+}

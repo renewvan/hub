@@ -61,6 +61,8 @@ Worked example throughout: `dbus-ads1115` → `renewvan/tank`.
   the distinction that matters is just _how often_ a topic is
   republished (identity fields: once at startup, or on config reload;
   live fields: every sensor read/change), not whether it's retained.
+- **A demo scenario, only for a new entity or new required property**: see
+  "Definition of done" below and [demo-mode.md](demo-mode.md).
 
 ## Service lifecycle
 
@@ -88,3 +90,20 @@ Victron hardware. When picked up, they follow this same recipe — strip
 the same three D-Bus layers, keep the same domain logic and config
 pattern, add the same MQTT client/publish-loop/systemd shape — against
 whatever entity schema exists for battery/heater at that point.
+
+## Adding a node for an existing entity
+
+An external developer adding a node for an entity that already has a schema
+(e.g. a Renogy solar charger publishing `solar`) does **not** ship a demo and
+does not touch `schema/demo/`. The node only complies with the entity schema:
+required properties only, optionals may be absent, a stable id derived from
+the source, retained JSON values, and an LWT health topic. If the source
+exposes something the entity cannot represent, the path is a hub schema PR
+(with its demo update), never ad-hoc topics.
+
+## Definition of done
+
+A demo scenario is required only when adding a **new** entity schema or a
+**new required property**, in the hub PR: `schema/demo/<entity>.demo.json`
+must pass `python3 schema/validate-demo.py` (format and requirements in
+[demo-mode.md](demo-mode.md)).
