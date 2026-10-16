@@ -1,6 +1,6 @@
 {
   "entity": "gps",
-  "id": "demo",
+  "id": "van",
   "description": "Slow drive near Milan",
   "loop_s": 120,
   "initial": {

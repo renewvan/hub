@@ -25,7 +25,8 @@
       "type": "string",
       "minLength": 1,
       "pattern": "^[^/#+\\s]+$",
-      "description": "The topic id segment (renewvan-demo/<entity>/<id>/...). Never `driver` and never contains MQTT wildcards or `/`."
+      "not": { "enum": ["driver", "demo", "enabled", "health"] },
+      "description": "The topic id segment (renewvan/demo/<entity>/<id>/...). Never contains MQTT wildcards or `/`, and never one of the ids consumers treat specially: `driver` (liveness topics are dropped by id), or `demo`, `enabled`, `health` (the namespace's own control topics)."
     },
     "description": { "type": "string", "minLength": 1 },
     "loop_s": { "type": "integer", "minimum": 1 },
