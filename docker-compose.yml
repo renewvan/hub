@@ -207,6 +207,28 @@ services:
       MQTT_PASSWORD: ${RENEWVAN_PASSWORD:-}
       ROUTER_ID: ${ROUTER_ID:-main}
 
+  # Simulated van for Demo mode: replays hub/schema/demo scenarios onto the
+  # SEPARATE `renewvan-demo/` topic root (never `renewvan/`), so it cannot
+  # overwrite real retained state or reach the logger. See docs/demo-mode.md.
+  #
+  # Behind the `demo` profile: it is opt-in, and a plain
+  # `docker compose up -d` on a real van must not start a fake one. Use
+  # `docker compose --profile demo up -d`. The dashboard's Settings -> General
+  # -> Demo mode toggle only chooses which root it reads; this service is what
+  # makes the demo root non-empty.
+  node-demo:
+    profiles: ["demo"]
+    image: ghcr.io/renewvan/node-demo:v0.1.0
+    container_name: renewvan-demo
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    environment:
+      MQTT_HOST: ${RENEWVAN_HOST:-mosquitto}
+      MQTT_PORT: ${RENEWVAN_PORT:-1883}
+      MQTT_USERNAME: ${RENEWVAN_USERNAME:-}
+      MQTT_PASSWORD: ${RENEWVAN_PASSWORD:-}
+
   # renewvan/# -> InfluxDB point writer, one point per message. See
   # .scratch/renewvan-hub-v0-build/issues/05-influxdb-logger.md.
   logger:
@@ -231,7 +253,7 @@ services:
   # not a polling backend. See
   # .scratch/renewvan-hub-v0-build/issues/06-dashboard-web-app.md.
   dashboard:
-    image: ghcr.io/renewvan/dashboard:v0.1.36
+    image: ghcr.io/renewvan/dashboard:v0.1.38
     container_name: renewvan-dashboard
     restart: unless-stopped
     ports:

@@ -18,6 +18,8 @@ Every `renewvan/*` repo formats/lints on every commit via a pre-commit hook — 
 
 `./schema/validate-examples.sh` validates every fixture under `schema/examples/` against its entity's JSON Schema (`*.valid.json` must pass, `*.invalid.json` must fail). Run after any schema change.
 
+`python3 schema/validate-demo.py` (needs `pip install jsonschema`) checks every demo scenario in `schema/demo/` against its entity schema and fails if an entity has none. A new entity schema, or a new required property on one, needs a demo scenario in the same change (`docs/demo-mode.md`).
+
 ## Agent skills
 
 ### Issue tracker
