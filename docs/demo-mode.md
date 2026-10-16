@@ -9,13 +9,26 @@ A simulated van on the renewvan bus, so the dashboard (and any other consumer) c
 - Real nodes publish _retained_ topics there (ADR 0008: one source per entity id). Demo values would overwrite real state and outlive the demo.
 - The logger subscribes `renewvan/#`; fake readings must never reach InfluxDB.
 
-| Topic                                    | Direction         | Payload                                                          |
-| ---------------------------------------- | ----------------- | ---------------------------------------------------------------- |
-| `renewvan-demo/<entity>/<id>/<property>` | `node-demo` → bus | same JSON value as `renewvan/<entity>/<id>/<property>`, retained |
-| `renewvan-demo/health`                   | `node-demo` → bus | bare `online` / `offline` (not JSON-quoted; LWT), retained       |
-| `renewvan-demo/router/health`            | `node-demo` → bus | bare `online` while a router scenario exists; cleared on stop    |
+| Topic                                    | Direction         | Payload                                                                         |
+| ---------------------------------------- | ----------------- | ------------------------------------------------------------------------------- |
+| `renewvan-demo/enabled/set`              | client → bus      | JSON `true` / `false`, not retained: the command                                |
+| `renewvan-demo/enabled`                  | `node-demo` → bus | JSON `true` / `false`, retained: the shared state every client follows          |
+| `renewvan-demo/<entity>/<id>/<property>` | `node-demo` → bus | same JSON value as `renewvan/<entity>/<id>/<property>`, retained, only while on |
+| `renewvan-demo/health`                   | `node-demo` → bus | bare `online` / `offline` (not JSON-quoted; LWT), retained                      |
+| `renewvan-demo/router/health`            | `node-demo` → bus | bare `online` while on and a router scenario exists; cleared when switched off  |
 
-`node-demo` is opt-in (compose profile `demo`), publishes nothing real, and costs one idle MQTT connection plus a 1 Hz tick while running. The dashboard's **Demo mode** toggle is kiosk-local (`localStorage`, like the Alerts toggle) and only chooses which root the dashboard subscribes to (`renewvan/#` or `renewvan-demo/#`). It does not start or stop anything on the Pi, so toggling is instant, and it works from a laptop with no hub. With `node-demo` not running, the demo root is simply empty.
+**One shared switch.** `enabled` / `enabled/set` follow the same `<topic>` / `<topic>/set` convention as the kiosk settings. Any client publishes the command; `node-demo` applies it, republishes the retained state, and starts or clears the simulated van. Every dashboard follows the retained `enabled`, so toggling it in one client shows the demo in all of them, and it survives a reload and a `node-demo` restart. A client never flips its own view: it asks, and the view changes when the bus reports the change. With no `node-demo` running the command is never answered and the switch does nothing.
+
+`node-demo` always runs (compose service, no profile) and is idle while off: one MQTT connection and a 1 Hz tick that publishes nothing. It must not wait for broker acknowledgements on paho's network thread (which also receives them), so `/set` only queues the request and the 1 Hz driver thread applies it, immediately.
+
+State rules:
+
+- **Boot.** A retained `enabled: true` resumes the demo from every scenario's initial state (a crash can leave retained topics mid-loop; the first tick republishes every property). No retained value means off.
+- **Re-enabling** restarts every scenario at its beginning. A repeated `true` does not restart a running demo.
+- **Switching off** clears every simulated topic (an empty retained payload, ADR 0008's "no value") and `router/health`, but leaves `enabled: false` retained.
+- **Clean shutdown** clears the van but leaves `enabled` as it was, so a Pi that reboots while in demo mode comes back in demo mode.
+- **Invalid payloads** (anything but a JSON boolean) are ignored and logged.
+- **Clean MQTT session.** All state is in retained topics; a persistent session would replay a `/set` queued while the node was down.
 
 ## Scenarios
 
@@ -53,10 +66,10 @@ Command topics (`<field>/set`, e.g. temperature `name`/`unit`) are not simulated
 
 ## Run it
 
-```sh
-# from the hub repo, with a broker on localhost:1883
-# `demo` is a compose profile: a plain `docker compose up -d` on a real van never starts a fake one
-docker compose --profile demo up -d mosquitto node-demo
-```
+`node-demo` is part of the compose stack and starts with it; there is nothing to start by hand. Turn demo mode on from any dashboard: Settings → General → System → Demo mode. To drive it without a dashboard:
 
-Then in the dashboard: Settings → General → Demo mode.
+```sh
+mosquitto_pub -t renewvan-demo/enabled/set -m true    # on, for every client
+mosquitto_pub -t renewvan-demo/enabled/set -m false   # off
+mosquitto_sub -t renewvan-demo/enabled -v             # current shared state (retained)
+```
