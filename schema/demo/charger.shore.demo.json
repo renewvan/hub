@@ -1,0 +1,30 @@
+{
+  "entity": "charger",
+  "id": "shore",
+  "description": "Blue Smart IP22 on shore power: reports no power_w, so a consumer must derive watts. Initial record from a real Venus OS capture (node-venus/tests/fixtures/venus_capture_2026-10-16.json); the timeline is synthetic motion, not recorded.",
+  "loop_s": 120,
+  "initial": {
+    "current_a": 30.0,
+    "voltage_v": 13.28,
+    "source": "ac",
+    "charge_state": "bulk"
+  },
+  "timeline": [
+    {
+      "t": 40,
+      "set": {
+        "current_a": 22.0,
+        "voltage_v": 13.9,
+        "charge_state": "absorption"
+      }
+    },
+    {
+      "t": 80,
+      "set": {
+        "current_a": 4.0,
+        "voltage_v": 13.6,
+        "charge_state": "float"
+      }
+    }
+  ]
+}

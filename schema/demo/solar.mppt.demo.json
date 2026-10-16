@@ -1,0 +1,46 @@
+{
+  "entity": "solar",
+  "id": "mppt",
+  "description": "Solar charge controller. REAL (Venus capture, MPPT at first light): power_w, battery_voltage_v, battery_current_a, pv_voltage_v, yield_today_wh, charge_state. ADDED, not captured: pv_current_a, yield_history_wh (7 days, newest first, null = no data). The timeline is synthetic motion.",
+  "loop_s": 120,
+  "initial": {
+    "battery_current_a": 0.5,
+    "battery_voltage_v": 13.19,
+    "yield_today_wh": 0.0,
+    "pv_voltage_v": 46.7,
+    "charge_state": "bulk",
+    "power_w": 7.0,
+    "pv_current_a": 0.15,
+    "yield_history_wh": [0, 2980, 3410, 1220, null, 2640, 3100]
+  },
+  "timeline": [
+    {
+      "t": 30,
+      "set": {
+        "power_w": 38.0,
+        "battery_current_a": 2.9,
+        "pv_voltage_v": 47.2,
+        "pv_current_a": 0.81
+      }
+    },
+    {
+      "t": 60,
+      "set": {
+        "power_w": 96.0,
+        "battery_current_a": 7.3,
+        "pv_voltage_v": 47.9,
+        "yield_today_wh": 1.0,
+        "pv_current_a": 2.06
+      }
+    },
+    {
+      "t": 90,
+      "set": {
+        "power_w": 61.0,
+        "battery_current_a": 4.6,
+        "pv_voltage_v": 47.4,
+        "pv_current_a": 1.31
+      }
+    }
+  ]
+}
