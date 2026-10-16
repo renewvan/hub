@@ -74,6 +74,22 @@ host-path/bind-mount deployment (e.g. TrueNAS's Custom App "Install via
 YAML") is a personal deployment concern, not something this repo
 tracks — keep your own compose override outside version control.
 
+### Demo mode
+
+To try the dashboard without a van, run the simulated one: `docker compose --profile demo up -d mosquitto node-demo`
+publishes a looping demo van under the separate `renewvan-demo/` topic root (see
+`docs/demo-mode.md`). Then turn on Settings → General → Demo mode in the dashboard. The toggle
+only switches which topic root the dashboard reads, so real nodes can keep running alongside it
+and nothing real is overwritten. Writing a node for an entity that already exists? You ship no
+demo: see `docs/porting-dbus-to-mqtt-node.md` ("Adding a node for an existing entity").
+
+### Validating schemas
+
+- `./schema/validate-examples.sh` checks the example fixtures in `schema/examples/` against each
+  entity's JSON Schema.
+- `python3 schema/validate-demo.py` (needs `pip install jsonschema`) checks the demo scenarios in
+  `schema/demo/`; every entity needs one.
+
 ### Deploying to a Raspberry Pi over SSH
 
 `bin/bootstrap-pi.sh` and `bin/deploy.sh` automate steps 1–2 above for a

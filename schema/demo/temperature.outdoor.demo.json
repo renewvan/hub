@@ -1,0 +1,28 @@
+{
+  "entity": "temperature",
+  "id": "outdoor",
+  "description": "Outdoor probe",
+  "loop_s": 120,
+  "initial": {
+    "name": "Outside",
+    "unit": "C",
+    "source": "w1",
+    "serial": "28-00000d3a0002",
+    "temperature_c": 11.2,
+    "status": "ok"
+  },
+  "timeline": [
+    {
+      "t": 40,
+      "set": {
+        "temperature_c": 11.0
+      }
+    },
+    {
+      "t": 80,
+      "set": {
+        "temperature_c": 10.8
+      }
+    }
+  ]
+}

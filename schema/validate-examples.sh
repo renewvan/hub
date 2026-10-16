@@ -7,6 +7,8 @@ cd "$(dirname "$0")"
 status=0
 for schema in *.schema.json; do
   entity="${schema%.schema.json}"
+  # The demo envelope has no examples/ fixtures; validate-demo.py owns demo/.
+  [ "$entity" = "demo" ] && continue
   for fixture in examples/"${entity}"*.valid.json; do
     [ -e "$fixture" ] || continue
     if npx --yes ajv-cli@5 test -s "$schema" -d "$fixture" --valid >/dev/null; then

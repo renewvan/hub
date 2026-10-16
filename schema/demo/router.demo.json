@@ -1,0 +1,48 @@
+{
+  "entity": "router",
+  "id": "main",
+  "description": "LTE uplink with a signal dip",
+  "loop_s": 120,
+  "initial": {
+    "signal_rsrp_dbm": -88,
+    "signal_rsrq_db": -10,
+    "signal_sinr_db": 9,
+    "signal_rssi_dbm": -58,
+    "operator": "26203",
+    "network_type": "lte",
+    "uptime_s": 826671,
+    "data_used_month_tx_b": 140194858,
+    "data_used_month_rx_b": 385092522
+  },
+  "timeline": [
+    {
+      "t": 30,
+      "set": {
+        "signal_rsrp_dbm": -97,
+        "signal_sinr_db": 4,
+        "uptime_s": 826701,
+        "data_used_month_rx_b": 385592522
+      }
+    },
+    {
+      "t": 60,
+      "set": {
+        "signal_rsrp_dbm": -108,
+        "signal_sinr_db": 1,
+        "signal_rssi_dbm": -70,
+        "uptime_s": 826731,
+        "data_used_month_rx_b": 386092522
+      }
+    },
+    {
+      "t": 90,
+      "set": {
+        "signal_rsrp_dbm": -86,
+        "signal_sinr_db": 10,
+        "signal_rssi_dbm": -56,
+        "uptime_s": 826761,
+        "data_used_month_rx_b": 386592522
+      }
+    }
+  ]
+}
