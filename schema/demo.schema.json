@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://renewvan.dev/schema/demo.schema.json",
+  "title": "demo-scenario",
+  "description": "Envelope of a demo scenario under schema/demo/<entity>[.<id>].demo.json. `initial` is one complete entity record (it must validate against <entity>.schema.json); each `timeline` step overlays `set` on the running state and the merged result must validate too (checked by schema/validate-demo.py, which JSON Schema alone cannot express). The scenario loops every `loop_s` seconds, resetting to `initial`, like Venus OS's dbus-recorder replay.",
+  "type": "object",
+  "required": ["entity", "id", "description", "loop_s", "initial", "timeline"],
+  "additionalProperties": false,
+  "properties": {
+    "entity": {
+      "type": "string",
+      "enum": [
+        "tank",
+        "relay",
+        "battery",
+        "solar",
+        "charger",
+        "router",
+        "gps",
+        "temperature",
+        "tilt"
+      ]
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^/#+\\s]+$",
+      "description": "The topic id segment (renewvan-demo/<entity>/<id>/...). Never `driver` and never contains MQTT wildcards or `/`."
+    },
+    "description": { "type": "string", "minLength": 1 },
+    "loop_s": { "type": "integer", "minimum": 1 },
+    "initial": { "type": "object", "minProperties": 1 },
+    "timeline": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["t", "set"],
+        "additionalProperties": false,
+        "properties": {
+          "t": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Seconds from loop start; must be < loop_s and non-decreasing."
+          },
+          "set": { "type": "object", "minProperties": 1 }
+        }
+      }
+    }
+  }
+}

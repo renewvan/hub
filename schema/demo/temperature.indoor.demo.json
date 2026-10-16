@@ -1,0 +1,28 @@
+{
+  "entity": "temperature",
+  "id": "indoor",
+  "description": "Cabin probe warming slowly",
+  "loop_s": 120,
+  "initial": {
+    "name": "Cabin",
+    "unit": "C",
+    "source": "w1",
+    "serial": "28-00000d3a0001",
+    "temperature_c": 20.4,
+    "status": "ok"
+  },
+  "timeline": [
+    {
+      "t": 40,
+      "set": {
+        "temperature_c": 20.9
+      }
+    },
+    {
+      "t": 80,
+      "set": {
+        "temperature_c": 21.3
+      }
+    }
+  ]
+}
