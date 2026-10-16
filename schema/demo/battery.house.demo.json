@@ -1,0 +1,46 @@
+{
+  "entity": "battery",
+  "id": "house",
+  "description": "House battery. REAL (Venus capture, SmartShunt): soc_pct, voltage_v, current_a, power_w. ADDED, not captured (a plain shunt reports none of them; included so the time-to-go, temperature and charge-stage UI has data): temperature_c, time_to_go_s, time_since_full_charge_s, charge_state. The timeline is synthetic motion.",
+  "loop_s": 120,
+  "initial": {
+    "soc_pct": 95.5,
+    "voltage_v": 13.18,
+    "current_a": -8.0,
+    "power_w": -105.44,
+    "temperature_c": 21.0,
+    "time_to_go_s": 64800,
+    "time_since_full_charge_s": 86400,
+    "charge_state": "discharging"
+  },
+  "timeline": [
+    {
+      "t": 30,
+      "set": {
+        "current_a": -12.5,
+        "power_w": -164.0,
+        "voltage_v": 13.12,
+        "time_to_go_s": 49507
+      }
+    },
+    {
+      "t": 60,
+      "set": {
+        "current_a": -31.0,
+        "power_w": -404.55,
+        "voltage_v": 13.05,
+        "soc_pct": 95.4,
+        "time_to_go_s": 19941
+      }
+    },
+    {
+      "t": 90,
+      "set": {
+        "current_a": -6.0,
+        "power_w": -78.96,
+        "voltage_v": 13.16,
+        "time_to_go_s": 103140
+      }
+    }
+  ]
+}

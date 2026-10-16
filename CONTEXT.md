@@ -63,7 +63,7 @@ The physical hardware a node runs on (the Raspberry Pi, an ESP32 board, a wall p
 _Avoid_: Node (for the hardware), board, device.
 
 **Demo mode**:
-A simulated van on the renewvan bus, so the dashboard (and any other consumer) can be built and shown without a van or hardware. Modelled on Venus OS's Demo mode. The dashboard's **Demo mode** toggle is kiosk-local (`localStorage`, like the Alerts toggle) and only chooses which root it subscribes to; it starts and stops nothing on the Pi, and real nodes keep publishing on `renewvan/`, ignored while it is on. Read-only: command topics are not simulated. See `docs/demo-mode.md` and `docs/adr/0010-demo-mode-on-a-separate-topic-root.md`.
+A simulated van on the renewvan bus, so the dashboard (and any other consumer) can be built and shown without a van or hardware. Modelled on Venus OS's Demo mode. One switch shared by every client: any client publishes `renewvan-demo/enabled/set`, **node-demo** answers with the retained `renewvan-demo/enabled` and starts or clears the simulated van, and every dashboard follows that flag (off by default). Real nodes keep publishing on `renewvan/`, ignored while it is on. Read-only: command topics are not simulated. See `docs/demo-mode.md` and `docs/adr/0010-demo-mode-on-a-separate-topic-root.md`.
 _Avoid_: Simulation mode, test mode, mock mode.
 
 **Demo root** (`renewvan-demo/`):
@@ -75,7 +75,7 @@ A hub-owned file describing one simulated entity instance: an `initial` record p
 _Avoid_: Fixture (those are `schema/examples/`, static valid/invalid payloads), recording (nothing is captured live), mock.
 
 **node-demo**:
-The process that replays every demo scenario onto the **Demo root**. A Node in mechanism (a Pi-side process with an LWT health topic, started via the `demo` compose profile so a plain `docker compose up -d` on a real van never runs it) but a simulator in purpose: it owns no hardware and remaps no feed, so it is named for what it is, not for a source.
+The process that replays every demo scenario onto the **Demo root**. A Node in mechanism (a Pi-side process with an LWT health topic) that always runs but is idle until `renewvan-demo/enabled` is `true`, so a real van shows nothing fake unless someone switches it on but a simulator in purpose: it owns no hardware and remaps no feed, so it is named for what it is, not for a source.
 _Avoid_: Mock node, fake driver, simulator node.
 
 **Naming convention**:

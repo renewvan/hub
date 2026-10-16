@@ -76,12 +76,13 @@ tracks — keep your own compose override outside version control.
 
 ### Demo mode
 
-To try the dashboard without a van, run the simulated one: `docker compose --profile demo up -d mosquitto node-demo`
-publishes a looping demo van under the separate `renewvan-demo/` topic root (see
-`docs/demo-mode.md`). Then turn on Settings → General → Demo mode in the dashboard. The toggle
-only switches which topic root the dashboard reads, so real nodes can keep running alongside it
-and nothing real is overwritten. Writing a node for an entity that already exists? You ship no
-demo: see `docs/porting-dbus-to-mqtt-node.md` ("Adding a node for an existing entity").
+To try the dashboard without a van, turn on Settings → General → System → Demo mode in any
+dashboard. `node-demo` is part of the compose stack and idle until asked; the switch is shared on
+the bus (`renewvan-demo/enabled`), so every client then shows a looping simulated van published
+under the separate `renewvan-demo/` topic root (see `docs/demo-mode.md`). Real nodes keep running
+alongside it and nothing real is overwritten or logged. Writing a node for an entity that already
+exists? You ship no demo: see `docs/porting-dbus-to-mqtt-node.md` ("Adding a node for an
+existing entity").
 
 ### Validating schemas
 
