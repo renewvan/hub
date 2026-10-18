@@ -62,6 +62,14 @@ _Avoid_: Driver (superseded — one term for firmware and process alike), Bridge
 The physical hardware a node runs on (the Raspberry Pi, an ESP32 board, a wall panel). One host may run several nodes; a node is never a host.
 _Avoid_: Node (for the hardware), board, device.
 
+**Node manifest**:
+The static description of one **Node**, written once by its author as `manifest.json` at the root of the Node's repo: its key (`node`), `product` name, `source`, the entity types it `publishes`, and optionally a `manufacturer` and `homepage`. It never carries a version or a Host serial. Contract: `schema/node-manifest.schema.json`. See `docs/adr/0011-node-manifest-and-retained-info-topic.md`.
+_Avoid_: Config, descriptor, metadata (too generic); Device (the Venus-style page a consumer shows for a Node, not the manifest).
+
+**Node info**:
+What a **Node** publishes about itself, retained, at `renewvan/<node>/info`: its **Node manifest** plus the version it is running and, when known, the serial of its **Host**. It stays on the bus when the Node goes offline. Not an entity: it has no `<id>`. Contract: `schema/node-info.schema.json`. See `docs/adr/0011-node-manifest-and-retained-info-topic.md`.
+_Avoid_: Node status, heartbeat (that is the separate `online`/`offline` health word); Node metadata.
+
 **Demo mode**:
 A simulated van on the renewvan bus, so the dashboard (and any other consumer) can be built and shown without a van or hardware. Modelled on Venus OS's Demo mode. One switch shared by every client: any client publishes `renewvan/demo/enabled/set`, **node-demo** answers with the retained `renewvan/demo/enabled` and starts or clears the simulated van, and every dashboard follows that flag (off by default). Real nodes and the logger keep running, and the dashboard ignores the real van while it is on. Nothing simulated is ever persisted. Read-only: command topics are not simulated. See `docs/demo-mode.md` and `docs/adr/0010-demo-mode-publishes-under-renewvan-demo.md`.
 _Avoid_: Simulation mode, test mode, mock mode.
