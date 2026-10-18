@@ -17,8 +17,12 @@ Fleet pass: the simulated Nodes in demo/fleet.demo-fleet.json (not matched by th
 each entry's `info` against node-info.schema.json, with `info.node` equal to the
 entry's `node`; the reserved key `demo` is rejected (by the slug pattern in
 demo-fleet.schema.json and node-info.schema.json); every `publishes` type has an
-entity scenario; `health_timeline` times are non-decreasing and < `loop_s`; and
-exactly one Node carries a `health_timeline`.
+entity scenario; `health_timeline` times are non-decreasing and < `loop_s`; exactly
+one Node carries a `health_timeline`; versions and serials are visibly fake (`dev` or
+`*-demo`; a `DEMO` serial or a unicast, locally administered MAC); the node-key pattern matches
+node-info.schema.json's so the reserved key cannot drift; and the fleet shows every
+Device-page state (a node with no info, an offline node with retained info, a `dev`
+build, a MAC serial, a multi-entity node) plus the `router`.
 
 Requires `jsonschema` (pip install jsonschema). Exit 1 on any failure.
 """
@@ -26,6 +30,7 @@ Requires `jsonschema` (pip install jsonschema). Exit 1 on any failure.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -53,22 +58,36 @@ def entity_schemas() -> dict[str, Path]:
     return found
 
 
+# A visibly fake host serial is a `DEMO` marker, or a locally administered MAC (second hex digit
+# of the first octet is 2, 6, A or E, so unicast): vendors assign globally administered MACs.
+FAKE_PI_SERIAL = re.compile(r"^DEMO[0-9A-F]{12}$")
+MAC_SERIAL = re.compile(r"^[0-9A-F][26AE](:[0-9A-F]{2}){5}$")
+FAKE_VERSION = re.compile(r"^(dev|.*-demo)$")
+
+
 def validate_fleet(covered: set[str]) -> list[str]:
     """Fleet pass: returns failure messages (empty when the fleet is valid)."""
     rel = FLEET_PATH.relative_to(SCHEMA_DIR)
     if not FLEET_PATH.exists():
         return [f"{rel}: fleet file is missing"]
     fleet = load(FLEET_PATH)
-    env_errors = list(
-        Draft7Validator(load(SCHEMA_DIR / "demo-fleet.schema.json")).iter_errors(fleet)
-    )
+    fleet_schema = load(SCHEMA_DIR / "demo-fleet.schema.json")
+    info_schema = load(SCHEMA_DIR / "node-info.schema.json")
+    env_errors = list(Draft7Validator(fleet_schema).iter_errors(fleet))
     if env_errors:
         return [f"{rel}: envelope: {env_errors[0].message}"]
 
-    info_validator = Draft7Validator(load(SCHEMA_DIR / "node-info.schema.json"))
+    # The reserved key `demo` is rejected by the node-key pattern in each schema; fail if the
+    # fleet's copy ever stops matching the real contract's.
+    fleet_pattern = fleet_schema["properties"]["nodes"]["items"]["properties"]["node"]["pattern"]
+    if fleet_pattern != info_schema["properties"]["node"]["pattern"]:
+        return [f"{rel}: node key pattern differs from node-info.schema.json"]
+
+    info_validator = Draft7Validator(info_schema)
     failures: list[str] = []
     flapping: list[str] = []
     seen: set[str] = set()
+    valid_infos: list[dict] = []
     for entry in fleet["nodes"]:
         key = entry["node"]
         where = f"{rel}: node '{key}'"
@@ -84,9 +103,19 @@ def validate_fleet(covered: set[str]) -> list[str]:
             elif info["node"] != key:
                 failures.append(f"{where}: info.node is '{info['node']}', expected '{key}'")
             else:
+                valid_infos.append(info)
                 for entity in info["publishes"]:
                     if entity not in covered:
                         failures.append(f"{where}: publishes '{entity}', which has no scenario")
+                if not FAKE_VERSION.match(info["version"]):
+                    failures.append(
+                        f"{where}: version '{info['version']}' must be `dev` or end -demo"
+                    )
+                serial = info.get("host_serial")
+                if serial is not None and not (
+                    FAKE_PI_SERIAL.match(serial) or MAC_SERIAL.match(serial)
+                ):
+                    failures.append(f"{where}: host_serial '{serial}' is not visibly fake")
 
         timeline = entry.get("health_timeline")
         if timeline:
@@ -105,6 +134,25 @@ def validate_fleet(covered: set[str]) -> list[str]:
     if len(flapping) != 1:
         found = ", ".join(flapping) or "none"
         failures.append(f"{rel}: exactly one node must have a health_timeline, found: {found}")
+
+    wanted = [
+        (any("info" not in e for e in fleet["nodes"]), "a node with no info"),
+        (
+            any(e["health"] == "offline" and "info" in e for e in fleet["nodes"]),
+            "an offline node with retained info",
+        ),
+        (any(i["version"] == "dev" for i in valid_infos), "a `dev` build"),
+        (
+            any(MAC_SERIAL.match(i.get("host_serial", "")) for i in valid_infos),
+            "a node with a MAC serial",
+        ),
+        (
+            any(len(i["publishes"]) > 1 for i in valid_infos),
+            "a node publishing more than one entity",
+        ),
+        ("router" in seen, "the `router` node"),
+    ]
+    failures.extend(f"{rel}: fleet must include {what}" for ok, what in wanted if not ok)
     return failures
 
 

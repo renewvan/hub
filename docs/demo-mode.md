@@ -91,7 +91,7 @@ The simulated Nodes are declared in one hub-owned file, [`schema/demo/fleet.demo
 - The shipped fleet shows every Device-page state: a healthy multi-entity Node (`venus`), a `dev` build (`tank`), entities with no info (`gps`), an offline Node with retained info (`tilt`), an ESP32 with a MAC serial (`relay`), and the one flapping Node (`router`).
 - **Versions and serials are visibly fake** (`v0.0.0-demo`, `DEMO…`, `DE:AD:BE:EF:…`) and never read from the Pi, so a screenshot of the demo cannot leak a real serial.
 
-The fleet pass of `validate-demo.py` checks: the envelope; each `info` against `node-info.schema.json` with `info.node` equal to the entry's `node`; the reserved key `demo` is rejected (by the slug pattern in both schemas, so it cannot drift from the real contract); every `publishes` type has an entity scenario; `health_timeline` times are non-decreasing and `< loop_s`; and exactly one Node flaps.
+The fleet pass of `validate-demo.py` checks: the envelope; each `info` against `node-info.schema.json` with `info.node` equal to the entry's `node`; the reserved key `demo` is rejected (by the node-key pattern, which must stay identical in `demo-fleet.schema.json` and `node-info.schema.json`, so it cannot drift from the real contract); every `publishes` type has an entity scenario; `health_timeline` times are non-decreasing and `< loop_s`; exactly one Node flaps; versions and serials are visibly fake (`dev` or `*-demo`; a `DEMO…` serial or a unicast, locally administered MAC, which a vendor does not assign to a real device); and the fleet includes every state listed above plus the `router`.
 
 ## Requirement for every node
 
