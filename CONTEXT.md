@@ -63,7 +63,7 @@ The physical hardware a node runs on (the Raspberry Pi, an ESP32 board, a wall p
 _Avoid_: Node (for the hardware), board, device.
 
 **Node manifest**:
-The static description of one **Node**, written once by its author as `manifest.json` at the root of the Node's repo: its key (`node`), `product` name, `source`, the entity types it `publishes`, and optionally a `manufacturer` and `homepage`. It never carries a version or a Host serial. Contract: `schema/node-manifest.schema.json`. See `docs/adr/0011-node-manifest-and-retained-info-topic.md`.
+The static description of one **Node**, written once by its author as `manifest.json` at the root of the Node's repo: what the Node is, what it reads, and which entity types it publishes. It never carries a version or a Host serial. Contract: `schema/node-manifest.schema.json`. See `docs/adr/0011-node-manifest-and-retained-info-topic.md`.
 _Avoid_: Config, descriptor, metadata (too generic); Device (the Venus-style page a consumer shows for a Node, not the manifest).
 
 **Node info**:
