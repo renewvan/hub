@@ -27,7 +27,7 @@ SCHEMA_DIR = Path(__file__).parent
 DEMO_DIR = SCHEMA_DIR / "demo"
 
 # Schemas that are not bus entities (command/status topics, the envelope itself).
-NON_ENTITY_PREFIXES = ("kiosk-", "tailscale-", "demo")
+NON_ENTITY_PREFIXES = ("kiosk-", "tailscale-", "node-", "demo")
 
 
 def load(path: Path):

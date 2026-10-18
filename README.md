@@ -87,7 +87,10 @@ existing entity").
 ### Validating schemas
 
 - `./schema/validate-examples.sh` checks the example fixtures in `schema/examples/` against each
-  entity's JSON Schema.
+  schema (entities, plus `node-manifest` and `node-info`, the contract for a Node's `manifest.json`
+  and its retained `renewvan/<node>/info` payload). It also fails when an entity schema exists that
+  the `publishes` enum in `node-manifest.schema.json` and `node-info.schema.json` does not list, so
+  adding an entity means adding it to both enums.
 - `python3 schema/validate-demo.py` (needs `pip install jsonschema`) checks the demo scenarios in
   `schema/demo/`; every entity needs one.
 
