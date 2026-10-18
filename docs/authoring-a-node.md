@@ -21,14 +21,14 @@ At the root of your Node repo. It is the single source of the static fields.
 }
 ```
 
-| Field          | Required | Rule                                                                                                                                                       |
-| -------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `node`         | yes      | Lowercase slug, no `node-` prefix (repo `node-venus` is node `venus`). Must equal the topic segment you publish under. `demo` is reserved and is rejected. |
-| `product`      | yes      | Human name, non-empty. Shown as the Node's title.                                                                                                          |
-| `source`       | yes      | What you read: the hardware or feed. Non-empty.                                                                                                            |
-| `publishes`    | yes      | Non-empty, unique list of entity types from the schema's enum (`battery`, `charger`, `gps`, `relay`, `router`, `solar`, `tank`, `temperature`, `tilt`).    |
-| `manufacturer` | no       | Non-empty when present. Consumers show `renewvan` when info exists without one.                                                                            |
-| `homepage`     | no       | An `http://` or `https://` URL.                                                                                                                            |
+| Field          | Required | Rule                                                                                                                                                                                                                |
+| -------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `node`         | yes      | Lowercase slug starting with a letter (letters, digits, single hyphens), no `node-` prefix (repo `node-venus` is node `venus`). Must equal the topic segment you publish under. `demo` is reserved and is rejected. |
+| `product`      | yes      | Human name, non-empty. Shown as the Node's title.                                                                                                                                                                   |
+| `source`       | yes      | What you read: the hardware or feed. Non-empty.                                                                                                                                                                     |
+| `publishes`    | yes      | Non-empty, unique list of entity types from the `publishes` enum in the schema (one value per entity schema under `schema/`).                                                                                       |
+| `manufacturer` | no       | Non-empty when present. Consumers show `renewvan` when info exists without one.                                                                                                                                     |
+| `homepage`     | no       | An `http://` or `https://` URL.                                                                                                                                                                                     |
 
 **`version` and `host_serial` are forbidden in the manifest** (the schema rejects them). A hand-edited version could disagree with the release; the serial belongs to whichever Host the Node lands on.
 
@@ -40,7 +40,7 @@ The version is not in the manifest. Your Node reads it at runtime.
 
 - **Python Nodes:** the git **release tag** is the only source. The release workflow passes it as a build argument that becomes an environment variable the Node reads. Do not keep a `version` file or a `__version__`; the packaging version is a fixed placeholder nothing reads.
 - **`dev` fallback:** when the variable is unset, report the literal `dev`. A development run still publishes something truthful, and `version` is required in info, so never publish an empty one.
-- **ESP32 relay:** the owner flashes a locally built binary, so a CI binary is not what runs on a van. The flash script derives the version from the owner's checkout with `git describe --tags --always --dirty` and always passes it to the build. An untagged tree flashes with a hash version; the script does not refuse. The firmware defaults to `dev`.
+- **ESP32 relay:** the owner flashes a locally built binary, so a CI binary is not what runs on a van. The flash script derives the version from the owner's checkout with `git describe --tags --always --dirty` and always passes it to the build. An untagged tree flashes with a hash version; the script does not refuse. The firmware defaults to `dev`, because a missing build argument would otherwise silently ship a literal placeholder.
 
 ## 3. Publish info before `online`
 
@@ -57,7 +57,7 @@ Rules:
 - **Leave info retained when you go offline.** Do not clear it on shutdown or from the last will. That retained info is what lets a consumer say "offline, last seen vX".
 - Info validates against `node-info.schema.json`: the manifest fields, a required non-empty `version`, and an optional non-empty `host_serial`, with no other properties.
 
-Python Nodes copy one small helper into their own repo (about 15 lines) rather than importing a shared package, so each Node releases independently (ADR 0011, ADR 0001). It loads the manifest, adds the stamped version and the serial, and serialises the result. Python Node images copy `manifest.json` into the package at build time and the Node reads the copy beside its own module, falling back to the repo-root file when run from a checkout.
+Python Nodes copy one small helper into their own repo (about 15 lines) rather than importing a shared package, so each Node releases independently (ADR 0011, ADR 0001). It loads the manifest, adds the stamped version and the serial, and serialises the result. The decided layout for Python Nodes is that the image build copies `manifest.json` into the package and the Node reads the copy beside its own module, falling back to the repo-root file when run from a checkout. No Node implements this yet.
 
 ## 4. Host serial: parse and omit
 
@@ -71,7 +71,7 @@ The schema only requires a non-empty string, so these two formats are convention
 
 ## 5. Pass the CI gate
 
-Every Node repo's CI fetches `node-manifest.schema.json` from this repo at a **pinned ref** and validates `manifest.json` against it. Pin to a tag or commit SHA, not a branch, so a hub change cannot break your CI unannounced; bump the pin when you want a newer contract.
+Every Node repo's CI fetches `node-manifest.schema.json` from this repo at a **pinned ref** and validates `manifest.json` against it. Pinning means a later hub change cannot break your CI unannounced; bump the pin when you want a newer contract.
 
 To check locally against this repo's copy:
 
