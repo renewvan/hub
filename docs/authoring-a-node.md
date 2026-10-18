@@ -81,9 +81,9 @@ npx --yes ajv-cli@5 validate -s path/to/hub/schema/node-manifest.schema.json -d 
 
 ## 6. Demo fleet
 
-A Node is not done for the dashboard until Demo mode can show it. The simulated fleet is declared in one hub-owned file that `node-demo` replays under the Demo namespace as retained info and health. Each simulated Node's info must validate against `node-info.schema.json`, and every type in its `publishes` must have an entity scenario under `schema/demo/`. Versions and serials in the fleet are visibly fake and never read from the Pi. See [demo-mode.md](demo-mode.md).
+A Node is not done for the dashboard until Demo mode can show it. The simulated fleet is declared in one hub-owned file, `schema/demo/fleet.demo-fleet.json`, that `node-demo` replays under the Demo namespace as retained info and health. `python3 schema/validate-demo.py` checks each entry's info against `node-info.schema.json`, and that every type in its `publishes` has an entity scenario under `schema/demo/`. Versions and serials in the fleet are visibly fake and never read from the Pi. See [demo-mode.md](demo-mode.md).
 
-> The fleet file and its validator are specified in renewvan/hub#35 but are not in this repo yet. Until they land, a new Node ships no fleet entry; this section describes the requirement it will be held to.
+Add your Node to the fleet in the same change as its first release if you want Demo mode to show it. A new **required** property on the info schema needs every fleet entry updated in the same change. The fleet format is in [demo-mode.md](demo-mode.md#simulated-nodes-the-fleet-file).
 
 ## When you add an entity
 

@@ -11,13 +11,14 @@ A simulated van on the renewvan bus, so the dashboard (and any other consumer) c
 
 **Consequence of sharing the root.** Anything that subscribes `renewvan/#` (a plain `mosquitto_sub`, Grafana's MQTT source, the dashboard, the logger) also receives `renewvan/demo/#`. The logger is safe by construction: it only writes four-segment topics whose domain is an entity, and a demo entity topic has five segments (`renewvan/demo/<entity>/<id>/<property>`) while every other demo topic has `demo` in the domain slot. That is pinned by a regression test in `logger`. Any other consumer that writes or acts on bus data must skip the `demo/` segment itself.
 
-| Topic                                    | Direction         | Payload                                                                                        |
-| ---------------------------------------- | ----------------- | ---------------------------------------------------------------------------------------------- |
-| `renewvan/demo/enabled/set`              | client → bus      | JSON `true` / `false`, not retained: the command                                               |
-| `renewvan/demo/enabled`                  | `node-demo` → bus | JSON `true` / `false`, retained: the shared state every client follows                         |
-| `renewvan/demo/<entity>/<id>/<property>` | `node-demo` → bus | same JSON value as `renewvan/<entity>/<id>/<property>`, retained, only while on; five segments |
-| `renewvan/demo/health`                   | `node-demo` → bus | bare `online` / `offline` (not JSON-quoted; LWT), retained                                     |
-| `renewvan/demo/router/health`            | `node-demo` → bus | bare `online` while on and a router scenario exists; cleared when switched off                 |
+| Topic                                    | Direction         | Payload                                                                                                     |
+| ---------------------------------------- | ----------------- | ----------------------------------------------------------------------------------------------------------- |
+| `renewvan/demo/enabled/set`              | client → bus      | JSON `true` / `false`, not retained: the command                                                            |
+| `renewvan/demo/enabled`                  | `node-demo` → bus | JSON `true` / `false`, retained: the shared state every client follows                                      |
+| `renewvan/demo/<entity>/<id>/<property>` | `node-demo` → bus | same JSON value as `renewvan/<entity>/<id>/<property>`, retained, only while on; five segments              |
+| `renewvan/demo/health`                   | `node-demo` → bus | bare `online` / `offline` (not JSON-quoted; LWT), retained                                                  |
+| `renewvan/demo/<node>/info`              | `node-demo` → bus | Node info JSON from the fleet file, retained, only while on; three segments; absent for a Node with no info |
+| `renewvan/demo/<node>/health`            | `node-demo` → bus | bare `online` / `offline` per the fleet file, retained, only while on; cleared when switched off            |
 
 **One shared switch.** `enabled` / `enabled/set` follow the same `<topic>` / `<topic>/set` convention as the kiosk settings. Any client publishes the command; `node-demo` applies it, republishes the retained state, and starts or clears the simulated van. Every dashboard follows the retained `enabled`, so toggling it in one client shows the demo in all of them, and it survives a reload and a `node-demo` restart. A client never flips its own view: it asks, and the view changes when the bus reports the change. With no `node-demo` running the command is never answered and the switch does nothing.
 
@@ -27,7 +28,7 @@ State rules:
 
 - **Boot.** A retained `enabled: true` resumes the demo from every scenario's initial state (a crash can leave retained topics mid-loop; the first tick republishes every property). No retained value means off.
 - **Re-enabling** restarts every scenario at its beginning. A repeated `true` does not restart a running demo.
-- **Switching off** clears every simulated topic (an empty retained payload, ADR 0008's "no value") and `router/health`, but leaves `enabled: false` retained.
+- **Switching off** clears every simulated topic (an empty retained payload, ADR 0008's "no value"), including every simulated Node's `info` and `health`, but leaves `enabled: false` retained.
 - **Clean shutdown** clears the van but leaves `enabled` as it was, so a Pi that reboots while in demo mode comes back in demo mode.
 - **Invalid payloads** (anything but a JSON boolean) are ignored and logged.
 - **Clean MQTT session.** All state is in retained topics; a persistent session would replay a `/set` queued while the node was down.
@@ -53,7 +54,44 @@ One file per simulated entity instance under [`schema/demo/`](../schema/demo/), 
 - Every scenario shares one clock, so entities stay coherent (solar rising while the battery charges).
 - Values are realistic and schema-valid. Prefer values captured from a real device (`node-venus/tests/fixtures/venus_capture_*.json`) over invented ones.
 
-`schema/validate-demo.py` checks the envelope, validates `initial` and every cumulative `initial ⊕ set` against the entity schema, and fails if an entity has **no** scenario.
+`schema/validate-demo.py` checks the envelope, validates `initial` and every cumulative `initial ⊕ set` against the entity schema, and fails if an entity has **no** scenario. It also runs the [fleet pass](#simulated-nodes-the-fleet-file).
+
+### Simulated Nodes: the fleet file
+
+The simulated Nodes are declared in one hub-owned file, [`schema/demo/fleet.demo-fleet.json`](../schema/demo/fleet.demo-fleet.json), enveloped by [`schema/demo-fleet.schema.json`](../schema/demo-fleet.schema.json). It is named `*.demo-fleet.json` so the per-entity glob (`*.demo.json`) never matches it, and the entity validation is unchanged. `node-demo` is a simulator, not a Node (`CONTEXT.md`): it has no manifest, info or entry of its own. This file is the contract; the replay of the fleet is a `node-demo` change that follows this one, so until it ships `node-demo` still publishes only the router's health topic.
+
+```json
+{
+  "description": "…",
+  "loop_s": 120,
+  "nodes": [
+    {
+      "node": "venus",
+      "health": "online",
+      "info": { "node": "venus", "version": "v0.0.0-demo", "…": "…" }
+    },
+    { "node": "gps", "health": "online" },
+    {
+      "node": "router",
+      "health": "online",
+      "health_timeline": [
+        { "t": 60, "health": "offline" },
+        { "t": 90, "health": "online" }
+      ],
+      "info": { "node": "router", "…": "…" }
+    }
+  ]
+}
+```
+
+- `info` is a complete [Node info](../schema/node-info.schema.json), published retained at loop start. **Omit it** to simulate a Node that publishes no info (health only).
+- `health` is the bare retained word at loop start. `offline` with an `info` present is a Node that dropped and left its retained info.
+- `health_timeline` overlays health at `t` seconds into the loop; health resets to `health` at each loop start. Exactly one Node has one, so the live online-to-offline-to-online transition is on display. The shipped one is the router, dropping out as its signal bottoms out (`router.demo.json`, t=60) and returning as it recovers (t=90).
+- Shares one clock and `loop_s` with the entity scenarios.
+- The shipped fleet shows every Device-page state: a healthy multi-entity Node (`venus`), a `dev` build (`tank`), entities with no info (`gps`), an offline Node with retained info (`tilt`), an ESP32 with a MAC serial (`relay`), and the one flapping Node (`router`).
+- **Versions and serials are visibly fake** (`v0.0.0-demo`, `DEMO…`, `DE:AD:BE:EF:…`) and never read from the Pi, so a screenshot of the demo cannot leak a real serial.
+
+The fleet pass of `validate-demo.py` checks: the envelope; each `info` against `node-info.schema.json` with `info.node` equal to the entry's `node`; the reserved key `demo` is rejected (by the slug pattern in both schemas, so it cannot drift from the real contract); every `publishes` type has an entity scenario; `health_timeline` times are non-decreasing and `< loop_s`; and exactly one Node flaps.
 
 ## Requirement for every node
 
@@ -63,6 +101,8 @@ An entity is not done until it has a demo scenario. Concretely, a change that ad
 2. keep the scenario exercising each state a consumer must handle: at minimum the optional-absent case (a source that omits optional properties) and, where the entity has alarm/fault semantics, one step that enters it (a tank crossing its threshold, a router signal dip).
 
 `validate-demo.py` enforces (1) mechanically; (2) is a review item. A new _node_ for an existing entity (another BMS publishing `battery`) needs no new scenario: the scenario is per entity, not per source, because the dashboard cannot tell sources apart (ADR 0008).
+
+A new **required** property on the Node info schema (`schema/node-info.schema.json`) likewise needs a fleet update in the same change: every entry's `info` in `schema/demo/fleet.demo-fleet.json` must still validate, and `validate-demo.py` fails until it does. A new entity type also needs it listed in the `publishes` enum of both Node schemas (`schema/validate-examples.sh` enforces that) and, for the dashboard to show it under a Node, a fleet Node that publishes it.
 
 Command topics (`<field>/set`, e.g. temperature `name`/`unit`) are not simulated by `node-demo`: demo state is read-only. The dashboard disables or no-ops its writes in demo mode.
 

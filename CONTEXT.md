@@ -82,8 +82,12 @@ _Avoid_: Demo root, demo bus, demo broker (it is the same broker and a sub-names
 A hub-owned file describing one simulated entity instance: an `initial` record plus a `timeline` of `set` overlays over a `loop_s` loop, validated by `schema/validate-demo.py` against the entity's schema. Scenarios are per entity, not per source, and share one clock so entities stay coherent. Venus analogue: a `dbus-recorder` recording.
 _Avoid_: Fixture (those are `schema/examples/`, static valid/invalid payloads), recording (nothing is captured live), mock.
 
+**Demo fleet** (`schema/demo/fleet.demo-fleet.json`):
+A hub-owned file declaring the simulated **Nodes** of a demo van: each entry is a complete **Node info** plus the health to show, optionally a health timeline over the shared `loop_s` loop, and no info at all to simulate a Node that has not been updated. Versions and serials in it are visibly fake. It is separate from the **Demo scenarios** (which are per entity) and is validated by the fleet pass of `schema/validate-demo.py`. See `docs/demo-mode.md`.
+_Avoid_: Fixture (those are `schema/examples/`), scenario (that is per entity), mock fleet.
+
 **node-demo**:
-The process that replays every demo scenario into the **Demo namespace**. A Node in mechanism (a Pi-side process with an LWT health topic) that always runs but is idle until `renewvan/demo/enabled` is `true`, so a real van shows nothing fake unless someone switches it on, but a simulator in purpose: it owns no hardware and remaps no feed, so it is named for what it is, not for a source.
+The process that replays every **Demo scenario** and the **Demo fleet** into the **Demo namespace**. A Pi-side process with an LWT health topic that always runs, idle until `renewvan/demo/enabled` is `true`, so a real van shows nothing fake unless someone switches it on. It is a simulator, not a **Node**: it owns no hardware, remaps no feed, and has no **Node manifest** or **Node info** of its own, so it is named for what it is, not for a source.
 _Avoid_: Mock node, fake driver, simulator node.
 
 **Naming convention**:

@@ -11,7 +11,7 @@ status=0
 # validate-demo.py.
 is_entity() {
   case "$1" in
-    demo | kiosk-* | tailscale-* | node-*) return 1 ;;
+    demo | demo-* | kiosk-* | tailscale-* | node-*) return 1 ;;
     *) return 0 ;;
   esac
 }
