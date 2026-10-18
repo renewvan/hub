@@ -126,25 +126,82 @@ def test_exactly_one_node_flaps(schema_copy: Path) -> None:
     assert "exactly one" in result.stdout
 
 
-def test_fleet_covers_every_device_page_state(schema_copy: Path) -> None:
-    fleet = json.loads((schema_copy / FLEET).read_text())
-    nodes = fleet["nodes"]
-    infos = [n["info"] for n in nodes if "info" in n]
-
-    assert any(len(i["publishes"]) > 1 and i["version"] != "dev" for i in infos), "healthy multi"
-    assert any(i["version"] == "dev" for i in infos), "dev build"
-    assert any("info" not in n and n["health"] == "online" for n in nodes), "no info"
-    assert any("info" in n and n["health"] == "offline" for n in nodes), "offline with info"
-    assert any(len(i.get("host_serial", "").split(":")) == 6 for i in infos), (
-        "ESP32 node with a MAC serial"
+def test_fleet_must_show_a_node_with_no_info(schema_copy: Path) -> None:
+    edit_fleet(
+        schema_copy, lambda f: node(f, "gps").update(info=node(f, "tank")["info"] | {"node": "gps"})
     )
-    assert any(n["node"] == "router" for n in nodes), "router is a simulated node"
+    result = run_validator(schema_copy)
+    assert result.returncode == 1
+    assert "no info" in result.stdout
 
 
-def test_no_real_pi_serial_or_release_version_appears(schema_copy: Path) -> None:
-    fleet = json.loads((schema_copy / FLEET).read_text())
-    for n in fleet["nodes"]:
-        info = n.get("info", {})
-        serial = info.get("host_serial", "")
-        assert serial == "" or serial.startswith("DEMO") or ":" in serial
-        assert info.get("version", "dev") in ("dev",) or "demo" in info["version"].lower()
+def test_fleet_must_show_an_offline_node_with_retained_info(schema_copy: Path) -> None:
+    edit_fleet(schema_copy, lambda f: node(f, "tilt").update(health="online"))
+    result = run_validator(schema_copy)
+    assert result.returncode == 1
+    assert "offline" in result.stdout
+
+
+def test_fleet_must_show_a_dev_build(schema_copy: Path) -> None:
+    edit_fleet(schema_copy, lambda f: node(f, "tank")["info"].update(version="v0.0.0-demo"))
+    result = run_validator(schema_copy)
+    assert result.returncode == 1
+    assert "dev" in result.stdout
+
+
+def test_fleet_must_show_a_node_with_a_mac_serial(schema_copy: Path) -> None:
+    edit_fleet(
+        schema_copy, lambda f: node(f, "relay")["info"].update(host_serial="DEMO0000000000B2")
+    )
+    result = run_validator(schema_copy)
+    assert result.returncode == 1
+    assert "MAC" in result.stdout
+
+
+def test_fleet_must_show_a_healthy_multi_entity_node(schema_copy: Path) -> None:
+    edit_fleet(schema_copy, lambda f: node(f, "venus")["info"].update(publishes=["battery"]))
+    result = run_validator(schema_copy)
+    assert result.returncode == 1
+    assert "more than one entity" in result.stdout
+
+
+def test_router_is_a_simulated_node(schema_copy: Path) -> None:
+    def rename_router(fleet: dict) -> None:
+        # Keep exactly one flapper so only the router rule can fire.
+        router = node(fleet, "router")
+        router["node"] = "uplink"
+        router["info"]["node"] = "uplink"
+
+    edit_fleet(schema_copy, rename_router)
+    result = run_validator(schema_copy)
+    assert result.returncode == 1
+    assert "the `router` node" in result.stdout
+
+
+@pytest.mark.parametrize(
+    "serial",
+    ["10000000abcdef01", "00000000deadbeef"],
+    ids=["real-looking-pi-serial", "pi-serial-not-marked-fake"],
+)
+def test_a_real_looking_pi_serial_is_rejected(schema_copy: Path, serial: str) -> None:
+    edit_fleet(schema_copy, lambda f: node(f, "venus")["info"].update(host_serial=serial))
+    result = run_validator(schema_copy)
+    assert result.returncode == 1
+    assert "host_serial" in result.stdout
+
+
+@pytest.mark.parametrize("version", ["v1.2.3", "0.8.0", "abc1234"])
+def test_a_real_looking_version_is_rejected(schema_copy: Path, version: str) -> None:
+    edit_fleet(schema_copy, lambda f: node(f, "venus")["info"].update(version=version))
+    result = run_validator(schema_copy)
+    assert result.returncode == 1
+    assert "version" in result.stdout
+
+
+def test_node_slug_pattern_must_not_drift_between_schemas(schema_copy: Path) -> None:
+    path = schema_copy / "demo-fleet.schema.json"
+    text = path.read_text().replace("(?!demo$)", "")
+    path.write_text(text)
+    result = run_validator(schema_copy)
+    assert result.returncode == 1
+    assert "pattern" in result.stdout
