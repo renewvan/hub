@@ -104,7 +104,7 @@ An entity is not done until it has a demo scenario. Concretely, a change that ad
 
 A new **required** property on the Node info schema (`schema/node-info.schema.json`) likewise needs a fleet update in the same change: every entry's `info` in `schema/demo/fleet.demo-fleet.json` must still validate, and `validate-demo.py` fails until it does. A new entity type also needs it listed in the `publishes` enum of both Node schemas (`schema/validate-examples.sh` enforces that) and, for the dashboard to show it under a Node, a fleet Node that publishes it.
 
-Command topics (`<field>/set`, e.g. temperature `name`/`unit`, relay `set` and `name/set`) are not simulated by `node-demo`: demo state is read-only. The dashboard disables or no-ops its writes in demo mode. This matters most for relays: the demo ids (`relay_01`…`relay_05`) overlap the real ids, so a relay `set` published while Demo mode is on would switch a real load. The dashboard's bus hook drops every non-kiosk publish in demo mode, and the Relays page renders every control disabled.
+Command topics (`<field>/set`, e.g. temperature `name`/`unit`, relay `set` and `name/set`) are not simulated by `node-demo`: demo state is read-only. The dashboard disables or no-ops its writes in demo mode. This matters most for relays: the demo ids (`relay_01`…`relay_05`) overlap the real ids, so a consumer must never publish a relay `set` or `name/set` while Demo mode is on (`docs/adr/0013-writable-relay-and-its-wire-contract.md`).
 
 ## Run it
 
