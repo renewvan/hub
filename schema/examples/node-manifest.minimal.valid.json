@@ -1,0 +1,6 @@
+{
+  "node": "tank",
+  "product": "Tank level node",
+  "source": "ADS1115 resistive sender",
+  "publishes": ["tank"]
+}
