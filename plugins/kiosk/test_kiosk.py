@@ -1,11 +1,11 @@
 """
-Tests for node_kiosk's power/set handling.
+Tests for kiosk's power/set handling.
 
 evdev and paho.mqtt are hardware/network dependencies unavailable on a dev
-machine; stub them before importing node_kiosk so this runs anywhere.
+machine; stub them before importing kiosk so this runs anywhere.
 
-Run: python3 -m unittest plugins.kiosk.test_node_kiosk -v
-     (or: cd plugins/kiosk && python3 -m unittest test_node_kiosk -v)
+Run: python3 -m unittest plugins.kiosk.test_kiosk -v
+     (or: cd plugins/kiosk && python3 -m unittest test_kiosk -v)
 """
 
 import sys
@@ -42,7 +42,7 @@ def _stub_hardware_modules() -> None:
 
 
 _stub_hardware_modules()
-import node_kiosk as nk  # noqa: E402
+import kiosk as nk  # noqa: E402
 
 
 class _FakeClient:

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 renewvan kiosk plugin (plugins/kiosk) — display power bridge, brightness
-control, and auto-sleep idle timer. Systemd service `renewvan-node-kiosk`.
+control, and auto-sleep idle timer. Systemd service `renewvan-kiosk`.
 
 ## Display power
 
@@ -119,7 +119,7 @@ AUTO_SLEEP_POLL_INTERVAL_S = 5.0
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s [node-kiosk] %(levelname)s %(message)s",
+    format="%(asctime)s [kiosk] %(levelname)s %(message)s",
     stream=sys.stdout,
 )
 log = logging.getLogger(__name__)
@@ -678,10 +678,10 @@ def on_disconnect(client: mqtt.Client, userdata, rc, properties=None):
 
 
 def main():
-    log.info("node-kiosk starting (broker=%s:%d)", MQTT_HOST, MQTT_PORT)
+    log.info("kiosk starting (broker=%s:%d)", MQTT_HOST, MQTT_PORT)
 
     client = mqtt.Client(
-        client_id="renewvan-node-kiosk",
+        client_id="renewvan-kiosk",
         callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
         protocol=mqtt.MQTTv5,
     )
