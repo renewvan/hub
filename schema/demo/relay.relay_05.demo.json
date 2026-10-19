@@ -1,0 +1,10 @@
+{
+  "entity": "relay",
+  "id": "relay_05",
+  "description": "Unnamed relay, off and static",
+  "loop_s": 120,
+  "initial": {
+    "state": false
+  },
+  "timeline": []
+}

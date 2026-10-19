@@ -57,12 +57,12 @@
       }
     },
     {
-      "node": "relay",
+      "node": "esp32-relay",
       "health": "online",
       "info": {
-        "node": "relay",
-        "product": "ESP32 relay",
-        "source": "ESP32 GPIO relay board",
+        "node": "esp32-relay",
+        "product": "ESP32 16-channel relay board",
+        "source": "ESP32 with two chained SN74HC595 shift registers",
         "publishes": ["relay"],
         "version": "v0.0.0-demo",
         "host_serial": "DE:AD:BE:EF:00:01"

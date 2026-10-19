@@ -88,7 +88,7 @@ The simulated Nodes are declared in one hub-owned file, [`schema/demo/fleet.demo
 - `health` is the bare retained word at loop start. `offline` with an `info` present is a Node that dropped and left its retained info.
 - `health_timeline` overlays health at `t` seconds into the loop; health resets to `health` at each loop start. Exactly one Node has one, so the live online-to-offline-to-online transition is on display. The shipped one is the router, dropping out as its signal bottoms out (`router.demo.json`, t=60) and returning as it recovers (t=90).
 - Shares one clock and `loop_s` with the entity scenarios.
-- The shipped fleet shows every Device-page state: a healthy multi-entity Node (`venus`), a `dev` build (`tank`), entities with no info (`gps`), an offline Node with retained info (`tilt`), an ESP32 with a MAC serial (`relay`), and the one flapping Node (`router`).
+- The shipped fleet shows every Device-page state: a healthy multi-entity Node (`venus`), a `dev` build (`tank`), entities with no info (`gps`), an offline Node with retained info (`tilt`), an ESP32 with a MAC serial (`esp32-relay`), and the one flapping Node (`router`).
 - **Versions and serials are visibly fake** (`v0.0.0-demo`, `DEMO…`, `DE:AD:BE:EF:…`) and never read from the Pi, so a screenshot of the demo cannot leak a real serial.
 
 The fleet pass of `validate-demo.py` checks: the envelope; each `info` against `node-info.schema.json` with `info.node` equal to the entry's `node`; the reserved key `demo` is rejected (by the node-key pattern, which must stay identical in `demo-fleet.schema.json` and `node-info.schema.json`, so it cannot drift from the real contract); every `publishes` type has an entity scenario; `health_timeline` times are non-decreasing and `< loop_s`; exactly one Node flaps; versions and serials are visibly fake (`dev` or `*-demo`; a `DEMO…` serial or a unicast, locally administered MAC, which a vendor does not assign to a real device); and the fleet includes every state listed above plus the `router`.
@@ -104,7 +104,7 @@ An entity is not done until it has a demo scenario. Concretely, a change that ad
 
 A new **required** property on the Node info schema (`schema/node-info.schema.json`) likewise needs a fleet update in the same change: every entry's `info` in `schema/demo/fleet.demo-fleet.json` must still validate, and `validate-demo.py` fails until it does. A new entity type also needs it listed in the `publishes` enum of both Node schemas (`schema/validate-examples.sh` enforces that) and, for the dashboard to show it under a Node, a fleet Node that publishes it.
 
-Command topics (`<field>/set`, e.g. temperature `name`/`unit`) are not simulated by `node-demo`: demo state is read-only. The dashboard disables or no-ops its writes in demo mode.
+Command topics (`<field>/set`, e.g. temperature `name`/`unit`, relay `set` and `name/set`) are not simulated by `node-demo`: demo state is read-only. The dashboard disables or no-ops its writes in demo mode. This matters most for relays: the demo ids (`relay_01`…`relay_05`) overlap the real ids, so a relay `set` published while Demo mode is on would switch a real load. The dashboard's bus hook drops every non-kiosk publish in demo mode, and the Relays page renders every control disabled.
 
 ## Run it
 

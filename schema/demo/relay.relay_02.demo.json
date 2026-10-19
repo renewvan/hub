@@ -1,0 +1,24 @@
+{
+  "entity": "relay",
+  "id": "relay_02",
+  "description": "Named relay that switches on at 30s and off at 90s",
+  "loop_s": 120,
+  "initial": {
+    "state": false,
+    "name": "Reading lights"
+  },
+  "timeline": [
+    {
+      "t": 30,
+      "set": {
+        "state": true
+      }
+    },
+    {
+      "t": 90,
+      "set": {
+        "state": false
+      }
+    }
+  ]
+}
