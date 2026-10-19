@@ -34,7 +34,7 @@ Auto-sleep reuses the same evdev touch device as touch-to-wake as its idle
 clock: any touch (not just a waking one) resets it. When enabled, the
 display sleeps itself after the configured idle minutes with no touch —
 but only for a session a physical touch originated (see
-`_display_on_origin` in `node_kiosk.py`): a remote wake never triggers
+`_display_on_origin` in `kiosk.py`): a remote wake never triggers
 auto-sleep on its own, so leaving the dashboard open remotely doesn't
 fight the idle timer.
 
@@ -42,16 +42,16 @@ fight the idle timer.
 
 ```bash
 # 1. Copy to /opt/renewvan/plugins/kiosk/
-sudo mkdir -p /opt/renewvan/node-kiosk
-sudo cp plugins/kiosk/node_kiosk.py plugins/kiosk/requirements.txt /opt/renewvan/plugins/kiosk/
+sudo mkdir -p /opt/renewvan/plugins/kiosk
+sudo cp plugins/kiosk/kiosk.py plugins/kiosk/requirements.txt /opt/renewvan/plugins/kiosk/
 
 # 2. Install Python deps (system-level, no venv needed on Pi OS)
 pip3 install -r /opt/renewvan/plugins/kiosk/requirements.txt
 
 # 3. Install + enable systemd service
-sudo cp plugins/kiosk/renewvan-node-kiosk.service /etc/systemd/system/
+sudo cp plugins/kiosk/renewvan-kiosk.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now renewvan-node-kiosk.service
+sudo systemctl enable --now renewvan-kiosk.service
 
 # 4. Install the boot-time Chromium kiosk launcher. System-wide, not the
 #    per-user labwc autostart file — labwc runs both, and only the system
@@ -76,7 +76,7 @@ sudo bash /opt/renewvan/plugins/kiosk/fix-labwc-touch-scroll.sh
 
 ## Configuration
 
-All config via environment variables — set them in the systemd unit's `[Service]` block or in `/etc/renewvan/node-kiosk.env`:
+All config via environment variables — set them in the systemd unit's `[Service]` block or in `/etc/renewvan/kiosk.env`:
 
 | Variable            | Default                    | Description                                                                             |
 | ------------------- | -------------------------- | --------------------------------------------------------------------------------------- |
@@ -94,7 +94,7 @@ All config via environment variables — set them in the systemd unit's `[Servic
 If `vcgencmd display_power` does not suit the attached panel, switch to the `wlopm` compositor-level fallback with a config-only change:
 
 ```ini
-# /etc/renewvan/node-kiosk.env
+# /etc/renewvan/kiosk.env
 DISPLAY_ON_CMD=wlopm --on '*'
 DISPLAY_OFF_CMD=wlopm --off '*'
 DISPLAY_QUERY_CMD=wlopm
@@ -105,5 +105,5 @@ DISPLAY_QUERY_CMD=wlopm
 ## Logs
 
 ```bash
-journalctl -u renewvan-node-kiosk -f
+journalctl -u renewvan-kiosk -f
 ```

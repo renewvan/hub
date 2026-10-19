@@ -8,8 +8,8 @@ SupplementaryGroups=input video
 Environment=WAYLAND_DISPLAY=wayland-0
 Environment=XDG_RUNTIME_DIR=/run/user/1000
 User=alexsanzder
-EnvironmentFile=-/etc/renewvan/node-kiosk.env
-ExecStart=/opt/renewvan/venvs/kiosk/bin/python /opt/renewvan/plugins/kiosk/node_kiosk.py
+EnvironmentFile=-/etc/renewvan/kiosk.env
+ExecStart=/opt/renewvan/venvs/kiosk/bin/python /opt/renewvan/plugins/kiosk/kiosk.py
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal

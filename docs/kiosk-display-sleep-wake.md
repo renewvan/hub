@@ -19,7 +19,7 @@ The `kiosk` segment is a new domain on the renewvan bus, sitting alongside
 `tank`, `battery`, and `relay`. The `display/power` leaf is the only topic
 defined so far; the namespace is reserved for future kiosk-specific topics.
 
-## Kiosk plugin (`plugins/kiosk`, systemd service `renewvan-node-kiosk`)
+## Kiosk plugin (`plugins/kiosk`, systemd service `renewvan-kiosk`)
 
 A small process running on the Pi host **outside** the Docker compose stack
 (it needs direct access to `vcgencmd` and the GPU firmware mailbox, which
@@ -61,7 +61,7 @@ in `docs/pi-agent-sudo-setup.md` and resolved for Chromium in the
    `"off"`, swallowing the first waking touch. Removed: redundant with
    `vcgencmd display_power`/`wlopm` physically cutting the panel's
    backlight (the screen is actually off, not CSS-black — see "Physical
-   panel power-off" below) and with `node_kiosk.py`'s own evdev touch
+   panel power-off" below) and with `kiosk.py`'s own evdev touch
    grab, which already consumes the waking touch at the input layer
    before it ever reaches the browser (see `plugins/kiosk/README.md`'s
    touch-to-wake section) — the CSS overlay's touch-swallow logic never
