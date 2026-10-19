@@ -36,4 +36,5 @@ Hard to reverse: the node, image, topic and env-var names are public contracts t
 
 - `docs/adr/0002-driver-to-node-rename.md` — the previous rename, and the precedent for treating artifact names as public contracts.
 - `docs/adr/0001-compose-services-via-pinned-images-not-git-submodules.md` — the pinned-image mechanism `node-venus` flows through.
+- `docs/adr/0012-board-named-relay-node.md` — the one bounded exception: a Node whose hardware is a purchasable relay board is named by host and board. This ADR's source-naming rule still governs every sensing Node.
 - `CONTEXT.md` — `Battery`, `Solar`, `Charger` and `Node` definitions.
