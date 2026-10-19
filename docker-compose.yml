@@ -215,7 +215,7 @@ services:
   # writes four-segment entity topics; demo ones have five). Nothing to start by hand. See
   # docs/demo-mode.md.
   node-demo:
-    image: ghcr.io/renewvan/node-demo:v0.4.0
+    image: ghcr.io/renewvan/node-demo:v0.5.0
     container_name: renewvan-demo
     restart: unless-stopped
     depends_on:
