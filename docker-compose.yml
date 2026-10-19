@@ -70,7 +70,7 @@ services:
   # Needs I2C device passthrough for the ADS1115; layered config.ini
   # override lives on the bind-mounted host path below.
   node-tank:
-    image: ghcr.io/renewvan/node-tank:v0.8.0
+    image: ghcr.io/renewvan/node-tank:v0.9.0
     container_name: renewvan-tank
     restart: unless-stopped
     depends_on:
@@ -129,7 +129,7 @@ services:
   # /app/state is writable and persistent: name/unit edits from the dashboard
   # live there.
   node-temperature:
-    image: ghcr.io/renewvan/node-temperature:v0.1.0
+    image: ghcr.io/renewvan/node-temperature:v0.2.0
     container_name: renewvan-temperature
     restart: unless-stopped
     depends_on:
@@ -176,7 +176,7 @@ services:
   # compose's renewvan bus (mosquitto). Entity ids are Venus device
   # instances. See docs/adr/0008-node-naming-and-entity-neutrality.md.
   node-venus:
-    image: ghcr.io/renewvan/node-venus:v0.3.0
+    image: ghcr.io/renewvan/node-venus:v0.4.0
     container_name: renewvan-venus
     restart: unless-stopped
     depends_on:
@@ -195,7 +195,7 @@ services:
   # feed on renewvan/router/<id>/raw, republishes normalized retained
   # fields. See .scratch/node-router/map.md.
   node-router:
-    image: ghcr.io/renewvan/node-router:v0.1.0
+    image: ghcr.io/renewvan/node-router:v0.2.0
     container_name: renewvan-router
     restart: unless-stopped
     depends_on:
@@ -215,7 +215,7 @@ services:
   # writes four-segment entity topics; demo ones have five). Nothing to start by hand. See
   # docs/demo-mode.md.
   node-demo:
-    image: ghcr.io/renewvan/node-demo:v0.3.0
+    image: ghcr.io/renewvan/node-demo:v0.4.0
     container_name: renewvan-demo
     restart: unless-stopped
     depends_on:
@@ -250,7 +250,7 @@ services:
   # not a polling backend. See
   # .scratch/renewvan-hub-v0-build/issues/06-dashboard-web-app.md.
   dashboard:
-    image: ghcr.io/renewvan/dashboard:v0.1.43
+    image: ghcr.io/renewvan/dashboard:v0.1.44
     container_name: renewvan-dashboard
     restart: unless-stopped
     ports:
