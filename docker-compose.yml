@@ -17,7 +17,7 @@
 # MQTT:      <host>:1883 (plain), <host>:9001 (websockets)
 # InfluxDB:  http://<host>:8086 (org=renewvan, bucket=renewvan)
 # Grafana:   http://<host>:3000 (admin/admin on first run)
-# Dashboard: http://<host>:8080
+# Dashboard: http://<host> (port 80)
 
 services:
   mosquitto:
@@ -100,7 +100,7 @@ services:
   # `docker compose --profile gps up -d`.
   node-gps:
     profiles: ["gps"]
-    image: ghcr.io/renewvan/node-gps:v0.2.0
+    image: ghcr.io/renewvan/node-gps:v0.3.0
     container_name: renewvan-gps
     restart: unless-stopped
     depends_on:
@@ -154,7 +154,7 @@ services:
   # persistent: the install level zero (set from renewvan/tilt/<id>/level_zero/set)
   # lives there and is lost on a container recreate if it isn't a mounted volume.
   node-tilt:
-    image: ghcr.io/renewvan/node-tilt:v0.1.3
+    image: ghcr.io/renewvan/node-tilt:v0.2.0
     container_name: renewvan-tilt
     restart: unless-stopped
     depends_on:
@@ -250,7 +250,7 @@ services:
   # not a polling backend. See
   # .scratch/renewvan-hub-v0-build/issues/06-dashboard-web-app.md.
   dashboard:
-    image: ghcr.io/renewvan/dashboard:v0.1.44
+    image: ghcr.io/renewvan/dashboard:v0.1.45
     container_name: renewvan-dashboard
     restart: unless-stopped
     ports:
