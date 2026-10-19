@@ -62,6 +62,14 @@ _Avoid_: Driver (superseded — one term for firmware and process alike), Bridge
 The physical hardware a node runs on (the Raspberry Pi, an ESP32 board, a wall panel). One host may run several nodes; a node is never a host.
 _Avoid_: Node (for the hardware), board, device.
 
+**Node manifest**:
+The static description of one **Node**, written once by its author as `manifest.json` at the root of the Node's repo: what the Node is, what it reads, and which entity types it publishes. It never carries a version or a Host serial. Contract: `schema/node-manifest.schema.json`. See `docs/adr/0011-node-manifest-and-retained-info-topic.md`.
+_Avoid_: Config, descriptor, metadata (too generic); Device (the Venus-style page a consumer shows for a Node, not the manifest).
+
+**Node info**:
+What a **Node** publishes about itself, retained, at `renewvan/<node>/info`: its **Node manifest** plus the version it is running and, when known, the serial of its **Host**. It stays on the bus when the Node goes offline. Not an entity: it has no `<id>`. Contract: `schema/node-info.schema.json`. See `docs/adr/0011-node-manifest-and-retained-info-topic.md`.
+_Avoid_: Node status, heartbeat (that is the separate `online`/`offline` health word); Node metadata.
+
 **Demo mode**:
 A simulated van on the renewvan bus, so the dashboard (and any other consumer) can be built and shown without a van or hardware. Modelled on Venus OS's Demo mode. One switch shared by every client: any client publishes `renewvan/demo/enabled/set`, **node-demo** answers with the retained `renewvan/demo/enabled` and starts or clears the simulated van, and every dashboard follows that flag (off by default). Real nodes and the logger keep running, and the dashboard ignores the real van while it is on. Nothing simulated is ever persisted. Read-only: command topics are not simulated. See `docs/demo-mode.md` and `docs/adr/0010-demo-mode-publishes-under-renewvan-demo.md`.
 _Avoid_: Simulation mode, test mode, mock mode.
@@ -74,8 +82,12 @@ _Avoid_: Demo root, demo bus, demo broker (it is the same broker and a sub-names
 A hub-owned file describing one simulated entity instance: an `initial` record plus a `timeline` of `set` overlays over a `loop_s` loop, validated by `schema/validate-demo.py` against the entity's schema. Scenarios are per entity, not per source, and share one clock so entities stay coherent. Venus analogue: a `dbus-recorder` recording.
 _Avoid_: Fixture (those are `schema/examples/`, static valid/invalid payloads), recording (nothing is captured live), mock.
 
+**Demo fleet** (`schema/demo/fleet.demo-fleet.json`):
+A hub-owned file declaring the simulated **Nodes** of a demo van: each entry is a complete **Node info** plus the health to show, optionally a health timeline over the shared `loop_s` loop, and no info at all to simulate a Node that has not been updated. Versions and serials in it are visibly fake. It is separate from the **Demo scenarios** (which are per entity) and is validated by the fleet pass of `schema/validate-demo.py`. See `docs/demo-mode.md`.
+_Avoid_: Fixture (those are `schema/examples/`), scenario (that is per entity), mock fleet.
+
 **node-demo**:
-The process that replays every demo scenario into the **Demo namespace**. A Node in mechanism (a Pi-side process with an LWT health topic) that always runs but is idle until `renewvan/demo/enabled` is `true`, so a real van shows nothing fake unless someone switches it on, but a simulator in purpose: it owns no hardware and remaps no feed, so it is named for what it is, not for a source.
+The process that replays every **Demo scenario** and the **Demo fleet** into the **Demo namespace**. A Pi-side process with an LWT health topic that always runs, idle until `renewvan/demo/enabled` is `true`, so a real van shows nothing fake unless someone switches it on. It is a simulator, not a **Node**: it owns no hardware, remaps no feed, and has no **Node manifest** or **Node info** of its own, so it is named for what it is, not for a source.
 _Avoid_: Mock node, fake driver, simulator node.
 
 **Naming convention**:
