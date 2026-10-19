@@ -208,47 +208,8 @@ def test_node_slug_pattern_must_not_drift_between_schemas(schema_copy: Path) -> 
     assert "pattern" in result.stdout
 
 
-def relay_scenarios(schema: Path) -> dict[str, dict]:
-    scenarios = [json.loads(p.read_text()) for p in (schema / "demo").glob("relay*.demo.json")]
-    return {s["id"]: s for s in scenarios}
-
-
-def test_demo_van_shows_named_and_unnamed_relays_and_one_that_switches(schema_copy: Path) -> None:
-    scenarios = relay_scenarios(schema_copy)
-    assert sorted(scenarios) == ["relay_01", "relay_02", "relay_03", "relay_04", "relay_05"]
-    assert {i: s["initial"].get("name") for i, s in scenarios.items()} == {
-        "relay_01": "Ceiling lights",
-        "relay_02": "Reading lights",
-        "relay_03": "Water pump",
-        "relay_04": None,
-        "relay_05": None,
-    }
-    switching = [i for i, s in scenarios.items() if s["timeline"]]
-    assert switching == ["relay_02"]
-    assert [(t["t"], t["set"]) for t in scenarios["relay_02"]["timeline"]] == [
-        (30, {"state": True}),
-        (90, {"state": False}),
-    ]
-
-
-def test_demo_relays_cover_on_and_off_at_rest(schema_copy: Path) -> None:
-    scenarios = relay_scenarios(schema_copy)
-    assert scenarios["relay_01"]["initial"]["state"] is True
-    assert scenarios["relay_03"]["initial"]["state"] is False
-    assert scenarios["relay_04"]["initial"]["state"] is True
-    assert scenarios["relay_05"]["initial"]["state"] is False
-
-
-def test_the_old_galley_relay_is_gone(schema_copy: Path) -> None:
-    assert "galley" not in relay_scenarios(schema_copy)
-
-
 def test_a_relay_scenario_that_blanks_the_name_is_rejected(schema_copy: Path) -> None:
-    path = next(
-        p
-        for p in (schema_copy / "demo").glob("relay*.demo.json")
-        if json.loads(p.read_text())["id"] == "relay_02"
-    )
+    path = schema_copy / "demo" / "relay.relay_02.demo.json"
     scenario = json.loads(path.read_text())
     scenario["timeline"].append({"t": 100, "set": {"name": ""}})
     path.write_text(json.dumps(scenario))

@@ -65,9 +65,7 @@ compose up -d`. This brings up the infra layer (Mosquitto, InfluxDB,
    whole `up -d` on a host with no GPS module): add `--profile gps` when the
    module is plugged in, or let `bin/deploy.sh` decide from the device.
 3. **Flash the ESP32 16-channel relay node**, once, per `renewvan/node-esp32-relay`'s own
-   README (ESPHome YAML, no custom firmware). Fit the output-enable pull-up and
-   bench-test across 20 or more resets before it goes in the van
-   (`docs/adr/0013-writable-relay-and-its-wire-contract.md`).
+   README (ESPHome YAML, no custom firmware).
 4. **Install the phone app** per `renewvan/mobile`'s own README (React
    Native — sideload or app-store build, not part of this compose flow).
 

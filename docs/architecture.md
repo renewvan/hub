@@ -59,7 +59,7 @@ The official reference build stays boring and purchasable, not custom hardware:
 - USB-RS485 for Modbus devices
 - 5–7" touchscreen running a kiosk browser
 
-Everything beyond that — relays, dimmers, tank senders — is documented as a **recipe** ("ESP32 + 16-channel relay board", "ESP32-C3 + INA226 + 75 mV shunt") rather than a custom PCB. The 16-channel relay recipe switches loads only: every channel boots off, and interlocks such as a pump dry-run cutoff stay in hardware (`docs/adr/0013-writable-relay-and-its-wire-contract.md`).
+Everything beyond that — relays, dimmers, tank senders — is documented as a **recipe** ("ESP32 + 16-channel relay board", "ESP32-C3 + INA226 + 75 mV shunt") rather than a custom PCB.
 
 Two hardware rules matter more than the rest: **never put mains or high-current switching on the Pi carrier** — that belongs in dedicated relays/contactors or certified devices, with the hub only sending commands — and **offer an always-on low-power tier**, an ESP32 watchdog node that can keep pumps/heat-protection running and reboot the Pi if it hangs.
 

@@ -1,7 +1,7 @@
 {
   "entity": "relay",
   "id": "relay_03",
-  "description": "Named critical-style load, off and static",
+  "description": "Named relay, off and static",
   "loop_s": 120,
   "initial": {
     "state": false,
