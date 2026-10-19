@@ -67,7 +67,7 @@ Once connected, all Pi services are reachable at the Tailscale IP:
 
 | Service   | URL                              |
 | --------- | -------------------------------- |
-| Dashboard | `http://<tailscale-ip>:8080`     |
+| Dashboard | `http://<tailscale-ip>`          |
 | SSH       | `ssh alexsanzder@<tailscale-ip>` |
 | Grafana   | `http://<tailscale-ip>:3000`     |
 | MQTT      | `<tailscale-ip>:1883`            |
