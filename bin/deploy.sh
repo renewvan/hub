@@ -136,7 +136,9 @@ fi
 
 echo "==> docker compose pull && up -d"
 docker compose pull
-docker compose up -d
+# --remove-orphans: containers have fixed container_name values, so a renamed service key leaves
+# the old container holding the name and a plain up -d aborts half-way (ADR 0014's rename did).
+docker compose up -d --remove-orphans
 REMOTE
 
 echo "==> Reloading kiosk browser"
