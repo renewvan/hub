@@ -1,0 +1,273 @@
+# Reusable release for every renewvan repo that ships something.
+# See docs/adr/0015-one-release-process-via-reusable-workflows.md.
+#
+# A repo's own .github/workflows/release.yml is a thin `workflow_dispatch` caller that passes
+# `kind` and the repo's name. One run works out the next version from the latest stable tag,
+# stamps it where the repo keeps one, tags that commit, creates the GitHub release, then
+# builds what the repo ships:
+#
+#   kind: image     a multi-arch Docker image to ghcr.io/<owner>/<image>
+#   kind: firmware  ESPHome firmware binaries attached to the GitHub release
+#
+# Stable releases are cut from `main`; a pre-release from whichever branch it is dispatched on
+# (tests gate it, `main` and `:latest` stay untouched).
+name: Release (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      kind:
+        description: "image | firmware"
+        type: string
+        required: true
+      bump:
+        description: patch | minor | major, applied to the latest stable tag
+        type: string
+        default: patch
+      version:
+        description: 'Explicit version (e.g. 0.2.0 or 0.2.0-beta.1); overrides "bump"'
+        type: string
+        default: ""
+      prerelease:
+        type: boolean
+        default: false
+      image:
+        description: "kind=image: image name under ghcr.io/<owner>/ (e.g. driver-tank)"
+        type: string
+        default: ""
+      device-version-arg:
+        description: "kind=image: pass the tag as the DEVICE_VERSION build arg (Devices that publish Device info)"
+        type: boolean
+        default: false
+      stamp-package-json:
+        description: Write the version into package.json in the release commit (JS repos)
+        type: boolean
+        default: false
+      test-command:
+        description: "Shell command that gates a pre-release (stable releases rely on the push-to-main CI run)"
+        type: string
+        default: ""
+      node-version-file:
+        description: Optional .node-version style file; when set, Node is set up for test-command
+        type: string
+        default: ""
+      python-version:
+        type: string
+        default: ""
+      esphome-yaml:
+        description: "kind=firmware: ESPHome config to build"
+        type: string
+        default: ""
+      esphome-version:
+        description: "kind=firmware: pinned ESPHome version"
+        type: string
+        default: ""
+
+jobs:
+  cut:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+      sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Check the branch
+        if: ${{ !inputs.prerelease && github.ref_name != 'main' }}
+        run: |
+          echo "::error::Stable releases are cut from main (dispatched on ${{ github.ref_name }}). Tick 'prerelease' for a beta."
+          exit 1
+
+      # The latest stable tag is the source of truth: it cannot drift from a file.
+      - name: Work out the version
+        id: version
+        env:
+          BUMP: ${{ inputs.bump }}
+          EXPLICIT: ${{ inputs.version }}
+        run: |
+          if [ -n "$EXPLICIT" ]; then
+            version="${EXPLICIT#v}"
+          else
+            latest="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | grep -Ev -- '-' | head -n1)"
+            latest="${latest#v}"
+            IFS=. read -r major minor patch <<< "${latest:-0.0.0}"
+            case "$BUMP" in
+              major) version="$((major + 1)).0.0" ;;
+              minor) version="${major}.$((minor + 1)).0" ;;
+              patch) version="${major}.${minor}.$((patch + 1))" ;;
+              *) echo "::error::bump must be patch, minor or major (got '$BUMP')"; exit 1 ;;
+            esac
+          fi
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::'$version' is not a semantic version"
+            exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
+            echo "::error::v$version already exists"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      # The version is stamped into the commit the tag points at (when the repo keeps one), so
+      # what is built from the tag and the repository agree. A pre-release is a throwaway commit
+      # that only the tag sees: it is never pushed to a branch.
+      - name: Stamp package.json
+        if: ${{ inputs.stamp-package-json }}
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          node -e "
+            const fs = require('node:fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.version = process.argv[1];
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          " "$VERSION"
+
+      - name: Commit, tag and push
+        id: commit
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          git config user.name "renewvan"
+          git config user.email "github@renewvan.com"
+          git add -A
+          # A re-cut of a version already in the tree, or a repo with no stamped file, has nothing to commit.
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: release $TAG"
+          fi
+          sha="$(git rev-parse HEAD)"
+          if [ "$PRERELEASE" = "true" ]; then
+            git push origin "$sha:refs/tags/$TAG"
+          else
+            git push origin HEAD:main
+            git tag "$TAG" "$sha"
+            git push origin "$TAG"
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          flags=(--verify-tag --title "$TAG" --generate-notes)
+          if [ "$PRERELEASE" = "true" ]; then flags+=(--prerelease); else flags+=(--latest); fi
+          gh release create "$TAG" "${flags[@]}"
+
+  publish-image:
+    if: ${{ inputs.kind == 'image' }}
+    needs: cut
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.cut.outputs.tag }}
+
+      # Stable releases are cut from `main`, where the push-to-main CI already ran the tests on
+      # the merge commit. A pre-release comes from a branch that may never have been through
+      # CI, so it keeps the gate.
+      - uses: actions/setup-python@v5
+        if: ${{ inputs.prerelease && inputs.test-command != '' && inputs.python-version != '' }}
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - uses: voidzero-dev/setup-vp@v1.21.2
+        if: ${{ inputs.prerelease && inputs.test-command != '' && inputs.node-version-file != '' }}
+        with:
+          node-version-file: ${{ inputs.node-version-file }}
+          cache: true
+
+      - name: Run tests
+        if: ${{ inputs.prerelease && inputs.test-command != '' }}
+        env:
+          TEST_COMMAND: ${{ inputs.test-command }}
+        run: bash -c "$TEST_COMMAND"
+
+      - name: Log in to registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+          build-args: ${{ inputs.device-version-arg && format('DEVICE_VERSION={0}', needs.cut.outputs.tag) || '' }}
+          # A pre-release publishes only its own tag, so it can never take `:latest` from the stable line.
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/${{ inputs.image }}:${{ needs.cut.outputs.tag }}
+            ${{ !inputs.prerelease && format('ghcr.io/{0}/{1}:latest', github.repository_owner, inputs.image) || '' }}
+
+  publish-firmware:
+    if: ${{ inputs.kind == 'firmware' }}
+    needs: cut
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.cut.outputs.tag }}
+
+      - name: Fake secrets for the build
+        run: cp secrets.yaml.example secrets.yaml
+
+      # The release tag is the firmware's version: manifest.json supplies the other stamped
+      # fields, exactly as scripts/flash.sh does locally.
+      - name: Compose the manifest substitutions
+        id: stamp
+        env:
+          VERSION: ${{ needs.cut.outputs.tag }}
+        run: |
+          {
+            echo "substitutions<<EOF"
+            echo "version=${VERSION}"
+            python3 scripts/manifest_substitutions.py manifest.json
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        id: build
+        uses: esphome/build-action@ae5408cdbc4f70692bf8e345c4982bca05a93667 # v8.1.0
+        with:
+          yaml-file: ${{ inputs.esphome-yaml }}
+          version: ${{ inputs.esphome-version }}
+          substitutions: ${{ steps.stamp.outputs.substitutions }}
+
+      # The action copies <name>.factory.bin and <name>.ota.bin into ./<name>/, where <name> is
+      # its `name` output (the device name with the chip variant appended).
+      - name: Attach the firmware to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.cut.outputs.tag }}
+          BUILD_NAME: ${{ steps.build.outputs.name }}
+        run: |
+          shopt -s nullglob
+          files=("${BUILD_NAME}"/*.factory.bin "${BUILD_NAME}"/*.ota.bin)
+          if [ "${#files[@]}" -lt 2 ]; then
+            echo "::error::expected a .factory.bin and a .ota.bin in ./${BUILD_NAME}/, found ${#files[@]}"
+            ls -la "${BUILD_NAME}" || true
+            exit 1
+          fi
+          gh release upload "$TAG" "${files[@]}" --clobber
