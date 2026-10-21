@@ -41,7 +41,7 @@
         "type": ["number", "null"],
         "minimum": 0
       },
-      "description": "Optional: the controller's own daily energy log, in watt-hours, as one retained JSON array, newest first. Index 0 is the controller's current day, so it equals `yield_today_wh`; index 1 is the previous day, and so on. The array is as long as the controller has days logged, so it may be shorter than the controller's maximum (a new controller has fewer) and is never padded. `null` marks a day the controller has no data for; it is not `0`, which is a real day that harvested nothing. Every value comes from the controller's own log, never computed or interpolated by a node. See docs/adr/0009."
+      "description": "Optional: the controller's own daily energy log, in watt-hours, as one retained JSON array, newest first. Index 0 is the controller's current day, so it equals `yield_today_wh`; index 1 is the previous day, and so on. The array is as long as the controller has days logged, so it may be shorter than the controller's maximum (a new controller has fewer) and is never padded. `null` marks a day the controller has no data for; it is not `0`, which is a real day that harvested nothing. Every value comes from the controller's own log, never computed or interpolated by a device. See docs/adr/0009."
     },
     "charge_state": {
       "type": "string",

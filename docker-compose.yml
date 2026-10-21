@@ -64,13 +64,13 @@ services:
     volumes:
       - grafana-data:/var/lib/grafana
 
-  # Native MQTT tank node (fresh + grey ADS1115 senders) — see
-  # docs/porting-dbus-to-mqtt-node.md and
+  # Native MQTT tank device (fresh + grey ADS1115 senders) — see
+  # docs/porting-dbus-to-mqtt-device.md and
   # .scratch/renewvan-hub-v0-build/issues/02-native-mqtt-tank-driver.md.
   # Needs I2C device passthrough for the ADS1115; layered config.ini
   # override lives on the bind-mounted host path below.
-  node-tank:
-    image: ghcr.io/renewvan/node-tank:v0.9.0
+  driver-tank:
+    image: ghcr.io/renewvan/driver-tank:v0.9.0
     container_name: renewvan-tank
     restart: unless-stopped
     depends_on:
@@ -85,8 +85,8 @@ services:
     volumes:
       - ${TANK_CONFIG_PATH:-./config/tank/config.ini}:/app/config.ini:ro
 
-  # Native MQTT GPS/GLONASS/BeiDou node (NMEA 0183 over USB-serial,
-  # u-blox-chip module) -- see node-gps's own README's "Topics published"
+  # Native MQTT GPS/GLONASS/BeiDou device (NMEA 0183 over USB-serial,
+  # u-blox-chip module) -- see driver-gps's own README's "Topics published"
   # section. Needs USB-serial device passthrough; layered config.ini
   # override lives on the bind-mounted host path below (sets
   # [mqtt] host = mosquitto; serial_port defaults to /dev/ttyACM0 in the
@@ -98,9 +98,9 @@ services:
   # it. bin/deploy.sh enables the profile only when the device exists. For a
   # manual `docker compose up -d` on a Pi with the module, use
   # `docker compose --profile gps up -d`.
-  node-gps:
+  driver-gps:
     profiles: ["gps"]
-    image: ghcr.io/renewvan/node-gps:v0.3.0
+    image: ghcr.io/renewvan/driver-gps:v0.3.0
     container_name: renewvan-gps
     restart: unless-stopped
     depends_on:
@@ -115,8 +115,8 @@ services:
     volumes:
       - ${GPS_CONFIG_PATH:-./config/gps/config.ini}:/app/config.ini:ro
 
-  # Native MQTT temperature node: 1-Wire DS18B20 probes + the Pi's own CPU
-  # thermal zone -- see node-temperature's own README's "Topics published"
+  # Native MQTT temperature device: 1-Wire DS18B20 probes + the Pi's own CPU
+  # thermal zone -- see driver-temperature's own README's "Topics published"
   # section. The 1-Wire kernel driver must be enabled on the host
   # (dtoverlay=w1-gpio,gpiopin=<N> in /boot/firmware/config.txt). The probe
   # entries under /sys/bus/w1/devices are symlinks into
@@ -128,8 +128,8 @@ services:
   # on a Pi without 1-Wire, though the CPU sensor needs none of it.
   # /app/state is writable and persistent: name/unit edits from the dashboard
   # live there.
-  node-temperature:
-    image: ghcr.io/renewvan/node-temperature:v0.2.0
+  driver-temperature:
+    image: ghcr.io/renewvan/driver-temperature:v0.2.1
     container_name: renewvan-temperature
     restart: unless-stopped
     depends_on:
@@ -146,15 +146,15 @@ services:
       - /sys/devices:/sys/devices:ro
       - /sys/class/thermal:/sys/class/thermal:ro
 
-  # Native MQTT van-inclination node: reads a GY-521 / MPU-6050 accelerometer
-  # on the same I2C bus as the tank node's ADS1115 (different address, no
-  # conflict) -- see node-tilt's own README's "Topics published" section.
+  # Native MQTT van-inclination device: reads a GY-521 / MPU-6050 accelerometer
+  # on the same I2C bus as the tank device's ADS1115 (different address, no
+  # conflict) -- see driver-tilt's own README's "Topics published" section.
   # Needs I2C device passthrough. The axis mapping for how the board is
   # mounted lives in the bind-mounted config.ini. /app/state is writable and
   # persistent: the install level zero (set from renewvan/tilt/<id>/level_zero/set)
   # lives there and is lost on a container recreate if it isn't a mounted volume.
-  node-tilt:
-    image: ghcr.io/renewvan/node-tilt:v0.2.0
+  driver-tilt:
+    image: ghcr.io/renewvan/driver-tilt:v0.2.0
     container_name: renewvan-tilt
     restart: unless-stopped
     depends_on:
@@ -175,8 +175,16 @@ services:
   # against that device's own broker (VENUS_*), publishes onto this
   # compose's renewvan bus (mosquitto). Entity ids are Venus device
   # instances. See docs/adr/0008-node-naming-and-entity-neutrality.md.
-  node-venus:
-    image: ghcr.io/renewvan/node-venus:v0.4.0
+  #
+  # Behind the `venus` profile: VENUS_MQTT_HOST / VENUS_PORTAL_ID are required
+  # and driver-venus reads them with a hard lookup, so on a van with no Venus OS
+  # device it would crash-loop (restart: unless-stopped) forever. bin/deploy.sh
+  # enables the profile only when VENUS_MQTT_HOST is set in .env. For a manual
+  # `docker compose up -d` on a van with Venus OS, use
+  # `docker compose --profile venus up -d`.
+  driver-venus:
+    profiles: ["venus"]
+    image: ghcr.io/renewvan/driver-venus:v0.4.0
     container_name: renewvan-venus
     restart: unless-stopped
     depends_on:
@@ -193,9 +201,9 @@ services:
   # RUT-360 Data to Server MQTT -> renewvan-bus router remap. Single
   # connection to this compose's own bus: subscribes the router's raw
   # feed on renewvan/router/<id>/raw, republishes normalized retained
-  # fields. See .scratch/node-router/map.md.
-  node-router:
-    image: ghcr.io/renewvan/node-router:v0.2.0
+  # fields. See .scratch/driver-router/map.md.
+  driver-router:
+    image: ghcr.io/renewvan/driver-router:v0.2.0
     container_name: renewvan-router
     restart: unless-stopped
     depends_on:
@@ -214,8 +222,8 @@ services:
   # entity topic), so it cannot overwrite real retained state, and the logger drops it (it only
   # writes four-segment entity topics; demo ones have five). Nothing to start by hand. See
   # docs/demo-mode.md.
-  node-demo:
-    image: ghcr.io/renewvan/node-demo:v0.5.0
+  driver-demo:
+    image: ghcr.io/renewvan/driver-demo:v0.5.0
     container_name: renewvan-demo
     restart: unless-stopped
     depends_on:
@@ -250,7 +258,7 @@ services:
   # not a polling backend. See
   # .scratch/renewvan-hub-v0-build/issues/06-dashboard-web-app.md.
   dashboard:
-    image: ghcr.io/renewvan/dashboard:v0.1.46
+    image: ghcr.io/renewvan/dashboard:v0.2.0
     container_name: renewvan-dashboard
     restart: unless-stopped
     ports:

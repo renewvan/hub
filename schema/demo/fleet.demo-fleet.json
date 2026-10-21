@@ -1,87 +1,87 @@
 {
-  "description": "Simulated Nodes for the Device page: healthy multi-entity, dev build, entities with no info, offline with retained info, ESP32 with a MAC, and the router dropping out when its signal bottoms out. Versions and serials are fake.",
+  "description": "Simulated Devices for the Device page: healthy multi-entity, dev build, entities with no info, offline with retained info, ESP32 with a MAC, and the router dropping out when its signal bottoms out. Versions and serials are fake.",
   "loop_s": 120,
-  "nodes": [
+  "devices": [
     {
-      "node": "venus",
+      "device": "venus",
       "health": "online",
       "info": {
-        "node": "venus",
+        "device": "venus",
         "product": "Venus OS bridge",
         "source": "Victron Venus OS MQTT feed",
         "publishes": ["battery", "solar", "charger"],
         "manufacturer": "renewvan",
-        "homepage": "https://github.com/renewvan/node-venus",
+        "homepage": "https://github.com/renewvan/driver-venus",
         "version": "v0.0.0-demo",
-        "host_serial": "DEMO0000000000A1"
+        "board_serial": "DEMO0000000000A1"
       }
     },
     {
-      "node": "tank",
+      "device": "tank",
       "health": "online",
       "info": {
-        "node": "tank",
-        "product": "Tank level node",
+        "device": "tank",
+        "product": "Tank level device",
         "source": "ADS1115 resistive sender",
         "publishes": ["tank"],
         "version": "dev",
-        "host_serial": "DEMO0000000000A1"
+        "board_serial": "DEMO0000000000A1"
       }
     },
     {
-      "node": "temperature",
+      "device": "temperature",
       "health": "online",
       "info": {
-        "node": "temperature",
-        "product": "Temperature node",
+        "device": "temperature",
+        "product": "Temperature device",
         "source": "1-Wire DS18B20 probes and the Pi SoC thermal zone",
         "publishes": ["temperature"],
         "version": "v0.0.0-demo",
-        "host_serial": "DEMO0000000000A1"
+        "board_serial": "DEMO0000000000A1"
       }
     },
     {
-      "node": "gps",
+      "device": "gps",
       "health": "online"
     },
     {
-      "node": "tilt",
+      "device": "tilt",
       "health": "offline",
       "info": {
-        "node": "tilt",
-        "product": "Tilt node",
+        "device": "tilt",
+        "product": "Tilt device",
         "source": "GY-521 / MPU-6050 accelerometer",
         "publishes": ["tilt"],
         "version": "v0.0.0-demo",
-        "host_serial": "DEMO0000000000A1"
+        "board_serial": "DEMO0000000000A1"
       }
     },
     {
-      "node": "esp32-relay",
+      "device": "esp32-relay",
       "health": "online",
       "info": {
-        "node": "esp32-relay",
+        "device": "esp32-relay",
         "product": "ESP32 16-channel relay board",
         "source": "ESP32 with two chained SN74HC595 shift registers",
         "publishes": ["relay"],
         "version": "v0.0.0-demo",
-        "host_serial": "DE:AD:BE:EF:00:01"
+        "board_serial": "DE:AD:BE:EF:00:01"
       }
     },
     {
-      "node": "router",
+      "device": "router",
       "health": "online",
       "health_timeline": [
         { "t": 60, "health": "offline" },
         { "t": 90, "health": "online" }
       ],
       "info": {
-        "node": "router",
-        "product": "Router node",
+        "device": "router",
+        "product": "Router device",
         "source": "Router vendor push feed",
         "publishes": ["router"],
         "version": "v0.0.0-demo",
-        "host_serial": "DEMO0000000000A1"
+        "board_serial": "DEMO0000000000A1"
       }
     }
   ]

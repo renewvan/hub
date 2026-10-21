@@ -6,7 +6,8 @@ control, and auto-sleep idle timer. Systemd service `renewvan-kiosk`.
 ## Display power
 
 Subscribes to  renewvan/kiosk/display/power/set  ("on" | "off").
-Executes the configured display-power command (default: wlopm --off/--on DSI-1).
+Drives the backlight's bl_power sysfs node (default) or the configured
+display-power commands, whose names are in the env var list below.
 Publishes the resulting state retained to  renewvan/kiosk/display/power.
 
 On startup the plugin probes the display-power command to read the current
@@ -38,8 +39,8 @@ to disabled/5 if no retained value exists on startup.
 Touch-to-wake: a background thread monitors the raw evdev touch device
 (TOUCH_DEVICE, default: auto-detected). When a TOUCH_DOWN event arrives while
 the display is off, the plugin publishes "on" to the command topic — same as a
-manual wake from the dashboard. This works even under wlopm where Wayland gates
-input to Chromium clients when the output is powered off. Every touch event
+manual wake from the dashboard. This holds with a compositor-level output-off
+command too, where Wayland stops delivering input to Chromium. Every touch event
 (not just while sleeping) also resets the auto-sleep idle clock.
 
 If a display-power/brightness command is unavailable the plugin logs an error,
@@ -51,9 +52,9 @@ Environment variables (all optional):
   MQTT_PORT          MQTT broker port              (default: 1883)
   MQTT_USERNAME      broker username               (default: empty)
   MQTT_PASSWORD      broker password               (default: empty)
-  DISPLAY_ON_CMD     shell command to turn on      (default: wlopm --on DSI-1)
-  DISPLAY_OFF_CMD    shell command to turn off     (default: wlopm --off DSI-1)
-  DISPLAY_QUERY_CMD  shell command to query state  (default: wlopm)
+  DISPLAY_ON_CMD     shell command to turn on      (default: write 0 to bl_power)
+  DISPLAY_OFF_CMD    shell command to turn off     (default: write 1 to bl_power)
+  DISPLAY_QUERY_CMD  shell command to query state  (default: read bl_power)
   TOUCH_DEVICE       evdev device path for touch-to-wake
                      (default: auto-detect first touch-capable device)
   BRIGHTNESS_DEVICE  /sys/class/backlight/<id> directory for brightness
@@ -81,9 +82,13 @@ MQTT_PORT = int(os.environ.get("MQTT_PORT", "1883"))
 MQTT_USERNAME = os.environ.get("MQTT_USERNAME", "")
 MQTT_PASSWORD = os.environ.get("MQTT_PASSWORD", "")
 
-DISPLAY_ON_CMD = os.environ.get("DISPLAY_ON_CMD", "wlopm --on DSI-1")
-DISPLAY_OFF_CMD = os.environ.get("DISPLAY_OFF_CMD", "wlopm --off DSI-1")
-DISPLAY_QUERY_CMD = os.environ.get("DISPLAY_QUERY_CMD", "wlopm")
+# Empty (default) = drive the backlight's bl_power sysfs node directly. That is
+# compositor-independent, so it works under cage (which has no output-power
+# protocol, hence no wlopm) as well as any other session. Set all three to
+# override with an external command, e.g. `vcgencmd display_power 0`.
+DISPLAY_ON_CMD = os.environ.get("DISPLAY_ON_CMD", "")
+DISPLAY_OFF_CMD = os.environ.get("DISPLAY_OFF_CMD", "")
+DISPLAY_QUERY_CMD = os.environ.get("DISPLAY_QUERY_CMD", "")
 TOUCH_DEVICE = os.environ.get("TOUCH_DEVICE", "")
 BRIGHTNESS_DEVICE = os.environ.get("BRIGHTNESS_DEVICE", "")
 
@@ -153,19 +158,37 @@ def _run(cmd: str) -> tuple[bool, str]:
         return False, ""
 
 
+def _bl_power_path() -> str | None:
+    """Path to the resolved backlight's bl_power node, or None if no backlight."""
+    device = _resolve_backlight_device()
+    return os.path.join(device, "bl_power") if device else None
+
+
 def query_display_state() -> str | None:
     """
     Query the current display power state.
     Returns "on", "off", or None if unavailable/unreadable.
 
-    Supported output formats:
+    With no DISPLAY_QUERY_CMD set, reads the backlight's bl_power node.
+    Otherwise runs the command and parses its output, which may be:
       bl_power sysfs (Official 7" Touch Display v1): "0" = on, "1" = off
       wlopm: lines like "DSI-1  on" / "DSI-1  off"
       vcgencmd: "display_power=1" (on) / "display_power=0" (off)
     """
-    ok, stdout = _run(DISPLAY_QUERY_CMD)
-    if not ok:
-        return None
+    if not DISPLAY_QUERY_CMD:
+        path = _bl_power_path()
+        if not path:
+            return None
+        try:
+            with open(path) as f:
+                stdout = f.read()
+        except OSError as exc:
+            log.error("Cannot read %s: %s", path, exc)
+            return None
+    else:
+        ok, stdout = _run(DISPLAY_QUERY_CMD)
+        if not ok:
+            return None
     stripped = stdout.strip()
     # bl_power sysfs: raw "0" (backlight on) or "1" (backlight off)
     if stripped == "0":
@@ -190,8 +213,21 @@ def query_display_state() -> str | None:
 def set_display(state: str) -> bool:
     """Apply display power state. Returns True on success."""
     cmd = DISPLAY_ON_CMD if state == "on" else DISPLAY_OFF_CMD
-    ok, _ = _run(cmd)
-    return ok
+    if cmd:
+        ok, _ = _run(cmd)
+        return ok
+    path = _bl_power_path()
+    if not path:
+        log.error("No backlight device found — cannot set display %s", state)
+        return False
+    try:
+        # bl_power: 0 = backlight on, 1 = off (FB_BLANK_UNBLANK / FB_BLANK_POWERDOWN)
+        with open(path, "w") as f:
+            f.write("0" if state == "on" else "1")
+        return True
+    except OSError as exc:
+        log.error("Cannot write %s: %s", path, exc)
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -538,8 +574,8 @@ def on_connect(client: mqtt.Client, userdata, flags, rc, properties=None):
     else:
         log.warning(
             "Could not read initial display state — retained topic not updated. "
-            "Check that %r is available on this host.",
-            DISPLAY_QUERY_CMD,
+            "Check that %s is available on this host.",
+            repr(DISPLAY_QUERY_CMD) if DISPLAY_QUERY_CMD else "a readable backlight bl_power node",
         )
 
     brightness = read_brightness_pct()

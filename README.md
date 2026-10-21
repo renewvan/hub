@@ -30,7 +30,7 @@ Assistant, Signal K, and RV-C — rather than competing with them. Any
 
 driver, whether it's talking to a Victron MPPT over [VE.Direct](http://VE.Direct) or an
 
-ESP32 relay node over ESPHome, normalizes into the same schema and
+ESP32 relay device over ESPHome, normalizes into the same schema and
 
 appears on the same bus.
 
@@ -43,31 +43,62 @@ vendor-agnostic glue between them.
 Early / hobby-scale (v0). This repo (`hub`) hosts the shared device-model
 schema, the MQTT/InfluxDB/Grafana deployment (docker-compose), and
 project docs. Drivers, bridges, the logger, and the dashboard each live
-in their own repo under the `renewvan` GitHub org (`node-tank`, `node-venus`,
+in their own repo under the `renewvan` GitHub org (`driver-tank`, `driver-venus`,
 `logger`) — see `.scratch/renewvan-hub-v0-build/` for the v0 build spec.
 Not yet ready for production van use — see \[Roadmap\](#roadmap).
 
 ## Install
 
-1. **Copy `.env.example` to `.env`** and fill in the required values
-   (Venus OS device reachability, if the van has one; the dashboard's browser-reachable
-   MQTT-WS URL) — see `.env.example`'s comments for what each value is
-   and where it's used.
-2. **Pull and start everything:** `docker compose pull && docker
-compose up -d`. This brings up the infra layer (Mosquitto, InfluxDB,
-   Grafana) alongside `node-tank`, `node-venus`, `logger`, and `dashboard` —
-   each a pinned, independently-published image (own repo, own
-   release; nothing built from source in `hub`, per
-   `docs/adr/0001-compose-services-via-pinned-images-not-git-submodules.md`).
-   Bumping a service later is a single `image:` tag edit in `docker-compose.yml`.
-   `node-gps` is behind the `gps` compose profile (its `/dev/ttyACM0`
-   passthrough would otherwise make Docker refuse to start and abort the
-   whole `up -d` on a host with no GPS module): add `--profile gps` when the
-   module is plugged in, or let `bin/deploy.sh` decide from the device.
-3. **Flash the ESP32 16-channel relay node**, once, per `renewvan/node-esp32-relay`'s own
-   README (ESPHome YAML, no custom firmware).
-4. **Install the phone app** per `renewvan/mobile`'s own README (React
-   Native — sideload or app-store build, not part of this compose flow).
+From your own machine (macOS or Linux), with a Raspberry Pi running Raspberry Pi OS (Debian 13, 64-bit)
+that you can `ssh` into with a key:
+
+```bash
+git clone https://github.com/renewvan/hub && cd hub
+bin/install.sh --host <ssh-alias-or-user@pi>
+```
+
+That is the whole install. It checks the Pi first, installs Docker, generates the InfluxDB
+credentials, starts the stack, and sets up the touchscreen. It is safe to re-run, and it never
+overwrites an existing `.env`.
+
+| Option                   | Effect                                                              |
+| ------------------------ | ------------------------------------------------------------------- |
+| `--venus-host <ip>`      | The van's Venus OS device (Cerbo GX etc.). Omit if there is none.   |
+| `--venus-portal-id <id>` | Its VRM portal ID. Asked for if `--venus-host` is given without it. |
+| `--public-host <h>`      | Address phones and laptops use to reach the Pi. Default: its IP.    |
+| `--no-kiosk`             | Headless hub: skip the touchscreen session.                         |
+| `--no-rotate`            | Skip the 180° panel rotation.                                       |
+| `--yes`                  | Never prompt; fail instead if something is missing.                 |
+
+Reboot the Pi once afterwards to start the touchscreen session.
+
+Still manual, because each needs a decision or a login only you can make: `sudo tailscale up`;
+tank calibration (`sensor_min`/`sensor_max` in `/etc/renewvan/tank/config.ini`, which starts on the
+image's defaults); the tilt axis mapping if the GY-521 is not mounted face-down; and broker
+authentication, which is **off** by default (see `.env.example` and hub issue 49 before exposing the
+Pi beyond your own network). The ESP32 relay device (`renewvan/driver-esp32-relay`) and the phone app
+(`renewvan/mobile`) are flashed and installed per their own READMEs.
+
+### Without the installer
+
+`bin/install.sh` runs the pieces below in order; run them yourself if you want control over one:
+
+1. **Copy `.env.example` to `.env`** and fill in the required values (the dashboard's
+   browser-reachable MQTT-WS URL; Venus OS device reachability, if the van has one) — see
+   `.env.example`'s comments for what each value is and where it's used.
+2. **Pull and start everything:** `docker compose pull && docker compose up -d`. This brings up the
+   infra layer (Mosquitto, InfluxDB, Grafana) alongside `driver-tank`, `logger`, and `dashboard` —
+   each a pinned, independently-published image (own repo, own release; nothing built from source in
+   `hub`, per `docs/adr/0001-compose-services-via-pinned-images-not-git-submodules.md`). Bumping a
+   service later is a single `image:` tag edit in `docker-compose.yml`. Two devices are behind compose
+   profiles because they cannot start without their hardware or a required setting, and would
+   otherwise abort or crash-loop the whole stack: `driver-gps` (`gps`, needs `/dev/ttyACM0`) and
+   `driver-venus` (`venus`, needs `VENUS_MQTT_HOST` and `VENUS_PORTAL_ID`). Add `--profile gps` /
+   `--profile venus`, or let `bin/deploy.sh` decide from the device and `.env`.
+3. **Flash the ESP32 16-channel relay device**, once, per `renewvan/driver-esp32-relay`'s own README
+   (ESPHome YAML, no custom firmware).
+4. **Install the phone app** per `renewvan/mobile`'s own README (React Native — sideload or
+   app-store build, not part of this compose flow).
 
 `docker-compose.yml` is the plain-Compose-host path (named volumes). A
 host-path/bind-mount deployment (e.g. TrueNAS's Custom App "Install via
@@ -77,48 +108,46 @@ tracks — keep your own compose override outside version control.
 ### Demo mode
 
 To try the dashboard without a van, turn on Settings → General → System → Demo mode in any
-dashboard. `node-demo` is part of the compose stack and idle until asked; the switch is shared on
+dashboard. `driver-demo` is part of the compose stack and idle until asked; the switch is shared on
 the bus (`renewvan/demo/enabled`), so every client then shows a looping simulated van published
-under the `renewvan/demo/` namespace (see `docs/demo-mode.md`). Real nodes and the logger keep
-running alongside it; nothing real is overwritten and nothing simulated is ever stored. Writing a node for an entity that already
-exists? You ship no demo: see `docs/porting-dbus-to-mqtt-node.md` ("Adding a node for an
+under the `renewvan/demo/` namespace (see `docs/demo-mode.md`). Real devices and the logger keep
+running alongside it; nothing real is overwritten and nothing simulated is ever stored. Writing a device for an entity that already
+exists? You ship no demo: see `docs/porting-dbus-to-mqtt-device.md` ("Adding a device for an
 existing entity").
 
 ### Validating schemas
 
 - `./schema/validate-examples.sh` checks the example fixtures in `schema/examples/` against each
-  schema (entities, plus `node-manifest` and `node-info`, the contract for a Node's `manifest.json`
-  and its retained `renewvan/<node>/info` payload). It also fails when an entity schema exists that
-  the `publishes` enum in `node-manifest.schema.json` and `node-info.schema.json` does not list, so
+  schema (entities, plus `device-manifest` and `device-info`, the contract for a Device's `manifest.json`
+  and its retained `renewvan/<device>/info` payload). It also fails when an entity schema exists that
+  the `publishes` enum in `device-manifest.schema.json` and `device-info.schema.json` does not list, so
   adding an entity means adding it to both enums.
 - `python3 schema/validate-demo.py` (needs `pip install jsonschema`) checks the demo scenarios in
   `schema/demo/`; every entity needs one.
 
-### Deploying to a Raspberry Pi over SSH
+### Deploying to a Raspberry Pi over SSH, step by step
 
-`bin/bootstrap-pi.sh` and `bin/deploy.sh` automate steps 1–2 above for a
-Pi reachable over SSH, instead of running them by hand on the device:
+The scripts `bin/install.sh` calls, for running one at a time against a Pi reachable over SSH:
 
-1. **One-time:** `bin/bootstrap-pi.sh [--host <ssh-alias>]` installs
-   Docker Engine + the Compose plugin if missing, and creates
-   `/opt/renewvan/hub` (deployed compose artifacts), `/etc/renewvan`
-   (host-specific config — Mosquitto broker config, tank calibration),
-   and `/var/log/renewvan`. Defaults to the `renewvan` SSH host alias;
-   set one up in `~/.ssh/config` first.
-2. **Repeatable:** `bin/deploy.sh [--host <ssh-alias>]` rsyncs
-   `docker-compose.yml` and `docker/` to `/opt/renewvan/hub`, then runs
-   `docker compose pull && up -d` on the Pi. On a fresh Pi it seeds
-   `.env` from `.env.example` (with `TANK_CONFIG_PATH` /
-   `MOSQUITTO_CONFIG_PATH` already pointed at `/etc/renewvan/`) and
-   exits asking you to fill in secrets and place
-   `/etc/renewvan/tank/config.ini` before re-running — it never
-   overwrites an existing `.env`.
+1. **One-time:** `bin/bootstrap-pi.sh [--host <ssh-alias>]` installs Docker Engine + the Compose
+   plugin if missing, and creates `/opt/renewvan/hub` (deployed compose artifacts), `/etc/renewvan`
+   (host-specific config — Mosquitto broker config, device configs), and `/var/log/renewvan`.
+   Defaults to the `renewvan` SSH host alias; set one up in `~/.ssh/config` first.
+2. **Repeatable:** `bin/deploy.sh [--host <ssh-alias>]` rsyncs `docker-compose.yml` and `docker/` to
+   `/opt/renewvan/hub`, seeds each device's `/etc/renewvan/<device>/config.ini` from `docker/<device>/`
+   if missing, then runs `docker compose pull && up -d` on the Pi. On a fresh Pi it seeds `.env`
+   from `.env.example` and exits asking you to fill in the secrets (`INFLUXDB_ADMIN_PASSWORD`,
+   `INFLUXDB_ADMIN_TOKEN`, `VITE_MQTT_WS_URL`, and `VENUS_*` if the van has Venus OS) before
+   re-running — it never overwrites an existing `.env`. `bin/install.sh` writes that `.env` for
+   you first, with generated credentials.
+3. **Once, for the touchscreen:** `bin/bootstrap-kiosk-pi.sh [--host <ssh-alias>]`. See
+   `plugins/kiosk/README.md`.
 
 ## Architecture
 
 See \[`/docs/[architecture.md](http://architecture.md)`\](docs/[architecture.md](http://architecture.md)) for the full layered
 
-design (edge nodes → drivers → MQTT bus → application services →
+design (edge devices → drivers → MQTT bus → application services →
 
 presentation).
 
@@ -126,9 +155,11 @@ presentation).
 
 ### Rotating the display 180° (Official Raspberry Pi 7" Touchscreen v1)
 
-Four independent layers must be aligned. Do them in order — each step is separate and non-redundant.
+`bin/bootstrap-kiosk-pi.sh` applies all of this (skip with `--no-rotate`). Rotation is
+done once, in the kernel; cage has no output transform, so nothing in the compositor
+can double-flip it. Two layers must agree:
 
-**1. Kernel & boot splash** — rotate at the KMS/DRM level so the boot splash, console, and touch coordinates all flip together from the earliest possible moment:
+**1. Kernel & boot splash** — rotate at the KMS/DRM level so the boot splash, console and framebuffer flip together from the earliest possible moment:
 
 ```
 # /boot/firmware/cmdline.txt  (single line — no line breaks)
@@ -138,18 +169,7 @@ video=DSI-1:800x480M@60D,panel_orientation=upside_down
 
 > `panel_orientation=upside_down` targets the DSI panel driver directly and is the only flag that rotates both the framebuffer and the early touch coordinate system in one step under `vc4-kms-v3d`. Legacy `lcd_rotate` / `display_rotate` do nothing on this driver.
 
-**2. Wayland compositor** — leave the kanshi output at `normal` transform. The KMS layer already rotated the image; a compositor transform on top would double-flip it back:
-
-```
-# ~/.config/kanshi/config
-profile {
-  output DSI-1 transform normal
-}
-```
-
-Reload without rebooting: `pkill -SIGHUP kanshi`
-
-**3. Touch coordinates** — the ft5x06 controller does not read the KMS `panel_orientation` property; its raw evdev coordinates remain unrotated. Add a udev rule with a 180° libinput calibration matrix:
+**2. Touch coordinates** — the ft5x06 controller does not read the KMS `panel_orientation` property; its raw evdev coordinates remain unrotated. Add a udev rule with a 180° libinput calibration matrix:
 
 ```
 # /etc/udev/rules.d/99-ft5x06-rotation.rules
@@ -166,15 +186,8 @@ sleep 1
 echo "10-0038" | sudo tee /sys/bus/i2c/drivers/edt_ft5x06/bind
 ```
 
-**4. Mouse cursor** — hardware cursor overlays are exempt from `panel_orientation` and will appear unrotated. Force software rendering so the cursor is composited into the framebuffer and rotates with it:
+The mouse cursor is a hardware overlay exempt from `panel_orientation`, so it would
+appear unrotated. `renewvan-cage.service` sets `WLR_NO_HARDWARE_CURSORS=1` to
+composite it into the framebuffer instead.
 
-```
-# ~/.config/labwc/environment  (append one line)
-WLR_NO_HARDWARE_CURSORS=1
-```
-
-Takes effect on next labwc session start (reboot or log out/in).
-
----
-
-Reboot once after all four steps to confirm everything survives a cold start.
+Reboot once to confirm everything survives a cold start.

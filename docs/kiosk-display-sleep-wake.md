@@ -10,10 +10,10 @@ Both the command and state topics share the [`kiosk-display-power`
 schema](../schema/kiosk-display-power.schema.json): a plain JSON string,
 either `"on"` or `"off"`.
 
-| Topic                              | Direction                | Retained | Description                                                                                                                              |
-| ---------------------------------- | ------------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `renewvan/kiosk/display/power`     | kiosk plugin → consumers | **yes**  | Current display power state, published after each successful command execution. Initialised from the live `vcgencmd` reading on startup. |
-| `renewvan/kiosk/display/power/set` | dashboard → kiosk plugin | no       | Command: `"on"` or `"off"`. The kiosk plugin executes the OS-level call and publishes the result to the state topic only on success.     |
+| Topic                              | Direction                | Retained | Description                                                                                                                                        |
+| ---------------------------------- | ------------------------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `renewvan/kiosk/display/power`     | kiosk plugin → consumers | **yes**  | Current display power state, published after each successful command execution. Initialised from the live backlight `bl_power` reading on startup. |
+| `renewvan/kiosk/display/power/set` | dashboard → kiosk plugin | no       | Command: `"on"` or `"off"`. The kiosk plugin executes the OS-level call and publishes the result to the state topic only on success.               |
 
 The `kiosk` segment is a new domain on the renewvan bus, sitting alongside
 `tank`, `battery`, and `relay`. The `display/power` leaf is the only topic
@@ -22,27 +22,28 @@ defined so far; the namespace is reserved for future kiosk-specific topics.
 ## Kiosk plugin (`plugins/kiosk`, systemd service `renewvan-kiosk`)
 
 A small process running on the Pi host **outside** the Docker compose stack
-(it needs direct access to `vcgencmd` and the GPU firmware mailbox, which
-require privileged device passthrough inside a container). Deployed as a
-systemd service.
+(it writes the backlight's `bl_power` sysfs node and reads the touch device
+via evdev, both of which would need privileged device passthrough inside a
+container). Deployed as a systemd service.
 
 ### Responsibilities
 
 - Subscribe to `renewvan/kiosk/display/power/set`.
-- On `"off"`: run `vcgencmd display_power 0`; publish `"off"` retained on
-  success.
-- On `"on"`: run `vcgencmd display_power 1`; publish `"on"` retained on
-  success.
-- At startup: probe `vcgencmd display_power` (no-arg call reads current
-  state). If unavailable, log an error and continue — the plugin must not
-  crash the dashboard or block the broker. If available, publish the
-  current state retained so the topic reflects reality after a restart.
+- On `"off"`: write `1` to the backlight's `bl_power`; publish `"off"`
+  retained on success.
+- On `"on"`: write `0` to `bl_power`; publish `"on"` retained on success.
+- At startup: read `bl_power`. If unavailable, log an error and continue —
+  the plugin must not crash the dashboard or block the broker. If
+  available, publish the current state retained so the topic reflects
+  reality after a restart.
 
 ### Pluggable command
 
-The OS-level command (`vcgencmd display_power`) is configurable so that the
-Wayland-compositor fallback (`wlopm --off` / `wlopm --on`) requires only a
-config change, not a code change.
+By default the plugin drives `bl_power` directly, which is
+compositor-independent: the kiosk session runs under cage, which has no
+output-power protocol, so `wlopm` does not work there. Setting
+`DISPLAY_ON_CMD` / `DISPLAY_OFF_CMD` / `DISPLAY_QUERY_CMD` swaps in an
+external command (`vcgencmd display_power`, say) with a config change only.
 
 ### Systemd sequencing
 
@@ -68,11 +69,11 @@ in `docs/pi-agent-sudo-setup.md` and resolved for Chromium in the
    actually fired in production. It also carried a recurring footgun: any
    dashboard viewer, including a remote phone, rendered it too, needing
    increasingly complex machinery (`isLocalKiosk()`, a `?kioskHost=1` URL
-   marker set by `bin/deploy.sh`/`plugins/kiosk/labwc-autostart`) just to
+   marker set by `bin/deploy.sh` and the old labwc autostart file) just to
    suppress it for non-kiosk viewers. All of that is gone along with the
    overlay.
 
-The dashboard never calls `vcgencmd` directly; it speaks MQTT only.
+The dashboard never touches the display hardware directly; it speaks MQTT only.
 
 ## Hardware note
 
@@ -94,7 +95,7 @@ alternative mechanism would be needed.
   idle-timeout sleep (preset `1`/`5`/`15`/`30` minute options), reusing
   the existing touch-to-wake evdev monitor as the idle clock. Manual
   sleep/wake remains available regardless.
-- **Remote-sleep-allowed gate — added, then removed.** A node-enforced
+- **Remote-sleep-allowed gate — added, then removed.** A device-enforced
   toggle (`renewvan/kiosk/display/remote-sleep-allowed`, default `true`)
   originally let a user disable _remote_ (dashboard/MQTT) sleep commands
   while the host itself could always be put to sleep by whoever has shell
@@ -117,6 +118,6 @@ alternative mechanism would be needed.
   kiosk Pi has been observed to crash (see power-loss recovery ticket); a
   retained MQTT topic survives any browser restart without blinking the display
   back on.
-- **Physical panel power-off, not CSS dim.** `vcgencmd display_power`
-  physically cuts the panel's backlight/signal, the same mechanism Venus OS
-  uses on its own screens. No parasitic draw while sleeping.
+- **Physical panel power-off, not CSS dim.** Writing `bl_power` physically
+  cuts the panel's backlight, the same effect Venus OS has on its own
+  screens. No parasitic draw while sleeping.
