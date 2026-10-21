@@ -30,6 +30,7 @@ Every repo that ships something is released the same way: from the Actions tab (
 - Callers pin hub **by commit SHA**, never `@main`: a hub change must not alter every repo's release unannounced. Adopting a newer workflow is one deliberate edit per repo.
 - The latest stable tag is the version source. A repo that must carry the version in a file (`dashboard`'s `package.json`) opts in with `stamp-package-json`; Python repos keep the `0.0.0` placeholder in `pyproject.toml`, which nothing reads.
 - Stable releases rely on the push-to-`main` CI run for tests; only a pre-release re-runs `test-command`.
+- Every caller grants `contents: write` **and** `packages: write`, including `kind: firmware` callers that publish no package. GitHub validates the entire called workflow before running it, and a caller that grants less than any called job requests fails with `startup_failure` and no jobs.
 - The workflow pushes the release commit to `main` with the default token, so `main` must not be branch-protected. If protection is ever enabled, the `cut` job needs a token that may bypass it.
 
 ## Consequences
