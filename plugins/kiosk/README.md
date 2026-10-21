@@ -40,67 +40,88 @@ fight the idle timer.
 
 ## Install (Pi)
 
+Two scripts do everything, from the repo root on your machine:
+
 ```bash
-# 1. Copy to /opt/renewvan/plugins/kiosk/
-sudo mkdir -p /opt/renewvan/plugins/kiosk
-sudo cp plugins/kiosk/kiosk.py plugins/kiosk/requirements.txt /opt/renewvan/plugins/kiosk/
-
-# 2. Install Python deps (system-level, no venv needed on Pi OS)
-pip3 install -r /opt/renewvan/plugins/kiosk/requirements.txt
-
-# 3. Install + enable systemd service
-sudo cp plugins/kiosk/renewvan-kiosk.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now renewvan-kiosk.service
-
-# 4. Install the boot-time Chromium kiosk launcher. System-wide, not the
-#    per-user labwc autostart file — labwc runs both, and only the system
-#    file suppresses the default desktop's panel/file-manager icons.
-#    bin/deploy.sh relaunches Chromium after every deploy with the same
-#    URL; this file only matters for a cold boot/reflash.
-sudo cp plugins/kiosk/labwc-autostart /etc/xdg/labwc/autostart
-sudo chmod +x /etc/xdg/labwc/autostart
-
-# 5. Touch-drag scrolling: stock Pi OS labwc rc.xml mouse-emulates the
-#    touchscreen (compositor translates touches to virtual-mouse events),
-#    so kiosk Chromium receives wl_pointer only — taps and sliders work,
-#    finger-drag panning never scrolls. It also ships touch rules mapped
-#    to a DSI-2 output that doesn't exist on single-panel hosts, which
-#    makes labwc drop native touches entirely. This fixes both:
-sudo bash /opt/renewvan/plugins/kiosk/fix-labwc-touch-scroll.sh
-#    (bin/deploy.sh runs this on every deploy so a Pi OS update that
-#    rewrites rc.xml can't silently regress it. If it reports changing
-#    anything, reboot once — labwc applies <touch> rules when attaching
-#    input devices at startup.)
+bin/bootstrap-pi.sh          # once: Docker + /opt/renewvan layout
+bin/deploy.sh                # rsyncs plugins/kiosk/, installs renewvan-kiosk
+bin/bootstrap-kiosk-pi.sh    # once: cage + Chromium session on tty1, boot config, udev
+sudo reboot                  # on the Pi
 ```
+
+`bin/bootstrap-kiosk-pi.sh` targets Raspberry Pi OS **Lite** (Debian 13): no
+desktop, no display manager. It installs `cage` and `chromium`, writes
+`renewvan-cage.service`, disables any display manager, and applies the panel
+rotation (`--no-rotate` skips it). Run `deploy.sh` first: the bootstrap reads the
+unit from `/opt/renewvan/plugins/kiosk/`.
+
+Two systemd units, two jobs:
+
+| Unit             | Runs                                 | Purpose                                            |
+| ---------------- | ------------------------------------ | -------------------------------------------------- |
+| `renewvan-kiosk` | `kiosk.py` (Python venv)             | MQTT bridge: display power, brightness, auto-sleep |
+| `renewvan-cage`  | `cage` → `renewvan-kiosk-browser.sh` | The on-screen session: fullscreen Chromium on tty1 |
+
+`renewvan-cage` gets its seat from logind (`PAMName=login` on tty1), so there is
+no `seatd`, display manager or autologin. cage exits when Chromium exits and
+`Restart=always` brings the session back; `bin/deploy.sh` reloads the dashboard
+by restarting this unit (and clearing Chromium's cache).
+
+The Chromium command line lives only in `renewvan-kiosk-browser.sh`. It waits up
+to 60 s for the dashboard, then `exec`s Chromium; `KIOSK_URL` overrides the URL.
+
+### Rotation and touch
+
+Rotation is done once, in the kernel: `video=DSI-1:800x480M@60D,panel_orientation=upside_down`
+in `/boot/firmware/cmdline.txt`. cage has no output transform, so nothing in the
+compositor can double-flip it. The ft5x06 touch controller ignores the KMS
+orientation, so `/etc/udev/rules.d/99-ft5x06-rotation.rules` rotates its
+coordinates with a libinput calibration matrix.
+
+### No mouse cursor
+
+cage draws a cursor only while its seat has a pointer capability. The Pi's HDMI ports
+expose CEC remote-control input (`vc4-hdmi-0`, `vc4-hdmi-1`), which libinput classes as
+`keyboard pointer`, so a kiosk with only a touchscreen still got a cursor.
+`/etc/udev/rules.d/99-renewvan-ignore-hdmi-cec.rules` sets `LIBINPUT_IGNORE_DEVICE=1` on
+them, leaving `touch` as the only capability, and cage hides the cursor. Nothing here uses
+CEC. If you plug in a real mouse the cursor returns; `WLR_NO_HARDWARE_CURSORS=1` (set in
+the unit) keeps it inside the rotated framebuffer when that happens.
 
 ## Configuration
 
 All config via environment variables — set them in the systemd unit's `[Service]` block or in `/etc/renewvan/kiosk.env`:
 
-| Variable            | Default                    | Description                                                                             |
-| ------------------- | -------------------------- | --------------------------------------------------------------------------------------- |
-| `MQTT_HOST`         | `localhost`                | MQTT broker hostname                                                                    |
-| `MQTT_PORT`         | `1883`                     | MQTT broker port                                                                        |
-| `MQTT_USERNAME`     | _(empty)_                  | Broker username                                                                         |
-| `MQTT_PASSWORD`     | _(empty)_                  | Broker password                                                                         |
-| `DISPLAY_ON_CMD`    | `vcgencmd display_power 1` | Command to power display on                                                             |
-| `DISPLAY_OFF_CMD`   | `vcgencmd display_power 0` | Command to power display off                                                            |
-| `DISPLAY_QUERY_CMD` | `vcgencmd display_power`   | Command to read current state (stdout parsed for `display_power=0/1`)                   |
-| `BRIGHTNESS_DEVICE` | _(auto-detect)_            | `/sys/class/backlight/<id>` directory; auto-detects the first backlight device if unset |
+| Variable            | Default                | Description                                                                                 |
+| ------------------- | ---------------------- | ------------------------------------------------------------------------------------------- |
+| `MQTT_HOST`         | `localhost`            | MQTT broker hostname                                                                        |
+| `MQTT_PORT`         | `1883`                 | MQTT broker port                                                                            |
+| `MQTT_USERNAME`     | _(empty)_              | Broker username                                                                             |
+| `MQTT_PASSWORD`     | _(empty)_              | Broker password                                                                             |
+| `DISPLAY_ON_CMD`    | _(empty = `bl_power`)_ | Command to power the display on. Empty: write `0` to the backlight's `bl_power`             |
+| `DISPLAY_OFF_CMD`   | _(empty = `bl_power`)_ | Command to power the display off. Empty: write `1` to `bl_power`                            |
+| `DISPLAY_QUERY_CMD` | _(empty = `bl_power`)_ | Command to read state. Empty: read `bl_power`. Output parsed as `0`/`1`, wlopm, or vcgencmd |
+| `BRIGHTNESS_DEVICE` | _(auto-detect)_        | `/sys/class/backlight/<id>` directory; auto-detects the first backlight device if unset     |
 
-### Wayland fallback
+### Display power
 
-If `vcgencmd display_power` does not suit the attached panel, switch to the `wlopm` compositor-level fallback with a config-only change:
+The default drives `/sys/class/backlight/<id>/bl_power` directly. That works under
+cage, which has no output-power protocol, so `wlopm` does not work there.
+`bin/bootstrap-kiosk-pi.sh` installs a udev rule (`99-renewvan-backlight.rules`)
+making `bl_power` group-writable by `video`, which the unit's user is in. The rule
+only fires when a device is added and the panel is already registered, so the script
+also runs `udevadm trigger` to apply it (and the touch rotation rule) to the live
+devices; without that, sleep fails with `Permission denied` until the next reboot.
+
+To use an external command instead (a panel without a backlight node), set all
+three variables:
 
 ```ini
 # /etc/renewvan/kiosk.env
-DISPLAY_ON_CMD=wlopm --on '*'
-DISPLAY_OFF_CMD=wlopm --off '*'
-DISPLAY_QUERY_CMD=wlopm
+DISPLAY_ON_CMD=vcgencmd display_power 1
+DISPLAY_OFF_CMD=vcgencmd display_power 0
+DISPLAY_QUERY_CMD=vcgencmd display_power
 ```
-
-`wlopm` with no arguments lists outputs and their power state; the plugin logs the raw output and marks state unknown (no retained publish) — supply a wrapper script if state initialisation matters for your setup.
 
 ## Logs
 

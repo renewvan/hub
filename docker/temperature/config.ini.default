@@ -1,7 +1,7 @@
 [mqtt]
 host = mosquitto
 
-[node]
+[device]
 ; Dashboard edits (name/unit) persist here; the compose service mounts
 ; /etc/renewvan/temperature/state at this path so they survive a container
 ; recreate.
@@ -12,7 +12,7 @@ state_dir = /app/state
 ; DS18B20 probes on this van's bus. Find serials with
 ; `ls /sys/bus/w1/devices` on the Pi. Probes left unmapped are still
 ; published under their serial. Edit, then
-; `docker compose restart node-temperature`.
+; `docker compose restart driver-temperature`.
 [sensor.outdoor]
 serial = 28-000000259026
 name = Outdoor

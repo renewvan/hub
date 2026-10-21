@@ -23,7 +23,7 @@
     },
     "operator": {
       "type": "string",
-      "description": "PLMN as reported by the modem: numeric MCC+MNC (e.g. \"26203\"), not a display name — mapping codes to operator names is presentation, not node business."
+      "description": "PLMN as reported by the modem: numeric MCC+MNC (e.g. \"26203\"), not a display name — mapping codes to operator names is presentation, not device business."
     },
     "network_type": {
       "type": "string",

@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://renewvan.dev/schema/tilt.schema.json",
   "title": "tilt",
-  "description": "v0.1 device-model entity: van inclination (roll/pitch) from a GY-521 / MPU-6050 accelerometer, read directly by the renewvan/node-tilt node (sensing, not a feed remap). Published under renewvan/tilt/<id>/<property>. Every field is live (retained), republished when roll or pitch moves past a deadband and on a heartbeat; there are no identity/startup-only fields. Angles are in the van frame (x forward, y left, z up), smoothed, and corrected by the install-time level zero set via renewvan/tilt/<id>/level_zero/set. Whether the van counts as 'level' is a presentation tolerance applied by the consumer, not published here.",
+  "description": "v0.1 device-model entity: van inclination (roll/pitch) from a GY-521 / MPU-6050 accelerometer, read directly by the renewvan/driver-tilt device (sensing, not a feed remap). Published under renewvan/tilt/<id>/<property>. Every field is live (retained), republished when roll or pitch moves past a deadband and on a heartbeat; there are no identity/startup-only fields. Angles are in the van frame (x forward, y left, z up), smoothed, and corrected by the install-time level zero set via renewvan/tilt/<id>/level_zero/set. Whether the van counts as 'level' is a presentation tolerance applied by the consumer, not published here.",
   "type": "object",
   "properties": {
     "roll_deg": {

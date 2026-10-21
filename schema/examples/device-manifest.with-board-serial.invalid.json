@@ -1,7 +1,7 @@
 {
-  "node": "venus",
+  "device": "venus",
   "product": "Venus OS bridge",
   "source": "Victron Venus OS MQTT feed",
   "publishes": ["battery"],
-  "host_serial": "10000000abcdef01"
+  "board_serial": "10000000abcdef01"
 }

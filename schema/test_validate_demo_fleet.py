@@ -41,8 +41,8 @@ def edit_fleet(schema: Path, change) -> None:
     path.write_text(json.dumps(fleet))
 
 
-def node(fleet: dict, key: str) -> dict:
-    return next(n for n in fleet["nodes"] if n["node"] == key)
+def device(fleet: dict, key: str) -> dict:
+    return next(n for n in fleet["devices"] if n["device"] == key)
 
 
 def test_shipped_fleet_passes(schema_copy: Path) -> None:
@@ -59,7 +59,7 @@ def test_fleet_file_is_not_read_as_an_entity_scenario(schema_copy: Path) -> None
 
 
 def test_invalid_info_is_rejected(schema_copy: Path) -> None:
-    edit_fleet(schema_copy, lambda f: node(f, "tank")["info"].pop("version"))
+    edit_fleet(schema_copy, lambda f: device(f, "tank")["info"].pop("version"))
     result = run_validator(schema_copy)
     assert result.returncode == 1
     assert "tank" in result.stdout and "version" in result.stdout
@@ -75,9 +75,9 @@ def test_publishes_type_without_entity_scenario_is_rejected(schema_copy: Path) -
 
 def test_reserved_key_demo_is_rejected(schema_copy: Path) -> None:
     def rename(fleet: dict) -> None:
-        n = node(fleet, "tank")
-        n["node"] = "demo"
-        n["info"]["node"] = "demo"
+        n = device(fleet, "tank")
+        n["device"] = "demo"
+        n["info"]["device"] = "demo"
 
     edit_fleet(schema_copy, rename)
     result = run_validator(schema_copy)
@@ -86,8 +86,8 @@ def test_reserved_key_demo_is_rejected(schema_copy: Path) -> None:
     assert "'demo'" in result.stdout
 
 
-def test_info_node_key_must_match_entry_key(schema_copy: Path) -> None:
-    edit_fleet(schema_copy, lambda f: node(f, "tank")["info"].update(node="tilt"))
+def test_info_device_key_must_match_entry_key(schema_copy: Path) -> None:
+    edit_fleet(schema_copy, lambda f: device(f, "tank")["info"].update(device="tilt"))
     result = run_validator(schema_copy)
     assert result.returncode == 1
     assert "tank" in result.stdout
@@ -95,7 +95,7 @@ def test_info_node_key_must_match_entry_key(schema_copy: Path) -> None:
 
 def test_timeline_time_at_or_past_loop_is_rejected(schema_copy: Path) -> None:
     def push_out_of_range(fleet: dict) -> None:
-        flapper = next(n for n in fleet["nodes"] if n.get("health_timeline"))
+        flapper = next(n for n in fleet["devices"] if n.get("health_timeline"))
         flapper["health_timeline"][-1]["t"] = fleet["loop_s"]
 
     edit_fleet(schema_copy, push_out_of_range)
@@ -106,7 +106,7 @@ def test_timeline_time_at_or_past_loop_is_rejected(schema_copy: Path) -> None:
 
 def test_unordered_timeline_is_rejected(schema_copy: Path) -> None:
     def reverse(fleet: dict) -> None:
-        flapper = next(n for n in fleet["nodes"] if n.get("health_timeline"))
+        flapper = next(n for n in fleet["devices"] if n.get("health_timeline"))
         flapper["health_timeline"].reverse()
 
     edit_fleet(schema_copy, reverse)
@@ -115,9 +115,9 @@ def test_unordered_timeline_is_rejected(schema_copy: Path) -> None:
     assert "goes backwards" in result.stdout
 
 
-def test_exactly_one_node_flaps(schema_copy: Path) -> None:
+def test_exactly_one_device_flaps(schema_copy: Path) -> None:
     def remove_flapper(fleet: dict) -> None:
-        for n in fleet["nodes"]:
+        for n in fleet["devices"]:
             n.pop("health_timeline", None)
 
     edit_fleet(schema_copy, remove_flapper)
@@ -126,57 +126,58 @@ def test_exactly_one_node_flaps(schema_copy: Path) -> None:
     assert "exactly one" in result.stdout
 
 
-def test_fleet_must_show_a_node_with_no_info(schema_copy: Path) -> None:
+def test_fleet_must_show_a_device_with_no_info(schema_copy: Path) -> None:
     edit_fleet(
-        schema_copy, lambda f: node(f, "gps").update(info=node(f, "tank")["info"] | {"node": "gps"})
+        schema_copy,
+        lambda f: device(f, "gps").update(info=device(f, "tank")["info"] | {"device": "gps"}),
     )
     result = run_validator(schema_copy)
     assert result.returncode == 1
     assert "no info" in result.stdout
 
 
-def test_fleet_must_show_an_offline_node_with_retained_info(schema_copy: Path) -> None:
-    edit_fleet(schema_copy, lambda f: node(f, "tilt").update(health="online"))
+def test_fleet_must_show_an_offline_device_with_retained_info(schema_copy: Path) -> None:
+    edit_fleet(schema_copy, lambda f: device(f, "tilt").update(health="online"))
     result = run_validator(schema_copy)
     assert result.returncode == 1
     assert "offline" in result.stdout
 
 
 def test_fleet_must_show_a_dev_build(schema_copy: Path) -> None:
-    edit_fleet(schema_copy, lambda f: node(f, "tank")["info"].update(version="v0.0.0-demo"))
+    edit_fleet(schema_copy, lambda f: device(f, "tank")["info"].update(version="v0.0.0-demo"))
     result = run_validator(schema_copy)
     assert result.returncode == 1
     assert "dev" in result.stdout
 
 
-def test_fleet_must_show_a_node_with_a_mac_serial(schema_copy: Path) -> None:
+def test_fleet_must_show_a_device_with_a_mac_serial(schema_copy: Path) -> None:
     edit_fleet(
         schema_copy,
-        lambda f: node(f, "esp32-relay")["info"].update(host_serial="DEMO0000000000B2"),
+        lambda f: device(f, "esp32-relay")["info"].update(board_serial="DEMO0000000000B2"),
     )
     result = run_validator(schema_copy)
     assert result.returncode == 1
     assert "MAC" in result.stdout
 
 
-def test_fleet_must_show_a_healthy_multi_entity_node(schema_copy: Path) -> None:
-    edit_fleet(schema_copy, lambda f: node(f, "venus")["info"].update(publishes=["battery"]))
+def test_fleet_must_show_a_healthy_multi_entity_device(schema_copy: Path) -> None:
+    edit_fleet(schema_copy, lambda f: device(f, "venus")["info"].update(publishes=["battery"]))
     result = run_validator(schema_copy)
     assert result.returncode == 1
     assert "more than one entity" in result.stdout
 
 
-def test_router_is_a_simulated_node(schema_copy: Path) -> None:
+def test_router_is_a_simulated_device(schema_copy: Path) -> None:
     def rename_router(fleet: dict) -> None:
         # Keep exactly one flapper so only the router rule can fire.
-        router = node(fleet, "router")
-        router["node"] = "uplink"
-        router["info"]["node"] = "uplink"
+        router = device(fleet, "router")
+        router["device"] = "uplink"
+        router["info"]["device"] = "uplink"
 
     edit_fleet(schema_copy, rename_router)
     result = run_validator(schema_copy)
     assert result.returncode == 1
-    assert "the `router` node" in result.stdout
+    assert "the `router` device" in result.stdout
 
 
 @pytest.mark.parametrize(
@@ -185,21 +186,21 @@ def test_router_is_a_simulated_node(schema_copy: Path) -> None:
     ids=["real-looking-pi-serial", "pi-serial-not-marked-fake"],
 )
 def test_a_real_looking_pi_serial_is_rejected(schema_copy: Path, serial: str) -> None:
-    edit_fleet(schema_copy, lambda f: node(f, "venus")["info"].update(host_serial=serial))
+    edit_fleet(schema_copy, lambda f: device(f, "venus")["info"].update(board_serial=serial))
     result = run_validator(schema_copy)
     assert result.returncode == 1
-    assert "host_serial" in result.stdout
+    assert "board_serial" in result.stdout
 
 
 @pytest.mark.parametrize("version", ["v1.2.3", "0.8.0", "abc1234"])
 def test_a_real_looking_version_is_rejected(schema_copy: Path, version: str) -> None:
-    edit_fleet(schema_copy, lambda f: node(f, "venus")["info"].update(version=version))
+    edit_fleet(schema_copy, lambda f: device(f, "venus")["info"].update(version=version))
     result = run_validator(schema_copy)
     assert result.returncode == 1
     assert "version" in result.stdout
 
 
-def test_node_slug_pattern_must_not_drift_between_schemas(schema_copy: Path) -> None:
+def test_device_slug_pattern_must_not_drift_between_schemas(schema_copy: Path) -> None:
     path = schema_copy / "demo-fleet.schema.json"
     text = path.read_text().replace("(?!demo$)", "")
     path.write_text(text)

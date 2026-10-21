@@ -46,13 +46,10 @@ python3 -m venv /opt/renewvan/venvs/kiosk
 sudo cp /opt/renewvan/plugins/kiosk/renewvan-kiosk.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now renewvan-kiosk.service
-# Kiosk touch input: stock Pi OS labwc rc.xml mouse-emulates the
-# touchscreen (wl_pointer only) — flip to real wl_touch so touch-drag
-# scrolling works in the dashboard. Idempotent; see the script's header
-# for the full rationale.
-sudo bash /opt/renewvan/plugins/kiosk/fix-labwc-touch-scroll.sh
+# The cage kiosk session unit (renewvan-cage.service) is installed by
+# bin/bootstrap-kiosk-pi.sh, not here: it needs the kiosk user substituted in.
 if [[ ! -f /etc/renewvan/kiosk.env ]]; then
-  printf '# renewvan kiosk plugin environment overrides\n# See plugins/kiosk/README.md for available variables.\n# Uncomment and set to override defaults:\n# MQTT_HOST=localhost\n# MQTT_PORT=1883\n# MQTT_USERNAME=\n# MQTT_PASSWORD=\n# DISPLAY_ON_CMD=vcgencmd display_power 1\n# DISPLAY_OFF_CMD=vcgencmd display_power 0\n# DISPLAY_QUERY_CMD=vcgencmd display_power\n' | sudo tee /etc/renewvan/kiosk.env >/dev/null
+  printf '# renewvan kiosk plugin environment overrides\n# See plugins/kiosk/README.md for available variables.\n# Display power defaults to the backlight bl_power device; set all three\n# DISPLAY_*_CMD to override. Uncomment and set to override defaults:\n# MQTT_HOST=localhost\n# MQTT_PORT=1883\n# MQTT_USERNAME=\n# MQTT_PASSWORD=\n' | sudo tee /etc/renewvan/kiosk.env >/dev/null
 fi
 
 # plugin/tailscale: install tailscale, venv, service
@@ -75,14 +72,14 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
-# GPS_CONFIG_PATH may be missing from a .env predating node-gps's addition
+# GPS_CONFIG_PATH may be missing from a .env predating driver-gps's addition
 # to .env.example (the branch above only seeds a brand-new .env) --
 # ensure it's present either way, idempotently.
 grep -q '^GPS_CONFIG_PATH=' .env || echo 'GPS_CONFIG_PATH=/etc/renewvan/gps/config.ini' >> .env
-# Same for node-temperature's keys.
+# Same for driver-temperature's keys.
 grep -q '^TEMPERATURE_CONFIG_PATH=' .env || echo 'TEMPERATURE_CONFIG_PATH=/etc/renewvan/temperature/config.ini' >> .env
 grep -q '^TEMPERATURE_STATE_PATH=' .env || echo 'TEMPERATURE_STATE_PATH=/etc/renewvan/temperature/state' >> .env
-# Same for node-tilt's keys.
+# Same for driver-tilt's keys.
 grep -q '^TILT_CONFIG_PATH=' .env || echo 'TILT_CONFIG_PATH=/etc/renewvan/tilt/config.ini' >> .env
 grep -q '^TILT_STATE_PATH=' .env || echo 'TILT_STATE_PATH=/etc/renewvan/tilt/state' >> .env
 
@@ -107,25 +104,34 @@ if [[ ! -f /etc/renewvan/tilt/config.ini ]]; then
 fi
 
 if [[ ! -f /etc/renewvan/tank/config.ini ]]; then
-  echo
-  echo "==> /etc/renewvan/tank/config.ini is missing (tank calibration — see"
-  echo "    docs/porting-dbus-to-mqtt-node.md). Place it on the Pi, then re-run"
-  echo "    bin/deploy.sh."
-  exit 1
+  echo "Seeding /etc/renewvan/tank/config.ini from the repo default (sets [mqtt] host = mosquitto; the image's defaults give two 70 L tanks on ADS1115 channels 0 and 1 until you calibrate sensor_min/max)."
+  cp docker/tank/config.ini.default /etc/renewvan/tank/config.ini
 fi
 
-# node-gps is behind the \`gps\` compose profile because its \`devices:\` entry
+# driver-gps is behind the \`gps\` compose profile because its \`devices:\` entry
 # makes Docker refuse to create the container (and compose abort the whole
 # \`up -d\`) when /dev/ttyACM0 does not exist. Enable the profile only when the
-# module is plugged in; re-running deploy after plugging it in starts the node.
+# module is plugged in; re-running deploy after plugging it in starts the device.
 # Without the module, any previously created gps container is stopped so it
 # doesn't crash-loop on the missing device.
 if [[ -e /dev/ttyACM0 ]]; then
   export COMPOSE_PROFILES="\${COMPOSE_PROFILES:+\${COMPOSE_PROFILES},}gps"
   echo "==> GPS device /dev/ttyACM0 present: enabling the gps profile"
 else
-  echo "==> No /dev/ttyACM0: skipping node-gps (plug in the GPS module and re-run deploy to enable it)"
-  docker compose rm -sf node-gps >/dev/null 2>&1 || true
+  echo "==> No /dev/ttyACM0: skipping driver-gps (plug in the GPS module and re-run deploy to enable it)"
+  docker compose rm -sf driver-gps >/dev/null 2>&1 || true
+fi
+
+# driver-venus is behind the \`venus\` compose profile: it needs VENUS_MQTT_HOST and
+# VENUS_PORTAL_ID (a hard lookup, no default), so on a van with no Venus OS device
+# it would crash-loop. Enable it only when .env names a Venus device; any
+# previously created container is stopped otherwise.
+if grep -Eq '^VENUS_MQTT_HOST=.+' .env; then
+  export COMPOSE_PROFILES="\${COMPOSE_PROFILES:+\${COMPOSE_PROFILES},}venus"
+  echo "==> VENUS_MQTT_HOST set: enabling the venus profile"
+else
+  echo "==> No VENUS_MQTT_HOST in .env: skipping driver-venus (set it and re-run deploy on a van with Venus OS)"
+  docker compose rm -sf driver-venus >/dev/null 2>&1 || true
 fi
 
 echo "==> docker compose pull && up -d"
@@ -134,25 +140,19 @@ docker compose up -d
 REMOTE
 
 echo "==> Reloading kiosk browser"
-ssh "${HOST}" "
-  pkill chromium || true
-  # Fresh cache: chromium heuristic-caches index.html, which would keep
-  # serving the previous dashboard build after an image bump.
-  rm -rf "\${HOME}/.cache/chromium" || true
-  sleep 2
-  WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/1000 nohup chromium \
-    --kiosk \
-    --ozone-platform=wayland \
-    --password-store=basic \
-    --noerrdialogs \
-    --disable-infobars \
-    --disable-session-crashed-bubble \
-    --disable-translate \
-    --disable-pinch \
-    --overscroll-history-navigation=0 \
-    --check-for-update-interval=31536000 \
-    --no-first-run \
-    http://localhost >/dev/null 2>&1 &
-"
+# Fresh cache: chromium heuristic-caches index.html, which would keep serving
+# the previous dashboard build after an image bump. The cache lives in the
+# kiosk user's home, which is the ssh user's home on a single-user kiosk Pi.
+# Restarting renewvan-cage relaunches cage and therefore Chromium; if the
+# unit isn't installed yet (Pi not bootstrapped with bin/bootstrap-kiosk-pi.sh)
+# say so instead of silently leaving the old dashboard on screen.
+ssh "${HOST}" '
+  rm -rf "${HOME}/.cache/chromium" || true
+  if systemctl cat renewvan-cage.service >/dev/null 2>&1; then
+    sudo systemctl restart renewvan-cage.service
+  else
+    echo "renewvan-cage.service not installed: run bin/bootstrap-kiosk-pi.sh, or reload the browser by hand" >&2
+  fi
+'
 
 echo "==> Deploy complete"

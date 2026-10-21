@@ -1,0 +1,17 @@
+[mqtt]
+host = mosquitto
+
+; Everything else comes from the image's config.default.ini: two tanks
+; (tank.fresh on ADS1115 channel 0, tank.grey on channel 1), a 0-190 ohm
+; sender range, 70 L each. Override only what differs on your van, then
+; `docker compose restart node-tank`. See node-tank's README, "Configuration".
+;
+; [tank.fresh]
+; sensor_min = 0.0
+; sensor_max = 190.0
+; tank_capacity = 70
+;
+; [tank.grey]
+; sensor_min = 0.0
+; sensor_max = 190.0
+; tank_capacity = 70

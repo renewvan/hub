@@ -2,9 +2,9 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://renewvan.dev/schema/demo-fleet.schema.json",
   "title": "demo-fleet",
-  "description": "Envelope of the simulated Node fleet, schema/demo/fleet.demo-fleet.json. One file declares every simulated Node; it is named *.demo-fleet.json so the per-entity scenario glob (*.demo.json) never matches it, and schema/validate-demo.py reads it in a separate pass. Each entry in `nodes` is a complete Node info (validated against node-info.schema.json) plus the health to show; node-demo publishes it retained under renewvan/demo/<node>/info and renewvan/demo/<node>/health, only while Demo mode is on, and clears both when it is switched off. A Node with no `info` publishes health only, to simulate a Node that has not been updated. `health_timeline` overlays health at `t` seconds into the loop and resets to `health` at each loop start; exactly one Node in the fleet carries one. node-demo itself is a simulator, not a Node, and has no entry. Versions and serials here are visibly fake and never read from the Pi. What JSON Schema cannot express (info.node equals the entry key, the reserved key `demo`, every `publishes` type has an entity scenario, `t` ordered and < loop_s, exactly one flapping Node) is checked by schema/validate-demo.py.",
+  "description": "Envelope of the simulated Device fleet, schema/demo/fleet.demo-fleet.json. One file declares every simulated Device; it is named *.demo-fleet.json so the per-entity scenario glob (*.demo.json) never matches it, and schema/validate-demo.py reads it in a separate pass. Each entry in `devices` is a complete Device info (validated against device-info.schema.json) plus the health to show; driver-demo publishes it retained under renewvan/demo/<device>/info and renewvan/demo/<device>/health, only while Demo mode is on, and clears both when it is switched off. A Device with no `info` publishes health only, to simulate a Device that has not been updated. `health_timeline` overlays health at `t` seconds into the loop and resets to `health` at each loop start; exactly one Device in the fleet carries one. driver-demo itself is a simulator, not a Device, and has no entry. Versions and serials here are visibly fake and never read from the Pi. What JSON Schema cannot express (info.device equals the entry key, the reserved key `demo`, every `publishes` type has an entity scenario, `t` ordered and < loop_s, exactly one flapping Device) is checked by schema/validate-demo.py.",
   "type": "object",
-  "required": ["description", "loop_s", "nodes"],
+  "required": ["description", "loop_s", "devices"],
   "additionalProperties": false,
   "properties": {
     "description": {
@@ -14,30 +14,30 @@
     "loop_s": {
       "type": "integer",
       "minimum": 1,
-      "description": "Loop length in seconds. Shares the clock of the entity scenarios, so a Node's health stays coherent with the entities it publishes."
+      "description": "Loop length in seconds. Shares the clock of the entity scenarios, so a Device's health stays coherent with the entities it publishes."
     },
-    "nodes": {
+    "devices": {
       "type": "array",
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["node", "health"],
+        "required": ["device", "health"],
         "additionalProperties": false,
         "properties": {
-          "node": {
+          "device": {
             "type": "string",
-            "pattern": "^(?!node-)(?!demo$)[a-z][a-z0-9]*(-[a-z0-9]+)*$",
-            "description": "The Node key: the <node> segment of renewvan/demo/<node>/info and /health. Same slug rule as node-info.schema.json, and the reserved key `demo` is rejected (it would collide with renewvan/demo/health)."
+            "pattern": "^(?!driver-)(?!demo$)[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+            "description": "The Device key: the <device> segment of renewvan/demo/<device>/info and /health. Same slug rule as device-info.schema.json, and the reserved key `demo` is rejected (it would collide with renewvan/demo/health)."
           },
           "info": {
             "type": "object",
             "minProperties": 1,
-            "description": "Complete Node info, retained; validated against node-info.schema.json by schema/validate-demo.py (a cross-file $ref would need a resolver in every consumer). Omit to simulate a Node that publishes no info. info.node must equal this entry's `node`."
+            "description": "Complete Device info, retained; validated against device-info.schema.json by schema/validate-demo.py (a cross-file $ref would need a resolver in every consumer). Omit to simulate a Device that publishes no info. info.device must equal this entry's `device`."
           },
           "health": {
             "type": "string",
             "enum": ["online", "offline"],
-            "description": "Health at loop start, published as a bare retained word. `offline` with an `info` present simulates a Node that dropped and left its retained info."
+            "description": "Health at loop start, published as a bare retained word. `offline` with an `info` present simulates a Device that dropped and left its retained info."
           },
           "health_timeline": {
             "type": "array",
@@ -58,7 +58,7 @@
                 }
               }
             },
-            "description": "Optional. Health changes within the loop; health resets to `health` at each loop start. Exactly one Node in the fleet has one."
+            "description": "Optional. Health changes within the loop; health resets to `health` at each loop start. Exactly one Device in the fleet has one."
           }
         }
       }

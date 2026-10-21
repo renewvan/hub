@@ -46,7 +46,7 @@
       "type": "number",
       "minimum": 0,
       "maximum": 100,
-      "description": "level_pct value that trips alarm_state to 'alarm' (inclusive, per node-tank's hysteresis: low direction triggers at <=, high direction at >=). Retained/static, published once at startup (v0.5). Present only if alarm is configured for this tank."
+      "description": "level_pct value that trips alarm_state to 'alarm' (inclusive, per driver-tank's hysteresis: low direction triggers at <=, high direction at >=). Retained/static, published once at startup (v0.5). Present only if alarm is configured for this tank."
     },
     "alarm_restore_pct": {
       "type": "number",
@@ -56,7 +56,7 @@
     },
     "temperature_c": {
       "type": "number",
-      "description": "Water temperature in degrees Celsius. Present only if an NTC temperature sensor is configured for this tank (10k thermistor divider on a spare ADS1115 channel, read by the tank node)."
+      "description": "Water temperature in degrees Celsius. Present only if an NTC temperature sensor is configured for this tank (10k thermistor divider on a spare ADS1115 channel, read by the tank device)."
     },
     "last_inspected_at": {
       "type": "string",
