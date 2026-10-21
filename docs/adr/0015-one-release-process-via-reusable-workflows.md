@@ -15,7 +15,7 @@ Every repo that ships something is released the same way: from the Actions tab (
 `kind` is the one real axis of difference:
 
 - **`image`**: `driver-*`, `logger`, `dashboard`. A Device repo also sets `device-version-arg` so the tag becomes the `DEVICE_VERSION` build arg that ends up in the retained Device info; `logger`, `dashboard` and `driver-demo` publish no Device info and do not.
-- **`firmware`**: `driver-esp32-relay`. It has no image. The release builds the ESPHome firmware at the tag and attaches `<name>.factory.bin` and `<name>.ota.bin` to the GitHub release, so it can be flashed or OTA-updated without a local ESPHome toolchain. The tag is the firmware's `version`, the same value `scripts/flash.sh` stamps locally.
+- **`firmware`**: `driver-esp32-relay`. It has no image. The release is a tag and a GitHub release with generated notes, and the job compiles the tagged tree as a gate. **It uploads no binaries**: WiFi, MQTT and the OTA password are compiled in from `secrets.yaml`, so a CI build carries the example placeholders, cannot join a van's network, and would publish a known OTA password if attached to a public release. The tag is the firmware's `version`, the same value `scripts/flash.sh` stamps from `git describe` when you flash from that tag.
 
 ## Why
 

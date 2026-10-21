@@ -7,7 +7,7 @@
 # builds what the repo ships:
 #
 #   kind: image     a multi-arch Docker image to ghcr.io/<owner>/<image>
-#   kind: firmware  ESPHome firmware binaries attached to the GitHub release
+#   kind: firmware  tag and GitHub release only; the tag is compiled as a gate, nothing is uploaded
 #
 # Stable releases are cut from `main`; a pre-release from whichever branch it is dispatched on
 # (tests gate it, `main` and `:latest` stay untouched).
@@ -219,18 +219,21 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/${{ inputs.image }}:${{ needs.cut.outputs.tag }}
             ${{ !inputs.prerelease && format('ghcr.io/{0}/{1}:latest', github.repository_owner, inputs.image) || '' }}
 
-  publish-firmware:
+  build-firmware:
     if: ${{ inputs.kind == 'firmware' }}
     needs: cut
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@v5
         with:
           ref: ${{ needs.cut.outputs.tag }}
 
-      - name: Fake secrets for the build
+      # WiFi, MQTT and the OTA password are compiled into the firmware from secrets.yaml. A CI
+      # build therefore carries the example placeholders, cannot join a van's network, and must
+      # never be published: this job only proves the tagged tree compiles.
+      - name: Placeholder secrets (build gate only, never uploaded)
         run: cp secrets.yaml.example secrets.yaml
 
       # The release tag is the firmware's version: manifest.json supplies the other stamped
@@ -254,20 +257,3 @@ jobs:
           yaml-file: ${{ inputs.esphome-yaml }}
           version: ${{ inputs.esphome-version }}
           substitutions: ${{ steps.stamp.outputs.substitutions }}
-
-      # The action copies <name>.factory.bin and <name>.ota.bin into ./<name>/, where <name> is
-      # its `name` output (the device name with the chip variant appended).
-      - name: Attach the firmware to the release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ needs.cut.outputs.tag }}
-          BUILD_NAME: ${{ steps.build.outputs.name }}
-        run: |
-          shopt -s nullglob
-          files=("${BUILD_NAME}"/*.factory.bin "${BUILD_NAME}"/*.ota.bin)
-          if [ "${#files[@]}" -lt 2 ]; then
-            echo "::error::expected a .factory.bin and a .ota.bin in ./${BUILD_NAME}/, found ${#files[@]}"
-            ls -la "${BUILD_NAME}" || true
-            exit 1
-          fi
-          gh release upload "$TAG" "${files[@]}" --clobber
