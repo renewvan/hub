@@ -100,7 +100,7 @@ services:
   # `docker compose --profile gps up -d`.
   driver-gps:
     profiles: ["gps"]
-    image: ghcr.io/renewvan/driver-gps:v0.3.0
+    image: ghcr.io/renewvan/driver-gps:v0.4.0
     container_name: renewvan-gps
     restart: unless-stopped
     depends_on:
@@ -154,7 +154,7 @@ services:
   # persistent: the install level zero (set from renewvan/tilt/<id>/level_zero/set)
   # lives there and is lost on a container recreate if it isn't a mounted volume.
   driver-tilt:
-    image: ghcr.io/renewvan/driver-tilt:v0.2.0
+    image: ghcr.io/renewvan/driver-tilt:v0.3.0
     container_name: renewvan-tilt
     restart: unless-stopped
     depends_on:
