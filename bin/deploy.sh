@@ -38,7 +38,7 @@ ssh "${HOST}" bash -s <<REMOTE
 set -euo pipefail
 cd "${REMOTE_DIR}"
 
-mkdir -p /etc/renewvan/mosquitto /etc/renewvan/tank /etc/renewvan/gps /etc/renewvan/temperature/state /etc/renewvan/tilt/state
+mkdir -p /etc/renewvan/mosquitto /etc/renewvan/tank /etc/renewvan/gps /etc/renewvan/temperature/state /etc/renewvan/tilt/state /etc/renewvan/dashboard
 
 # plugin/kiosk: create venv (Bookworm externally-managed Python) and install deps
 python3 -m venv /opt/renewvan/venvs/kiosk
@@ -64,6 +64,7 @@ if [[ ! -f .env ]]; then
   sed -i 's|^TEMPERATURE_STATE_PATH=.*|TEMPERATURE_STATE_PATH=/etc/renewvan/temperature/state|' .env
   sed -i 's|^TILT_CONFIG_PATH=.*|TILT_CONFIG_PATH=/etc/renewvan/tilt/config.ini|' .env
   sed -i 's|^TILT_STATE_PATH=.*|TILT_STATE_PATH=/etc/renewvan/tilt/state|' .env
+  sed -i 's|^DASHBOARD_BASEMAP_PATH=.*|DASHBOARD_BASEMAP_PATH=/etc/renewvan/dashboard/basemap.pmtiles|' .env
   sed -i 's|^MOSQUITTO_CONFIG_PATH=.*|MOSQUITTO_CONFIG_PATH=/etc/renewvan/mosquitto|' .env
   echo
   echo "==> Edit ${REMOTE_DIR}/.env on the Pi to fill in secrets (INFLUXDB_ADMIN_PASSWORD,"
@@ -82,6 +83,33 @@ grep -q '^TEMPERATURE_STATE_PATH=' .env || echo 'TEMPERATURE_STATE_PATH=/etc/ren
 # Same for driver-tilt's keys.
 grep -q '^TILT_CONFIG_PATH=' .env || echo 'TILT_CONFIG_PATH=/etc/renewvan/tilt/config.ini' >> .env
 grep -q '^TILT_STATE_PATH=' .env || echo 'TILT_STATE_PATH=/etc/renewvan/tilt/state' >> .env
+# Same for the dashboard's Basemap path.
+grep -q '^DASHBOARD_BASEMAP_PATH=' .env || echo 'DASHBOARD_BASEMAP_PATH=/etc/renewvan/dashboard/basemap.pmtiles' >> .env
+
+# The Basemap is bind-mounted as a single file. If the source is missing Docker creates a
+# root-owned *directory* there and nginx answers 301 instead of serving the file. Create an
+# empty placeholder (the Map page's "no map" state) only when nothing is there, so a
+# redeploy never replaces a real Basemap. -e, not -f: never touch whatever already exists.
+basemap_path="\$(sed -n 's|^DASHBOARD_BASEMAP_PATH=||p' .env)"
+if [[ -z "\${basemap_path}" ]]; then
+  echo "ERROR: DASHBOARD_BASEMAP_PATH in ${REMOTE_DIR}/.env is empty (default: /etc/renewvan/dashboard/basemap.pmtiles)" >&2
+  exit 1
+fi
+mkdir -p "\$(dirname "\${basemap_path}")"
+# A Pi that ran the dashboard before this mount existed may hold the directory Docker invents
+# for a missing single-file source. Remove it only if empty; never delete content.
+if [[ -d "\${basemap_path}" ]]; then
+  if rmdir "\${basemap_path}" 2>/dev/null || sudo rmdir "\${basemap_path}" 2>/dev/null; then
+    echo "Removed the empty directory Docker created at \${basemap_path}."
+  else
+    echo "ERROR: \${basemap_path} is a non-empty directory, not a Basemap file. Move its contents away and re-run." >&2
+    exit 1
+  fi
+fi
+if [[ ! -e "\${basemap_path}" ]]; then
+  echo "Creating empty Basemap placeholder \${basemap_path} (push a real one with scripts/push-basemap.sh)."
+  : > "\${basemap_path}"
+fi
 
 if [[ ! -f /etc/renewvan/mosquitto/mosquitto.conf ]]; then
   echo "Seeding /etc/renewvan/mosquitto/mosquitto.conf from the repo default."

@@ -161,6 +161,7 @@ else
     -e "s|^TEMPERATURE_STATE_PATH=.*|TEMPERATURE_STATE_PATH=/etc/renewvan/temperature/state|" \
     -e "s|^TILT_CONFIG_PATH=.*|TILT_CONFIG_PATH=/etc/renewvan/tilt/config.ini|" \
     -e "s|^TILT_STATE_PATH=.*|TILT_STATE_PATH=/etc/renewvan/tilt/state|" \
+    -e "s|^DASHBOARD_BASEMAP_PATH=.*|DASHBOARD_BASEMAP_PATH=/etc/renewvan/dashboard/basemap.pmtiles|" \
     -e "s|^MOSQUITTO_CONFIG_PATH=.*|MOSQUITTO_CONFIG_PATH=/etc/renewvan/mosquitto|" \
     .env.example >"${ENV_TMP}"
 
