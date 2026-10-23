@@ -2,6 +2,18 @@
   "fix_quality": "gps",
   "satellites_in_use": 8,
   "avg_snr_db": 38.5,
+  "satellites": [
+    { "constellation": "gps", "prn": 10, "snr_db": 38, "elevation_deg": 45, "azimuth_deg": 110 },
+    { "constellation": "gps", "prn": 15, "snr_db": 42, "elevation_deg": 60, "azimuth_deg": 220 },
+    {
+      "constellation": "glonass",
+      "prn": 65,
+      "snr_db": 30,
+      "elevation_deg": 20,
+      "azimuth_deg": 150
+    },
+    { "constellation": "beidou", "prn": 23, "snr_db": null, "elevation_deg": 5, "azimuth_deg": 12 }
+  ],
   "latitude": 47.9955,
   "longitude": 7.8529,
   "altitude_m": 122.3,

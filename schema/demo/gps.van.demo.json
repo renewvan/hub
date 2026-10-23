@@ -7,6 +7,48 @@
     "fix_quality": "gps",
     "satellites_in_use": 9,
     "avg_snr_db": 39.2,
+    "satellites": [
+      { "constellation": "gps", "prn": 5, "snr_db": 44, "elevation_deg": 68, "azimuth_deg": 172 },
+      { "constellation": "gps", "prn": 13, "snr_db": 41, "elevation_deg": 52, "azimuth_deg": 238 },
+      { "constellation": "gps", "prn": 20, "snr_db": 37, "elevation_deg": 34, "azimuth_deg": 95 },
+      { "constellation": "gps", "prn": 29, "snr_db": 29, "elevation_deg": 14, "azimuth_deg": 301 },
+      {
+        "constellation": "glonass",
+        "prn": 66,
+        "snr_db": 42,
+        "elevation_deg": 47,
+        "azimuth_deg": 130
+      },
+      {
+        "constellation": "glonass",
+        "prn": 75,
+        "snr_db": 36,
+        "elevation_deg": 28,
+        "azimuth_deg": 215
+      },
+      {
+        "constellation": "galileo",
+        "prn": 11,
+        "snr_db": 40,
+        "elevation_deg": 61,
+        "azimuth_deg": 18
+      },
+      {
+        "constellation": "galileo",
+        "prn": 24,
+        "snr_db": 33,
+        "elevation_deg": 22,
+        "azimuth_deg": 262
+      },
+      {
+        "constellation": "beidou",
+        "prn": 28,
+        "snr_db": 38,
+        "elevation_deg": 39,
+        "azimuth_deg": 330
+      },
+      { "constellation": "beidou", "prn": 9, "snr_db": null, "elevation_deg": 4, "azimuth_deg": 59 }
+    ],
     "latitude": 47.9955,
     "longitude": 7.8529,
     "altitude_m": 122.3,
@@ -34,6 +76,78 @@
         "speed_kmh": 41.0,
         "course_deg": 88.0,
         "satellites_in_use": 10,
+        "satellites": [
+          {
+            "constellation": "gps",
+            "prn": 5,
+            "snr_db": 43,
+            "elevation_deg": 67,
+            "azimuth_deg": 175
+          },
+          {
+            "constellation": "gps",
+            "prn": 13,
+            "snr_db": 40,
+            "elevation_deg": 51,
+            "azimuth_deg": 240
+          },
+          {
+            "constellation": "gps",
+            "prn": 20,
+            "snr_db": 35,
+            "elevation_deg": 33,
+            "azimuth_deg": 97
+          },
+          {
+            "constellation": "gps",
+            "prn": 29,
+            "snr_db": 31,
+            "elevation_deg": 15,
+            "azimuth_deg": 302
+          },
+          {
+            "constellation": "glonass",
+            "prn": 66,
+            "snr_db": 41,
+            "elevation_deg": 46,
+            "azimuth_deg": 132
+          },
+          {
+            "constellation": "glonass",
+            "prn": 75,
+            "snr_db": 34,
+            "elevation_deg": 27,
+            "azimuth_deg": 217
+          },
+          {
+            "constellation": "galileo",
+            "prn": 11,
+            "snr_db": 39,
+            "elevation_deg": 61,
+            "azimuth_deg": 20
+          },
+          {
+            "constellation": "galileo",
+            "prn": 24,
+            "snr_db": 35,
+            "elevation_deg": 23,
+            "azimuth_deg": 263
+          },
+          {
+            "constellation": "beidou",
+            "prn": 28,
+            "snr_db": 37,
+            "elevation_deg": 39,
+            "azimuth_deg": 331
+          },
+          {
+            "constellation": "beidou",
+            "prn": 9,
+            "snr_db": 24,
+            "elevation_deg": 5,
+            "azimuth_deg": 60
+          }
+        ],
         "fix_time": "2026-10-16T08:01:00+00:00"
       }
     },
