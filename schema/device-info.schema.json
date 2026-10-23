@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://renewvan.dev/schema/device-info.schema.json",
   "title": "device-info",
-  "description": "Payload published retained by each Device to renewvan/<device>/info (three segments, so it is never mistaken for a four-segment entity topic). The Device's manifest (device-manifest.schema.json) plus a REQUIRED build-stamped version and an OPTIONAL board_serial. Published on every connect immediately before 'online' on renewvan/<device>/health, and left retained when the Device goes offline so consumers can show 'offline, last seen <version>'. Home Assistant field mapping, for anyone bridging Device info to an HA device block (documented here only; nothing HA-shaped goes on the wire): product -> model, version -> sw_version, board_serial -> serial_number, homepage -> configuration_url, device -> identifiers. board_serial is a support identity for display, never a join key, and every Device on one Host publishes the same value. Formats seen so far: (1) a Raspberry Pi SoC serial, the Serial line of /proc/cpuinfo, 16 hex digits such as 10000000abcdef01; (2) an ESP32 MAC address as AA:BB:CC:DD:EE:FF. It is omitted, never faked or 'unknown', when it cannot be read or is empty or all zeros.",
+  "description": "Payload published retained by each Device to renewvan/<device>/info (three segments, so it is never mistaken for a four-segment entity topic). The Device's manifest (device-manifest.schema.json) plus a REQUIRED build-stamped version and OPTIONAL board_serial and ip. Published on every connect immediately before 'online' on renewvan/<device>/health, and left retained when the Device goes offline so consumers can show 'offline, last seen <version>'. Home Assistant field mapping, for anyone bridging Device info to an HA device block (documented here only; nothing HA-shaped goes on the wire): product -> model, version -> sw_version, board_serial -> serial_number, homepage -> configuration_url, device -> identifiers. board_serial is a support identity for display, never a join key, and every Device on one Host publishes the same value. Formats seen so far: (1) a Raspberry Pi SoC serial, the Serial line of /proc/cpuinfo, 16 hex digits such as 10000000abcdef01; (2) an ESP32 MAC address as AA:BB:CC:DD:EE:FF. It is omitted, never faked or 'unknown', when it cannot be read or is empty or all zeros. ip is the Board's own current IPv4 address, for a Device that runs on a Board with its own network address (an ESP32 on WiFi): it is as of the last connect, because info is republished on every connect, and it is omitted when the Device has no address of its own to report (a Pi-side Device does not publish it: the Pi's address is on renewvan/hub/status).",
   "type": "object",
   "required": ["device", "product", "source", "publishes", "version"],
   "additionalProperties": false,
@@ -61,6 +61,12 @@
       "type": "string",
       "minLength": 1,
       "description": "Optional. Serial of the Board the Device runs on (Home Assistant: serial_number); free string, minimum length 1. See the schema description for the two formats seen. Omitted when unavailable."
+    },
+    "ip": {
+      "type": "string",
+      "pattern": "^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$",
+      "not": { "const": "0.0.0.0" },
+      "description": "Optional. The Board's own current IPv4 address in dotted-quad form, e.g. the address DHCP gave an ESP32. Published only by a Device that knows its own address; omitted, never '0.0.0.0' or a placeholder, when it has none yet. As of the moment info was published: info is republished on every connect, so the value is as fresh as the Device's last (re)connect."
     }
   }
 }

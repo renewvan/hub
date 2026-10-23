@@ -19,10 +19,11 @@ entry's `device`; the reserved key `demo` is rejected (by the slug pattern in
 demo-fleet.schema.json and device-info.schema.json); every `publishes` type has an
 entity scenario; `health_timeline` times are non-decreasing and < `loop_s`; exactly
 one Device carries a `health_timeline`; versions and serials are visibly fake (`dev` or
-`*-demo`; a `DEMO` serial or a unicast, locally administered MAC); the device-key pattern matches
+`*-demo`; a `DEMO` serial or a unicast, locally administered MAC; an `ip` in an RFC 5737
+documentation range); the device-key pattern matches
 device-info.schema.json's so the reserved key cannot drift; and the fleet shows every
 Device-page state (a device with no info, an offline device with retained info, a `dev`
-build, a MAC serial, a multi-entity device) plus the `router`.
+build, a MAC serial, an IP address, a multi-entity device) plus the `router`.
 
 Requires `jsonschema` (pip install jsonschema). Exit 1 on any failure.
 """
@@ -41,7 +42,7 @@ DEMO_DIR = SCHEMA_DIR / "demo"
 FLEET_PATH = DEMO_DIR / "fleet.demo-fleet.json"
 
 # Schemas that are not bus entities (command/status topics, the envelope itself).
-NON_ENTITY_PREFIXES = ("kiosk-", "tailscale-", "device-", "demo")
+NON_ENTITY_PREFIXES = ("kiosk-", "tailscale-", "hub-", "device-", "demo")
 
 
 def load(path: Path):
@@ -63,6 +64,9 @@ def entity_schemas() -> dict[str, Path]:
 FAKE_PI_SERIAL = re.compile(r"^DEMO[0-9A-F]{12}$")
 MAC_SERIAL = re.compile(r"^[0-9A-F][26AE](:[0-9A-F]{2}){5}$")
 FAKE_VERSION = re.compile(r"^(dev|.*-demo)$")
+# A visibly fake IP is one of the three RFC 5737 documentation ranges: never routable, so never a
+# real van's address.
+FAKE_IP = re.compile(r"^(192\.0\.2|198\.51\.100|203\.0\.113)\.\d{1,3}$")
 
 
 def validate_fleet(covered: set[str]) -> list[str]:
@@ -118,6 +122,11 @@ def validate_fleet(covered: set[str]) -> list[str]:
                     FAKE_PI_SERIAL.match(serial) or MAC_SERIAL.match(serial)
                 ):
                     failures.append(f"{where}: board_serial '{serial}' is not visibly fake")
+                address = info.get("ip")
+                if address is not None and not FAKE_IP.match(address):
+                    failures.append(
+                        f"{where}: ip '{address}' must be in an RFC 5737 documentation range"
+                    )
 
         timeline = entry.get("health_timeline")
         if timeline:
@@ -147,6 +156,10 @@ def validate_fleet(covered: set[str]) -> list[str]:
         (
             any(MAC_SERIAL.match(i.get("board_serial", "")) for i in valid_infos),
             "a device with a MAC serial",
+        ),
+        (
+            any("ip" in i for i in valid_infos),
+            "a device with an IP address",
         ),
         (
             any(len(i["publishes"]) > 1 for i in valid_infos),

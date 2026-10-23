@@ -67,7 +67,7 @@ The static description of one **Device**, written once by its author as `manifes
 _Avoid_: Config, descriptor, metadata (too generic).
 
 **Device info**:
-What a **Device** publishes about itself, retained, at `renewvan/<device>/info`: its **Device manifest** plus the version it is running and, when known, the serial of its **Board**. It stays on the bus when the Device goes offline. Not an entity: it has no `<id>`. Contract: `schema/device-info.schema.json`. See `docs/adr/0011-node-manifest-and-retained-info-topic.md`.
+What a **Device** publishes about itself, retained, at `renewvan/<device>/info`: its **Device manifest** plus the version it is running and, when known, the serial and the current IPv4 address (`ip`, only a Device with an address of its own, such as an ESP32 on WiFi) of its **Board**. It stays on the bus when the Device goes offline. Not an entity: it has no `<id>`. Contract: `schema/device-info.schema.json`. See `docs/adr/0011-node-manifest-and-retained-info-topic.md`.
 _Avoid_: Device status, heartbeat (that is the separate `online`/`offline` health word); Device metadata.
 
 **Demo mode**:
@@ -104,6 +104,10 @@ _Avoid_: "VPN device", "Tailscale device" (plugins are not MQTT devices — they
 **Basemap** (`/maps/basemap.pmtiles`):
 The single `.pmtiles` file the dashboard's Map page draws offline, covering one region. The user builds it on their own machine and copies it to the Pi; the hub only provides the plumbing: the `DASHBOARD_BASEMAP_PATH` key (default `/etc/renewvan/dashboard/basemap.pmtiles`), a single-file read-only mount into the `dashboard` service, an empty placeholder created by `bin/deploy.sh` when no file exists, and `scripts/push-basemap.sh` to replace it safely. A future Pi-side download plugin would write to the same path. The dashboard's offline-map guide owns how to build one.
 _Avoid_: "extract" (that is the `pmtiles extract` operation that can produce one, not the file), "tiles" alone (too generic: the file holds many), "map file".
+
+**Hub plugin** (`plugins/hub`):
+A Pi-host process (systemd service `renewvan-hub`) in `plugins/hub/` that publishes the Pi's own local-network address and the hub's version retained to `renewvan/hub/status` (`schema/hub-status.schema.json`). Payload fields: `ip` (source IPv4 of the Pi's default route, so never a Docker bridge or the Tailscale address; `null` with no route), `hostname`, and `version` (the hub release the Pi was deployed from: `git describe --tags --always --dirty` of the deploying checkout, stamped into a `VERSION` file by `bin/deploy.sh` because the Pi has no `.git`; `dev` when unstamped — same convention as **Device info** `version`). Read from the Pi itself, so the hub's IP is on the bus whether or not a router Device is installed — the router entity carries no IP. Ships installed by `bin/deploy.sh`; nothing to authenticate.
+_Avoid_: "hub device", "router IP" (the router entity has no address; this is the Pi's), "broker address" (what a client happens to connect to, which can be a Tailscale name or a proxy, not the Pi's LAN address).
 
 **Display power state** (`renewvan/kiosk/display/power`):
 A retained MQTT topic carrying `"on"` or `"off"` (see `schema/kiosk-display-power.schema.json`). Published by the kiosk plugin after each successful backlight `bl_power` write, and initialised from the live hardware state on startup. The dashboard reflects it via `DisplaySleepButton`'s icon only — no on-screen "sleeping" overlay (removed, see `docs/kiosk-display-sleep-wake.md`'s Design decisions: redundant with the physical backlight cut and with `kiosk.py`'s own touch grab, and it needed increasingly complex machinery to avoid also rendering on remote viewers). The only visible effect of `"off"` is the Pi's own backlight cutting. The matching command topic (`renewvan/kiosk/display/power/set`) carries the same payload but is not retained.

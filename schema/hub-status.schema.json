@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://renewvan.dev/schema/hub-status.schema.json",
+  "title": "hub-status",
+  "description": "Payload published retained by the hub plugin to renewvan/hub/status. Reports the Raspberry Pi's own local-network address, read from the Pi itself, so it exists whether or not a router Device is installed, and the version of the hub (this repo's compose stack and schema) the Pi was deployed from. Published every 30 s and on change.",
+  "type": "object",
+  "required": ["ip", "hostname", "version"],
+  "additionalProperties": false,
+  "properties": {
+    "ip": {
+      "type": ["string", "null"],
+      "pattern": "^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$",
+      "not": { "const": "0.0.0.0" },
+      "description": "The Pi's primary local-network IPv4 address: the source address of its default route (so never a Docker bridge or the Tailscale address). Null when the Pi has no default route."
+    },
+    "hostname": {
+      "type": ["string", "null"],
+      "minLength": 1,
+      "description": "The Pi's hostname, or null when it cannot be read."
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The version of the hub deployed on the Pi, stamped by bin/deploy.sh from the deploying checkout's 'git describe --tags --always --dirty' (a release tag, a tag-plus-commits string, a bare commit hash, or a '-dirty' variant of any of those), or the literal 'dev' when no stamp was written. Same convention as the Device info 'version'. Never read from a hand-edited file in the repo."
+    }
+  }
+}

@@ -46,16 +46,16 @@ The version is not in the manifest. Your Device reads it at runtime.
 
 Two retained topics, both three segments (so neither looks like an entity topic and the logger ignores both):
 
-| Topic                      | Payload                                                                                  |
-| -------------------------- | ---------------------------------------------------------------------------------------- |
-| `renewvan/<device>/info`   | Device info JSON (manifest fields + `version` and, when known, `board_serial`), retained |
-| `renewvan/<device>/health` | bare word `online` or `offline`, retained, with a last will of `offline`                 |
+| Topic                      | Payload                                                                                           |
+| -------------------------- | ------------------------------------------------------------------------------------------------- |
+| `renewvan/<device>/info`   | Device info JSON (manifest fields + `version` and, when known, `board_serial` and `ip`), retained |
+| `renewvan/<device>/health` | bare word `online` or `offline`, retained, with a last will of `offline`                          |
 
 Rules:
 
 - **On every connect, publish info first, then `online`.** A consumer that sees `online` then always finds info already retained, and republishing on reconnect heals a broker that lost its retained state.
 - **Leave info retained when you go offline.** Do not clear it on shutdown or from the last will. That retained info is what lets a consumer say "offline, last seen vX".
-- Info validates against `device-info.schema.json`: the manifest fields, a required non-empty `version`, and an optional non-empty `board_serial`, with no other properties.
+- Info validates against `device-info.schema.json`: the manifest fields, a required non-empty `version`, an optional non-empty `board_serial`, and an optional `ip`, with no other properties.
 
 Python Devices copy one small helper into their own repo (about 15 lines) rather than importing a shared package, so each Device releases independently (ADR 0011, ADR 0001). It loads the manifest, adds the stamped version and the serial, and serialises the result. The decided layout for Python Devices is that the image build copies `manifest.json` into the package and the Device reads the copy beside its own module, falling back to the repo-root file when run from a checkout. No Device implements this yet.
 
@@ -68,6 +68,8 @@ Python Devices copy one small helper into their own repo (about 15 lines) rather
 - **Omit the field** (do not send `unknown` or a placeholder) when it cannot be read, or when it is empty or all zeros. An all-zero serial would make every Pi with a failing kernel look identical.
 
 The schema only requires a non-empty string, so these two formats are conventions the schema description records, not something it enforces.
+
+**`ip` is optional and only for a Device that has its own network address**, such as an ESP32 on WiFi: the IPv4 address DHCP gave the Board, in dotted-quad form. The schema enforces the format and rejects `0.0.0.0`. Read it when you publish info, which you do on every connect, so it is as fresh as the Device's last (re)connect; a Device that is not told its address changed does not republish until it reconnects. Omit it, never send `0.0.0.0` or a placeholder, when the Board has no address yet. A Device on the Pi does not publish it: the Pi's address is on `renewvan/hub/status` (the hub plugin), and every Device on one Pi would only repeat it.
 
 ## 5. Pass the CI gate
 

@@ -192,6 +192,21 @@ def test_a_real_looking_pi_serial_is_rejected(schema_copy: Path, serial: str) ->
     assert "board_serial" in result.stdout
 
 
+def test_fleet_must_show_a_device_with_an_ip_address(schema_copy: Path) -> None:
+    edit_fleet(schema_copy, lambda f: device(f, "esp32-relay")["info"].pop("ip"))
+    result = run_validator(schema_copy)
+    assert result.returncode == 1
+    assert "an IP address" in result.stdout
+
+
+@pytest.mark.parametrize("address", ["192.168.10.57", "10.0.0.2", "198.51.101.4"])
+def test_a_real_looking_ip_is_rejected(schema_copy: Path, address: str) -> None:
+    edit_fleet(schema_copy, lambda f: device(f, "esp32-relay")["info"].update(ip=address))
+    result = run_validator(schema_copy)
+    assert result.returncode == 1
+    assert "ip" in result.stdout and "documentation range" in result.stdout
+
+
 @pytest.mark.parametrize("version", ["v1.2.3", "0.8.0", "abc1234"])
 def test_a_real_looking_version_is_rejected(schema_copy: Path, version: str) -> None:
     edit_fleet(schema_copy, lambda f: device(f, "venus")["info"].update(version=version))
