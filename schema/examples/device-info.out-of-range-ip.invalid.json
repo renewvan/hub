@@ -1,5 +1,5 @@
 {
-  "device": "esp32-relay",
+  "device": "esp32-16x-relay",
   "product": "ESP32-WROOM-E 16-channel relay board",
   "source": "ESP32-WROOM-E",
   "publishes": ["relay"],
