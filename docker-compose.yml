@@ -100,7 +100,7 @@ services:
   # `docker compose --profile gps up -d`.
   driver-gps:
     profiles: ["gps"]
-    image: ghcr.io/renewvan/driver-gps:v0.4.0
+    image: ghcr.io/renewvan/driver-gps:v0.5.0
     container_name: renewvan-gps
     restart: unless-stopped
     depends_on:
@@ -223,7 +223,7 @@ services:
   # writes four-segment entity topics; demo ones have five). Nothing to start by hand. See
   # docs/demo-mode.md.
   driver-demo:
-    image: ghcr.io/renewvan/driver-demo:v0.6.2
+    image: ghcr.io/renewvan/driver-demo:v0.6.3
     container_name: renewvan-demo
     restart: unless-stopped
     depends_on:
@@ -258,7 +258,7 @@ services:
   # not a polling backend. See
   # .scratch/renewvan-hub-v0-build/issues/06-dashboard-web-app.md.
   dashboard:
-    image: ghcr.io/renewvan/dashboard:v0.9.1
+    image: ghcr.io/renewvan/dashboard:v0.10.0
     container_name: renewvan-dashboard
     restart: unless-stopped
     ports:
