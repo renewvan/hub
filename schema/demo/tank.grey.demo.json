@@ -4,6 +4,7 @@
   "description": "grey_water tank, 38% -> 93% over the loop",
   "loop_s": 120,
   "initial": {
+    "driver": "tank",
     "fluid_type": "grey_water",
     "capacity_l": 70,
     "level_pct": 38,

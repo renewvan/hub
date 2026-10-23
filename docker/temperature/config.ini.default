@@ -1,7 +1,7 @@
 [mqtt]
 host = mosquitto
 
-[device]
+[driver]
 ; Dashboard edits (name/unit) persist here; the compose service mounts
 ; /etc/renewvan/temperature/state at this path so they survive a container
 ; recreate.

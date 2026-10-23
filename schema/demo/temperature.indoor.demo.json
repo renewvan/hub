@@ -4,6 +4,7 @@
   "description": "Cabin probe warming slowly",
   "loop_s": 120,
   "initial": {
+    "driver": "temperature",
     "name": "Cabin",
     "unit": "C",
     "source": "w1",

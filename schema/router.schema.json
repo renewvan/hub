@@ -5,6 +5,16 @@
   "description": "v0.1 device-model entity: the van's uplink router (Teltonika RUT-360), bridged from the router's RutOS Data to Server MQTT feed. Published under renewvan/router/<id>/<property>.",
   "type": "object",
   "properties": {
+    "driver": {
+      "type": "string",
+      "pattern": "^(?!driver-)(?!demo$)[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+      "description": "Optional, retained. The key of the Driver publishing this instance: the <driver> segment of renewvan/<driver>/info, published as renewvan/router/<id>/driver. Same slug rule as driver-info.schema.json. Identity field. A consumer must tolerate it being absent (a Driver that predates it) and then attributes the instance to every Driver whose info `publishes` lists 'router'."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional, retained. Human-readable label of this instance (e.g. 'House battery'), published as renewvan/router/<id>/name. Identity field."
+    },
     "signal_rsrp_dbm": {
       "type": "number",
       "description": "Reference Signal Received Power in dBm; the primary cellular signal metric."
@@ -23,7 +33,7 @@
     },
     "operator": {
       "type": "string",
-      "description": "PLMN as reported by the modem: numeric MCC+MNC (e.g. \"26203\"), not a display name — mapping codes to operator names is presentation, not device business."
+      "description": "PLMN as reported by the modem: numeric MCC+MNC (e.g. \"26203\"), not a display name — mapping codes to operator names is presentation, not driver business."
     },
     "network_type": {
       "type": "string",

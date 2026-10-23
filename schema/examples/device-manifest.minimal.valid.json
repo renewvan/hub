@@ -1,6 +1,0 @@
-{
-  "device": "tank",
-  "product": "Tank level device",
-  "source": "ADS1115 resistive sender",
-  "publishes": ["tank"]
-}

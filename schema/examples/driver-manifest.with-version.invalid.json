@@ -1,0 +1,7 @@
+{
+  "driver": "venus",
+  "product": "Venus OS bridge",
+  "source": "Victron Venus OS MQTT feed",
+  "publishes": ["battery"],
+  "version": "v0.8.0"
+}

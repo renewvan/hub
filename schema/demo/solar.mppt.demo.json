@@ -4,6 +4,7 @@
   "description": "Solar charge controller. REAL (Venus capture, MPPT at first light): power_w, battery_voltage_v, battery_current_a, pv_voltage_v, yield_today_wh, charge_state. ADDED, not captured: pv_current_a, yield_history_wh (7 days, newest first, null = no data). The timeline is synthetic motion.",
   "loop_s": 120,
   "initial": {
+    "driver": "venus",
     "battery_current_a": 0.5,
     "battery_voltage_v": 13.19,
     "yield_today_wh": 0.0,

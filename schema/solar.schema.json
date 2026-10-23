@@ -5,6 +5,16 @@
   "description": "v0.1 device-model entity: a solar charge controller (MPPT/PWM), regardless of vendor. Published under renewvan/solar/<id>/<property>. One entity per controller. `power_w` and `battery_voltage_v` are required of every source; the rest is optional because cheap controllers do not report it.",
   "type": "object",
   "properties": {
+    "driver": {
+      "type": "string",
+      "pattern": "^(?!driver-)(?!demo$)[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+      "description": "Optional, retained. The key of the Driver publishing this instance: the <driver> segment of renewvan/<driver>/info, published as renewvan/solar/<id>/driver. Same slug rule as driver-info.schema.json. Identity field. A consumer must tolerate it being absent (a Driver that predates it) and then attributes the instance to every Driver whose info `publishes` lists 'solar'."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional, retained. Human-readable label of this instance (e.g. 'House battery'), published as renewvan/solar/<id>/name. Identity field."
+    },
     "power_w": {
       "type": "number",
       "minimum": 0,
@@ -41,7 +51,7 @@
         "type": ["number", "null"],
         "minimum": 0
       },
-      "description": "Optional: the controller's own daily energy log, in watt-hours, as one retained JSON array, newest first. Index 0 is the controller's current day, so it equals `yield_today_wh`; index 1 is the previous day, and so on. The array is as long as the controller has days logged, so it may be shorter than the controller's maximum (a new controller has fewer) and is never padded. `null` marks a day the controller has no data for; it is not `0`, which is a real day that harvested nothing. Every value comes from the controller's own log, never computed or interpolated by a device. See docs/adr/0009."
+      "description": "Optional: the controller's own daily energy log, in watt-hours, as one retained JSON array, newest first. Index 0 is the controller's current day, so it equals `yield_today_wh`; index 1 is the previous day, and so on. The array is as long as the controller has days logged, so it may be shorter than the controller's maximum (a new controller has fewer) and is never padded. `null` marks a day the controller has no data for; it is not `0`, which is a real day that harvested nothing. Every value comes from the controller's own log, never computed or interpolated by a driver. See docs/adr/0009."
     },
     "charge_state": {
       "type": "string",

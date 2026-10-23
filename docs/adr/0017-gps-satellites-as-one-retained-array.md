@@ -44,7 +44,7 @@ Consumers checked, not assumed:
 
 - `schema/gps.schema.json` adds `satellites`; `schema/examples/gps.*` and `schema/demo/gps.van.demo.json` exercise it (both a satellite with a measurement and one with `null`; a no-fix record that still lists satellites).
 - `renewvan/driver-gps` keeps the per-satellite fields of every GSV sentence in a poll window (it already parsed them and kept only the SNRs) and publishes the array.
-- The dashboard adds `satellites?: Satellite[]` to its `Gps` type and draws one bar per satellite in Settings › Devices › GPS.
+- The dashboard adds `satellites?: Satellite[]` to its `Gps` type and draws one bar per satellite in Settings › Drivers › GPS.
 - `avg_snr_db` stays, unchanged: it remains the one-number summary and the only signal field on a driver that predates this change.
 
 ## See also

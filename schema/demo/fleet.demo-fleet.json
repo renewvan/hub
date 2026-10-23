@@ -1,12 +1,12 @@
 {
-  "description": "Simulated Devices for the Device page: healthy multi-entity, dev build, entities with no info, offline with retained info, ESP32 with a MAC, and the router dropping out when its signal bottoms out. Versions and serials are fake.",
+  "description": "Simulated Drivers for the Drivers page: healthy multi-entity, a second battery source (wattcycle, so one bank has two sources), dev build, entities with no info, offline with retained info, ESP32 with a MAC, and the router dropping out when its signal bottoms out. Versions and serials are fake.",
   "loop_s": 120,
-  "devices": [
+  "drivers": [
     {
-      "device": "venus",
+      "driver": "venus",
       "health": "online",
       "info": {
-        "device": "venus",
+        "driver": "venus",
         "product": "Venus OS bridge",
         "source": "Victron Venus OS MQTT feed",
         "publishes": ["battery", "solar", "charger"],
@@ -17,11 +17,25 @@
       }
     },
     {
-      "device": "tank",
+      "driver": "wattcycle",
       "health": "online",
       "info": {
-        "device": "tank",
-        "product": "Tank level device",
+        "driver": "wattcycle",
+        "product": "WattCycle JBD BMS battery driver",
+        "source": "JBD/DH04 BMS over BLE (BlueZ)",
+        "publishes": ["battery"],
+        "manufacturer": "renewvan",
+        "homepage": "https://github.com/renewvan/driver-wattcycle",
+        "version": "v0.0.0-demo",
+        "board_serial": "DEMO0000000000A1"
+      }
+    },
+    {
+      "driver": "tank",
+      "health": "online",
+      "info": {
+        "driver": "tank",
+        "product": "Tank level driver",
         "source": "ADS1115 resistive sender",
         "publishes": ["tank"],
         "version": "dev",
@@ -29,11 +43,11 @@
       }
     },
     {
-      "device": "temperature",
+      "driver": "temperature",
       "health": "online",
       "info": {
-        "device": "temperature",
-        "product": "Temperature device",
+        "driver": "temperature",
+        "product": "Temperature driver",
         "source": "1-Wire DS18B20 probes and the Pi SoC thermal zone",
         "publishes": ["temperature"],
         "version": "v0.0.0-demo",
@@ -41,15 +55,15 @@
       }
     },
     {
-      "device": "gps",
+      "driver": "gps",
       "health": "online"
     },
     {
-      "device": "tilt",
+      "driver": "tilt",
       "health": "offline",
       "info": {
-        "device": "tilt",
-        "product": "Tilt device",
+        "driver": "tilt",
+        "product": "Tilt driver",
         "source": "GY-521 / MPU-6050 accelerometer",
         "publishes": ["tilt"],
         "version": "v0.0.0-demo",
@@ -57,10 +71,10 @@
       }
     },
     {
-      "device": "esp32-16x-relay",
+      "driver": "esp32-16x-relay",
       "health": "online",
       "info": {
-        "device": "esp32-16x-relay",
+        "driver": "esp32-16x-relay",
         "product": "ESP32-WROOM-E 16-channel relay board",
         "source": "ESP32-WROOM-E",
         "publishes": ["relay"],
@@ -70,15 +84,15 @@
       }
     },
     {
-      "device": "router",
+      "driver": "router",
       "health": "online",
       "health_timeline": [
         { "t": 60, "health": "offline" },
         { "t": 90, "health": "online" }
       ],
       "info": {
-        "device": "router",
-        "product": "Router device",
+        "driver": "router",
+        "product": "Router driver",
         "source": "Router vendor push feed",
         "publishes": ["router"],
         "version": "v0.0.0-demo",

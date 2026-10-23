@@ -181,14 +181,14 @@ if [[ ! -f /etc/renewvan/tank/config.ini ]]; then
 fi
 
 if [[ ! -f /etc/renewvan/wattcycle/config.ini ]]; then
-  echo "Seeding /etc/renewvan/wattcycle/config.ini from the repo default (sets [mqtt] host = mosquitto; set [device] mac to the battery's BLE address, or driver-wattcycle stays off)."
+  echo "Seeding /etc/renewvan/wattcycle/config.ini from the repo default (sets [mqtt] host = mosquitto; set [driver] mac to the battery's BLE address, or driver-wattcycle stays off)."
   cp docker/wattcycle/config.ini.default /etc/renewvan/wattcycle/config.ini
 fi
 
 # driver-gps is behind the \`gps\` compose profile because its \`devices:\` entry
 # makes Docker refuse to create the container (and compose abort the whole
 # \`up -d\`) when /dev/ttyACM0 does not exist. Enable the profile only when the
-# module is plugged in; re-running deploy after plugging it in starts the device.
+# module is plugged in; re-running deploy after plugging it in starts the driver.
 # Without the module, any previously created gps container is stopped so it
 # doesn't crash-loop on the missing device.
 if [[ -e /dev/ttyACM0 ]]; then

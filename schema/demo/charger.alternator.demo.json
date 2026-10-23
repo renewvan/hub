@@ -4,6 +4,7 @@
   "description": "DC-DC charger fed by the alternator: idle, then engaged while driving. SYNTHETIC (the capture has no alternator charger).",
   "loop_s": 120,
   "initial": {
+    "driver": "venus",
     "voltage_v": 13.1,
     "current_a": 0.0,
     "input_voltage_v": 12.6,

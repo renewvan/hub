@@ -1,0 +1,10 @@
+{
+  "power_w": 14,
+  "battery_voltage_v": 13.45,
+  "battery_current_a": 1.0,
+  "pv_voltage_v": 47.5,
+  "pv_current_a": 0.3,
+  "yield_today_wh": 412,
+  "charge_state": "bulk",
+  "name": ""
+}

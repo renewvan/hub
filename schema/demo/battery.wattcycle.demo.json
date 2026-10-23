@@ -1,0 +1,42 @@
+{
+  "entity": "battery",
+  "id": "wattcycle",
+  "description": "The same house battery bank as `house`, seen by a second source: the WattCycle 314Ah BMS read over BLE by driver-wattcycle (the Venus SmartShunt is `house`). Two sources for one bank: the Primary battery setting picks which instance is the headline. Synthetic, not captured: values sit slightly off the shunt's (a BMS and a shunt never agree exactly) and follow the same load steps as `house`. No time-to-go: a BMS does not report it.",
+  "loop_s": 120,
+  "initial": {
+    "driver": "wattcycle",
+    "name": "WattCycle 314Ah",
+    "soc_pct": 94.0,
+    "voltage_v": 13.21,
+    "current_a": -7.6,
+    "power_w": -100.4,
+    "temperature_c": 22.5
+  },
+  "timeline": [
+    {
+      "t": 30,
+      "set": {
+        "current_a": -12.1,
+        "power_w": -159.0,
+        "voltage_v": 13.14
+      }
+    },
+    {
+      "t": 60,
+      "set": {
+        "current_a": -30.2,
+        "power_w": -394.7,
+        "voltage_v": 13.07,
+        "soc_pct": 93.9
+      }
+    },
+    {
+      "t": 90,
+      "set": {
+        "current_a": -5.8,
+        "power_w": -76.4,
+        "voltage_v": 13.17
+      }
+    }
+  ]
+}

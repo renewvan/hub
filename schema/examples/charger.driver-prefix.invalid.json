@@ -1,0 +1,9 @@
+{
+  "voltage_v": 13.39,
+  "current_a": 18.2,
+  "power_w": 243,
+  "input_voltage_v": 12.54,
+  "source": "alternator",
+  "charge_state": "absorption",
+  "driver": "driver-venus"
+}

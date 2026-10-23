@@ -4,6 +4,7 @@
   "description": "LTE uplink with a signal dip",
   "loop_s": 120,
   "initial": {
+    "driver": "router",
     "signal_rsrp_dbm": -88,
     "signal_rsrq_db": -10,
     "signal_sinr_db": 9,

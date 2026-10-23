@@ -62,7 +62,7 @@ if ! docker compose version >/dev/null 2>&1; then
   exit 1
 fi
 
-# Hardware buses the device containers read. driver-tank and driver-tilt open
+# Hardware buses the driver containers read. driver-tank and driver-tilt open
 # /dev/i2c-1 through a compose `devices:` entry, so a missing device makes Docker
 # refuse to create the container and aborts the whole `docker compose up -d`.
 # Raspberry Pi OS Lite ships with the bus off and the i2c-dev module unloaded

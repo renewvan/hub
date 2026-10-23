@@ -1,5 +1,5 @@
 # The single install/setup path for the hub (see README.md's Install
-# section): infra (Mosquitto, InfluxDB, Grafana), the device drivers, and the
+# section): infra (Mosquitto, InfluxDB, Grafana), the drivers, and the
 # backend service images (`logger`, `dashboard`). Every one is a pinned,
 # independently-published image, per
 # docs/adr/0001-compose-services-via-pinned-images-not-git-submodules.md;
@@ -87,7 +87,7 @@ services:
       MQTT_USERNAME: ${RENEWVAN_USERNAME:-}
       MQTT_PASSWORD: ${RENEWVAN_PASSWORD:-}
 
-  # Native MQTT GPS/GLONASS/BeiDou device (NMEA 0183 over USB-serial,
+  # Native MQTT GPS/GLONASS/BeiDou driver (NMEA 0183 over USB-serial,
   # u-blox-chip module) -- see driver-gps's own README's "Topics published"
   # section. Needs USB-serial device passthrough; layered config.ini
   # override lives on the bind-mounted host path below (sets
@@ -134,8 +134,8 @@ services:
       MQTT_PASSWORD: ${RENEWVAN_PASSWORD:-}
       ROUTER_ID: ${ROUTER_ID:-main}
 
-  # Native MQTT tank device (fresh + grey ADS1115 senders) — see
-  # docs/porting-dbus-to-mqtt-device.md and
+  # Native MQTT tank driver (fresh + grey ADS1115 senders) — see
+  # docs/porting-dbus-to-mqtt-driver.md and
   # .scratch/renewvan-hub-v0-build/issues/02-native-mqtt-tank-driver.md.
   # Needs I2C device passthrough for the ADS1115; layered config.ini
   # override lives on the bind-mounted host path below.
@@ -155,7 +155,7 @@ services:
     volumes:
       - ${TANK_CONFIG_PATH:-./config/tank/config.ini}:/app/config.ini:ro
 
-  # Native MQTT temperature device: 1-Wire DS18B20 probes + the Pi's own CPU
+  # Native MQTT temperature driver: 1-Wire DS18B20 probes + the Pi's own CPU
   # thermal zone -- see driver-temperature's own README's "Topics published"
   # section. The 1-Wire kernel driver must be enabled on the host
   # (dtoverlay=w1-gpio,gpiopin=<N> in /boot/firmware/config.txt). The probe
@@ -186,8 +186,8 @@ services:
       - /sys/devices:/sys/devices:ro
       - /sys/class/thermal:/sys/class/thermal:ro
 
-  # Native MQTT van-inclination device: reads a GY-521 / MPU-6050 accelerometer
-  # on the same I2C bus as the tank device's ADS1115 (different address, no
+  # Native MQTT van-inclination driver: reads a GY-521 / MPU-6050 accelerometer
+  # on the same I2C bus as the tank driver's ADS1115 (different address, no
   # conflict) -- see driver-tilt's own README's "Topics published" section.
   # Needs I2C device passthrough. The axis mapping for how the board is
   # mounted lives in the bind-mounted config.ini. /app/state is writable and
@@ -238,7 +238,7 @@ services:
       VENUS_MQTT_PORT: ${VENUS_MQTT_PORT:-1883}
       VENUS_PORTAL_ID: ${VENUS_PORTAL_ID}
 
-  # Native MQTT battery device: a WattCycle 314Ah (DH04 BMS) read directly
+  # Native MQTT battery driver: a WattCycle 314Ah (DH04 BMS) read directly
   # over BLE from the hub -- see driver-wattcycle's own README's "Topics
   # published" section. Talks to the host's BlueZ through the system D-Bus
   # socket (bleak), so the host must run bluetooth.service with the adapter

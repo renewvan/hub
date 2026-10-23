@@ -4,6 +4,7 @@
   "description": "Van settles level after parking",
   "loop_s": 120,
   "initial": {
+    "driver": "tilt",
     "roll_deg": -2.8,
     "pitch_deg": 4.1,
     "status": "ok"

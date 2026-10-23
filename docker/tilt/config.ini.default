@@ -1,7 +1,7 @@
 [mqtt]
 host = mosquitto
 
-[device]
+[driver]
 ; The level zero (renewvan/tilt/<id>/level_zero/set) persists here; the
 ; compose service mounts /etc/renewvan/tilt/state at this path so it survives
 ; a container recreate.

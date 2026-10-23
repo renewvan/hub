@@ -1,6 +1,0 @@
-{
-  "device": "demo",
-  "product": "Simulated van",
-  "source": "Demo scenarios",
-  "publishes": ["battery"]
-}

@@ -1,0 +1,8 @@
+{
+  "name": "Pi CPU",
+  "unit": "F",
+  "source": "cpu",
+  "temperature_c": 51.6,
+  "status": "ok",
+  "driver": "temperature"
+}
