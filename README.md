@@ -79,6 +79,18 @@ authentication, which is **off** by default (see `.env.example` and hub issue 49
 Pi beyond your own network). The ESP32 relay device (`renewvan/driver-esp32-relay`) and the phone app
 (`renewvan/mobile`) are flashed and installed per their own READMEs.
 
+### Offline map
+
+The dashboard's Map page draws one offline file, the **Basemap**. A fresh install has none, so the
+Map page shows its "no map" state. The hub's part is small: `DASHBOARD_BASEMAP_PATH` in `.env`
+(default `/etc/renewvan/dashboard/basemap.pmtiles`) is mounted read-only into the dashboard,
+`bin/deploy.sh` creates an empty placeholder there only if no file exists (a redeploy never
+overwrites your map), and `scripts/push-basemap.sh <file> [--host <ssh-alias>]` replaces it safely
+from your own machine (verifies the file, checks free space, swaps it in atomically, restarts the
+dashboard, confirms it serves). How to build a Basemap is in the
+[dashboard's offline-map guide](https://github.com/renewvan/dashboard/blob/main/docs/offline-map.md);
+smoke procedure for the script: `scripts/README.md`.
+
 ### Without the installer
 
 `bin/install.sh` runs the pieces below in order; run them yourself if you want control over one:

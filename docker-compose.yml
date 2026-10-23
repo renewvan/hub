@@ -267,6 +267,13 @@ services:
       VITE_MQTT_WS_URL: ${VITE_MQTT_WS_URL}
       VITE_MQTT_USERNAME: ${VITE_MQTT_USERNAME:-}
       VITE_MQTT_PASSWORD: ${VITE_MQTT_PASSWORD:-}
+    volumes:
+      # The Basemap: ONE file, never its directory -- a directory mount would hide the
+      # fonts and sprites baked into the image under /maps. Single-file mounts pin the
+      # inode, so replace it with scripts/push-basemap.sh (it restarts this container).
+      # bin/deploy.sh creates an empty placeholder so Docker never invents a root-owned
+      # directory at the source.
+      - ${DASHBOARD_BASEMAP_PATH:-./config/dashboard/basemap.pmtiles}:/usr/share/nginx/html/maps/basemap.pmtiles:ro
 volumes:
   mosquitto-data:
   mosquitto-log:
