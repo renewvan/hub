@@ -1,0 +1,17 @@
+[Unit]
+Description=renewvan hub status MQTT bridge (Pi local IP)
+Documentation=https://github.com/renewvan/hub/blob/main/plugins/hub/README.md
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+User=alexsanzder
+EnvironmentFile=-/etc/renewvan/hub.env
+ExecStart=/opt/renewvan/venvs/hub/bin/python /opt/renewvan/plugins/hub/hub_status.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

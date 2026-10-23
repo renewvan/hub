@@ -26,12 +26,20 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${REPO_ROOT}"
 
 echo "==> Syncing compose artifacts to ${HOST}:${REMOTE_DIR}"
-ssh "${HOST}" "mkdir -p ${REMOTE_DIR} /opt/renewvan/plugins/kiosk /opt/renewvan/plugins/tailscale /opt/renewvan/venvs"
+ssh "${HOST}" "mkdir -p ${REMOTE_DIR} /opt/renewvan/plugins/kiosk /opt/renewvan/plugins/tailscale /opt/renewvan/plugins/hub /opt/renewvan/venvs"
 rsync -az docker-compose.yml "${HOST}:${REMOTE_DIR}/docker-compose.yml"
 rsync -az --delete docker/ "${HOST}:${REMOTE_DIR}/docker/"
 rsync -az .env.example "${HOST}:${REMOTE_DIR}/.env.example"
 rsync -az --delete --exclude='.venv' plugins/kiosk/ "${HOST}:/opt/renewvan/plugins/kiosk/"
 rsync -az --delete plugins/tailscale/ "${HOST}:/opt/renewvan/plugins/tailscale/"
+rsync -az --delete plugins/hub/ "${HOST}:/opt/renewvan/plugins/hub/"
+# The hub's version is a property of this checkout, not of the files rsynced: the Pi has no .git.
+# Stamp it after the rsync above (which would otherwise --delete it) so renewvan-hub publishes it
+# on renewvan/hub/status and Settings > General > Firmware can show it. Same string the ESP32
+# flash script derives; an untagged tree gives a commit hash, never a refusal.
+HUB_VERSION="$(git describe --tags --always --dirty 2>/dev/null || echo dev)"
+echo "==> Stamping hub version ${HUB_VERSION}"
+ssh "${HOST}" "printf '%s\n' '${HUB_VERSION}' > /opt/renewvan/plugins/hub/VERSION"
 
 echo "==> Ensuring remote config"
 ssh "${HOST}" bash -s <<REMOTE
@@ -55,6 +63,9 @@ fi
 # plugin/tailscale: install tailscale, venv, service
 sudo bash /opt/renewvan/plugins/tailscale/install.sh
 
+# plugin/hub: publish the Pi's own local IP to renewvan/hub/status
+sudo bash /opt/renewvan/plugins/hub/install.sh
+
 if [[ ! -f .env ]]; then
   echo "No .env found — seeding from .env.example."
   cp .env.example .env
@@ -71,6 +82,31 @@ if [[ ! -f .env ]]; then
   echo "    INFLUXDB_ADMIN_TOKEN, VICTRON_MQTT_HOST/PORTAL_ID, RENEWVAN_WS_URL), then re-run"
   echo "    bin/deploy.sh."
   exit 1
+fi
+
+# A full-URL VITE_MQTT_WS_URL is opened by the *browser* (kiosk, phone), so it must
+# name an address this Pi actually has right now. Moving the Pi to another router
+# changes its DHCP IP and leaves the old one here: the dashboard then shows "Hub
+# connection lost" with no data while every container is healthy. Fail loudly.
+# The path form (/mqtt) names no host at all -- the dashboard resolves it against
+# the page's own origin and its nginx proxies it to the broker -- so it cannot go
+# stale and is not checked.
+ws_url="\$(sed -n 's|^VITE_MQTT_WS_URL=||p' .env)"
+if [[ -z "\${ws_url}" ]]; then
+  echo "ERROR: VITE_MQTT_WS_URL in ${REMOTE_DIR}/.env is missing (use /mqtt or ws://<host>:9001)" >&2
+  exit 1
+fi
+if [[ "\${ws_url}" != /* ]]; then
+  ws_host="\$(printf '%s' "\${ws_url}" | sed -n 's|^wss\\{0,1\\}://\\([^:/]*\\).*|\\1|p')"
+  if [[ -z "\${ws_host}" ]]; then
+    echo "ERROR: VITE_MQTT_WS_URL=\${ws_url} is not /mqtt or ws://<host>:9001" >&2
+    exit 1
+  fi
+  if ! { hostname -I | tr ' ' '\n'; hostname; hostname -f; echo localhost; } | grep -qxF "\${ws_host}"; then
+    echo "ERROR: VITE_MQTT_WS_URL points at \${ws_host}, which is not an address of this Pi (\$(hostname -I | xargs))." >&2
+    echo "       The Pi's IP probably changed (new router). Use VITE_MQTT_WS_URL=/mqtt, or set ws://<current-ip>:9001 in ${REMOTE_DIR}/.env, and re-run." >&2
+    exit 1
+  fi
 fi
 
 # GPS_CONFIG_PATH may be missing from a .env predating driver-gps's addition
