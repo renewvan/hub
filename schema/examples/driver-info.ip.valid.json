@@ -1,5 +1,5 @@
 {
-  "driver": "esp32-16x-relay",
+  "driver": "esp32",
   "product": "ESP32-WROOM-E 16-channel relay board",
   "source": "ESP32-WROOM-E",
   "publishes": ["relay"],
