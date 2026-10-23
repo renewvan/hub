@@ -76,7 +76,7 @@ Still manual, because each needs a decision or a login only you can make: `sudo 
 tank calibration (`sensor_min`/`sensor_max` in `/etc/renewvan/tank/config.ini`, which starts on the
 image's defaults); the tilt axis mapping if the GY-521 is not mounted face-down; and broker
 authentication, which is **off** by default (see `.env.example` and hub issue 49 before exposing the
-Pi beyond your own network). The ESP32 relay device (`renewvan/driver-esp32-relay`) and the phone app
+Pi beyond your own network). The ESP32 relay device (`renewvan/driver-esp32-16x-relay`) and the phone app
 (`renewvan/mobile`) are flashed and installed per their own READMEs.
 
 ### Offline map
@@ -107,8 +107,8 @@ smoke procedure for the script: `scripts/README.md`.
    otherwise abort or crash-loop the whole stack: `driver-gps` (`gps`, needs `/dev/ttyACM0`) and
    `driver-venus` (`venus`, needs `VENUS_MQTT_HOST` and `VENUS_PORTAL_ID`). Add `--profile gps` /
    `--profile venus`, or let `bin/deploy.sh` decide from the device and `.env`.
-3. **Flash the ESP32 16-channel relay device**, once, per `renewvan/driver-esp32-relay`'s own README
-   (ESPHome YAML, no custom firmware).
+3. **Flash the ESP32 16-channel relay device**, once, per `renewvan/driver-esp32-16x-relay`'s own README
+   (ESPHome YAML, no custom firmware). Use release `v0.1.2` or later: `v0.1.1` does not build.
 4. **Install the phone app** per `renewvan/mobile`'s own README (React Native — sideload or
    app-store build, not part of this compose flow).
 
