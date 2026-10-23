@@ -4,6 +4,8 @@
   "description": "House battery. REAL (Venus capture, SmartShunt): soc_pct, voltage_v, current_a, power_w. ADDED, not captured (a plain shunt reports none of them; included so the time-to-go, temperature and charge-stage UI has data): temperature_c, time_to_go_s, time_since_full_charge_s, charge_state. The timeline is synthetic motion.",
   "loop_s": 120,
   "initial": {
+    "driver": "venus",
+    "name": "House battery",
     "soc_pct": 95.5,
     "voltage_v": 13.18,
     "current_a": -8.0,

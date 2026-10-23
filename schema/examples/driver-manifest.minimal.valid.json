@@ -1,0 +1,6 @@
+{
+  "driver": "tank",
+  "product": "Tank level driver",
+  "source": "ADS1115 resistive sender",
+  "publishes": ["tank"]
+}

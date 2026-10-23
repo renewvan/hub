@@ -4,6 +4,7 @@
   "description": "Named relay, on and static",
   "loop_s": 120,
   "initial": {
+    "driver": "esp32-16x-relay",
     "state": true,
     "name": "Ceiling lights"
   },

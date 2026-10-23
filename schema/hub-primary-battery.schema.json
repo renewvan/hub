@@ -1,0 +1,8 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://renewvan.dev/schema/hub-primary-battery.schema.json",
+  "title": "hub-primary-battery",
+  "description": "Payload for the shared primary battery setting: which battery instance every client treats as the headline battery (one bank can be published by two Drivers, e.g. driver-venus and driver-wattcycle). Published retained by the hub plugin to renewvan/hub/primary-battery (state), restored from the value it persisted on the Pi and published on every (re)connect, default \"auto\"; sent unretained by a client to renewvan/hub/primary-battery/set (command), which the plugin persists and republishes as state. The value is either \"auto\" (deterministic: sort instance ids, take the first complete battery) or a battery instance id (e.g. \"512\", \"wattcycle\"). The hub plugin does not know which instances exist, so it does not check the id against them: it only rejects payloads that are not a non-empty JSON string. A consumer whose id is not on the bus or not complete falls back to \"auto\".",
+  "type": "string",
+  "minLength": 1
+}

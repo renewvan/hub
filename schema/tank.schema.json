@@ -5,6 +5,16 @@
   "description": "v0.1 device-model entity: a fluid reservoir monitored by a resistive level sensor. Published under renewvan/tank/<id>/<property>. Field additions since v0.1: alarm_state, temperature_c, last_inspected_date (v0.2); fill_rate_lpm, drain_rate_lpm, last_full_date, last_empty_date (v0.3); volume_since_full_l, volume_since_empty_l, level_pct_smoothed (v0.4), and last_inspected_date/last_full_date/last_empty_date renamed to last_inspected_at/last_full_at/last_empty_at with full ISO-8601 timestamps (v0.4, breaking); alarm_direction, alarm_threshold_pct, alarm_restore_pct (v0.5) -- retained/static identity fields, published once at startup alongside fluid_type/capacity_l, present under the same condition as alarm_state (a tank with alarm configured); level_pct_smoothed removed (v0.6, breaking, see docs/adr/0005); fill_rate_lpm, drain_rate_lpm removed (v0.7, breaking, see docs/adr/0006) -- unused instantaneous flow-rate fields, no consumer ever displayed them, superseded by volume_since_full_l/volume_since_empty_l for the dashboard's pace-based telemetry.",
   "type": "object",
   "properties": {
+    "driver": {
+      "type": "string",
+      "pattern": "^(?!driver-)(?!demo$)[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+      "description": "Optional, retained. The key of the Driver publishing this instance: the <driver> segment of renewvan/<driver>/info, published as renewvan/tank/<id>/driver. Same slug rule as driver-info.schema.json. Identity field. A consumer must tolerate it being absent (a Driver that predates it) and then attributes the instance to every Driver whose info `publishes` lists 'tank'."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional, retained. Human-readable label of this instance (e.g. 'House battery'), published as renewvan/tank/<id>/name. Identity field."
+    },
     "fluid_type": {
       "type": "string",
       "enum": ["fresh_water", "grey_water", "black_water", "fuel", "lpg"]
@@ -56,7 +66,7 @@
     },
     "temperature_c": {
       "type": "number",
-      "description": "Water temperature in degrees Celsius. Present only if an NTC temperature sensor is configured for this tank (10k thermistor divider on a spare ADS1115 channel, read by the tank device)."
+      "description": "Water temperature in degrees Celsius. Present only if an NTC temperature sensor is configured for this tank (10k thermistor divider on a spare ADS1115 channel, read by the tank driver)."
     },
     "last_inspected_at": {
       "type": "string",

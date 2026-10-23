@@ -2,18 +2,23 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://renewvan.dev/schema/temperature.schema.json",
   "title": "temperature",
-  "description": "v0.1 device-model entity: a standalone temperature sensor (1-Wire DS18B20 probe or the Pi's own CPU thermal zone) read directly by the renewvan/driver-temperature device (sensing, not a feed remap). Published under renewvan/temperature/<id>/<property>, where <id> is the user-assigned sensor id from config.ini (or the probe's serial when unconfigured). temperature_c is ALWAYS degrees Celsius on the wire; 'unit' is a display preference only -- consumers convert for rendering. Identity fields (name, unit, source, serial) are retained and published once at startup and again whenever a user edit lands on the <field>/set command topic; live fields (temperature_c, status) are republished every poll (default 3s). Sensors that sit on another entity's hardware (tank water temperature, battery temperature) stay on that entity's own temperature_c field and are not duplicated here.",
+  "description": "v0.1 device-model entity: a standalone temperature sensor (1-Wire DS18B20 probe or the Pi's own CPU thermal zone) read directly by the renewvan/driver-temperature driver (sensing, not a feed remap). Published under renewvan/temperature/<id>/<property>, where <id> is the user-assigned sensor id from config.ini (or the probe's serial when unconfigured). temperature_c is ALWAYS degrees Celsius on the wire; 'unit' is a display preference only -- consumers convert for rendering. Identity fields (name, unit, source, serial) are retained and published once at startup and again whenever a user edit lands on the <field>/set command topic; live fields (temperature_c, status) are republished every poll (default 3s). Sensors that sit on another entity's hardware (tank water temperature, battery temperature) stay on that entity's own temperature_c field and are not duplicated here.",
   "type": "object",
   "properties": {
+    "driver": {
+      "type": "string",
+      "pattern": "^(?!driver-)(?!demo$)[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+      "description": "Optional, retained. The key of the Driver publishing this instance: the <driver> segment of renewvan/<driver>/info, published as renewvan/temperature/<id>/driver. Same slug rule as driver-info.schema.json. Identity field. A consumer must tolerate it being absent (a Driver that predates it) and then attributes the instance to every Driver whose info `publishes` lists 'temperature'."
+    },
     "name": {
       "type": "string",
       "minLength": 1,
-      "description": "Human-readable label shown on the dashboard (e.g. 'Fridge'). User-editable via renewvan/temperature/<id>/name/set; persisted by the device and overrides the config.ini default. Identity field."
+      "description": "Human-readable label shown on the dashboard (e.g. 'Fridge'). User-editable via renewvan/temperature/<id>/name/set; persisted by the driver and overrides the config.ini default. Identity field."
     },
     "unit": {
       "type": "string",
       "enum": ["C", "F"],
-      "description": "Display unit preference for this sensor. Does NOT change the unit of temperature_c (always Celsius). User-editable via renewvan/temperature/<id>/unit/set; persisted by the device and overrides the config.ini default. Identity field."
+      "description": "Display unit preference for this sensor. Does NOT change the unit of temperature_c (always Celsius). User-editable via renewvan/temperature/<id>/unit/set; persisted by the driver and overrides the config.ini default. Identity field."
     },
     "source": {
       "type": "string",
@@ -29,7 +34,7 @@
       "type": "number",
       "minimum": -55,
       "maximum": 150,
-      "description": "Temperature in degrees Celsius. Only republished while status is 'ok'; when status is not 'ok' the device skips the publish (same as driver-tank's NTC failure behavior) and the LAST retained value stays on the broker, so consumers MUST gate on status == 'ok' before rendering it. Range is the DS18B20 operating range (-55..125) widened to cover the Pi SoC. Live field."
+      "description": "Temperature in degrees Celsius. Only republished while status is 'ok'; when status is not 'ok' the driver skips the publish (same as driver-tank's NTC failure behavior) and the LAST retained value stays on the broker, so consumers MUST gate on status == 'ok' before rendering it. Range is the DS18B20 operating range (-55..125) widened to cover the Pi SoC. Live field."
     },
     "status": {
       "type": "string",

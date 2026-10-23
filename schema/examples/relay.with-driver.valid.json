@@ -1,0 +1,4 @@
+{
+  "state": true,
+  "driver": "esp32-16x-relay"
+}

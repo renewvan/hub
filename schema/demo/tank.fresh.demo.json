@@ -4,6 +4,7 @@
   "description": "fresh_water tank, 62% -> 24% over the loop",
   "loop_s": 120,
   "initial": {
+    "driver": "tank",
     "fluid_type": "fresh_water",
     "capacity_l": 100,
     "level_pct": 62,

@@ -4,6 +4,7 @@
   "description": "Named relay that switches on at 30s and off at 90s",
   "loop_s": 120,
   "initial": {
+    "driver": "esp32-16x-relay",
     "state": false,
     "name": "Reading lights"
   },
