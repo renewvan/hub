@@ -1,14 +1,14 @@
 {
   "entity": "gps",
   "id": "van",
-  "description": "Slow drive near Milan",
+  "description": "Slow drive in downtown Freiburg",
   "loop_s": 120,
   "initial": {
     "fix_quality": "gps",
     "satellites_in_use": 9,
     "avg_snr_db": 39.2,
-    "latitude": 45.4642,
-    "longitude": 9.19,
+    "latitude": 47.9955,
+    "longitude": 7.8529,
     "altitude_m": 122.3,
     "hdop": 0.9,
     "speed_kmh": 0.0,
@@ -19,8 +19,8 @@
     {
       "t": 30,
       "set": {
-        "latitude": 45.4648,
-        "longitude": 9.1906,
+        "latitude": 47.9961,
+        "longitude": 7.8535,
         "speed_kmh": 24.0,
         "course_deg": 90.0,
         "fix_time": "2026-10-16T08:00:30+00:00"
@@ -29,8 +29,8 @@
     {
       "t": 60,
       "set": {
-        "latitude": 45.4655,
-        "longitude": 9.1925,
+        "latitude": 47.9968,
+        "longitude": 7.8554,
         "speed_kmh": 41.0,
         "course_deg": 88.0,
         "satellites_in_use": 10,
@@ -40,8 +40,8 @@
     {
       "t": 90,
       "set": {
-        "latitude": 45.466,
-        "longitude": 9.195,
+        "latitude": 47.9973,
+        "longitude": 7.8579,
         "speed_kmh": 0.0,
         "course_deg": 88.0,
         "fix_time": "2026-10-16T08:01:30+00:00"
