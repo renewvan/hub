@@ -91,7 +91,21 @@ grep -q '^DASHBOARD_BASEMAP_PATH=' .env || echo 'DASHBOARD_BASEMAP_PATH=/etc/ren
 # empty placeholder (the Map page's "no map" state) only when nothing is there, so a
 # redeploy never replaces a real Basemap. -e, not -f: never touch whatever already exists.
 basemap_path="\$(sed -n 's|^DASHBOARD_BASEMAP_PATH=||p' .env)"
+if [[ -z "\${basemap_path}" ]]; then
+  echo "ERROR: DASHBOARD_BASEMAP_PATH in ${REMOTE_DIR}/.env is empty (default: /etc/renewvan/dashboard/basemap.pmtiles)" >&2
+  exit 1
+fi
 mkdir -p "\$(dirname "\${basemap_path}")"
+# A Pi that ran the dashboard before this mount existed may hold the directory Docker invents
+# for a missing single-file source. Remove it only if empty; never delete content.
+if [[ -d "\${basemap_path}" ]]; then
+  if rmdir "\${basemap_path}" 2>/dev/null || sudo rmdir "\${basemap_path}" 2>/dev/null; then
+    echo "Removed the empty directory Docker created at \${basemap_path}."
+  else
+    echo "ERROR: \${basemap_path} is a non-empty directory, not a Basemap file. Move its contents away and re-run." >&2
+    exit 1
+  fi
+fi
 if [[ ! -e "\${basemap_path}" ]]; then
   echo "Creating empty Basemap placeholder \${basemap_path} (push a real one with scripts/push-basemap.sh)."
   : > "\${basemap_path}"

@@ -51,15 +51,26 @@ SIZE="$(wc -c <"${FILE}" | tr -d ' ')"
 [[ "${SIZE}" -gt 0 ]] || die "${FILE} is empty"
 
 echo "==> Resolving the Basemap path on ${HOST}"
-# The same key bin/deploy.sh seeds; the Pi's .env owns where the file lives.
-DEST="$(ssh "${HOST}" "sed -n 's|^DASHBOARD_BASEMAP_PATH=||p' ${REMOTE_DIR}/.env 2>/dev/null | tail -n 1")" \
+# The same key bin/deploy.sh seeds; the Pi's .env owns where the file lives. Capture ssh's own
+# exit status (not a local pipe's) so an unreachable host is reported as such.
+RAW="$(ssh "${HOST}" "sed -n 's|^DASHBOARD_BASEMAP_PATH=||p' ${REMOTE_DIR}/.env 2>/dev/null | tail -n 1")" \
   || die "Cannot reach ${HOST} over ssh"
+# Compose strips quotes and a trailing CR from .env values; do the same.
+DEST="$(printf '%s' "${RAW}" | tr -d '\r' | sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'\$/\1/")"
 DEST="${DEST:-${DEFAULT_BASEMAP}}"
 case "${DEST}" in
   /*) ;;
   *) die "DASHBOARD_BASEMAP_PATH=${DEST} on ${HOST} is relative; set an absolute path in ${REMOTE_DIR}/.env (bin/deploy.sh does this)" ;;
 esac
+case "${DEST}" in
+  *"'"*) die "DASHBOARD_BASEMAP_PATH=${DEST} contains a single quote; not supported" ;;
+esac
 TMP="${DEST}.tmp.$$"
+
+# An older Pi may hold a root-owned *directory* here (Docker creates one for a missing
+# single-file mount source). mv onto a directory succeeds by moving the file INSIDE it, which
+# would strand the new map, so refuse before touching anything.
+ssh "${HOST}" "[ ! -d '${DEST}' ]" || die "${DEST} on ${HOST} is a directory (Docker creates one when the mount source is missing). Remove it ('sudo rmdir' if empty) and run bin/deploy.sh to create the placeholder, then retry"
 
 # Free space check, in bytes, on the filesystem that holds the live file. A replace
 # briefly holds the old and the new file together, hence strictly more than twice.
