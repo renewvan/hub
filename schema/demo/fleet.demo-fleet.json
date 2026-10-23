@@ -57,12 +57,12 @@
       }
     },
     {
-      "device": "esp32-relay",
+      "device": "esp32-16x-relay",
       "health": "online",
       "info": {
-        "device": "esp32-relay",
-        "product": "ESP32 16-channel relay board",
-        "source": "ESP32 with two chained SN74HC595 shift registers",
+        "device": "esp32-16x-relay",
+        "product": "ESP32-WROOM-E 16-channel relay board",
+        "source": "ESP32-WROOM-E",
         "publishes": ["relay"],
         "version": "v0.0.0-demo",
         "board_serial": "DE:AD:BE:EF:00:01",

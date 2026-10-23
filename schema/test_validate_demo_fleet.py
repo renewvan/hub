@@ -153,7 +153,7 @@ def test_fleet_must_show_a_dev_build(schema_copy: Path) -> None:
 def test_fleet_must_show_a_device_with_a_mac_serial(schema_copy: Path) -> None:
     edit_fleet(
         schema_copy,
-        lambda f: device(f, "esp32-relay")["info"].update(board_serial="DEMO0000000000B2"),
+        lambda f: device(f, "esp32-16x-relay")["info"].update(board_serial="DEMO0000000000B2"),
     )
     result = run_validator(schema_copy)
     assert result.returncode == 1
@@ -193,7 +193,7 @@ def test_a_real_looking_pi_serial_is_rejected(schema_copy: Path, serial: str) ->
 
 
 def test_fleet_must_show_a_device_with_an_ip_address(schema_copy: Path) -> None:
-    edit_fleet(schema_copy, lambda f: device(f, "esp32-relay")["info"].pop("ip"))
+    edit_fleet(schema_copy, lambda f: device(f, "esp32-16x-relay")["info"].pop("ip"))
     result = run_validator(schema_copy)
     assert result.returncode == 1
     assert "an IP address" in result.stdout
@@ -201,7 +201,7 @@ def test_fleet_must_show_a_device_with_an_ip_address(schema_copy: Path) -> None:
 
 @pytest.mark.parametrize("address", ["192.168.10.57", "10.0.0.2", "198.51.101.4"])
 def test_a_real_looking_ip_is_rejected(schema_copy: Path, address: str) -> None:
-    edit_fleet(schema_copy, lambda f: device(f, "esp32-relay")["info"].update(ip=address))
+    edit_fleet(schema_copy, lambda f: device(f, "esp32-16x-relay")["info"].update(ip=address))
     result = run_validator(schema_copy)
     assert result.returncode == 1
     assert "ip" in result.stdout and "documentation range" in result.stdout
