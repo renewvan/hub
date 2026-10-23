@@ -91,7 +91,8 @@ fi
 # The path form (/mqtt) names no host at all -- the dashboard resolves it against
 # the page's own origin and its nginx proxies it to the broker -- so it cannot go
 # stale and is not checked.
-ws_url="\$(sed -n 's|^VITE_MQTT_WS_URL=||p' .env)"
+# Strip the quotes and trailing CR compose also tolerates, so a hand-edited value is judged on its content.
+ws_url="\$(sed -n 's|^VITE_MQTT_WS_URL=||p' .env | tr -d '\\r' | sed -e 's/^"\\(.*\\)"\$/\\1/' -e "s/^'\\(.*\\)'\\\$/\\1/")"
 if [[ -z "\${ws_url}" ]]; then
   echo "ERROR: VITE_MQTT_WS_URL in ${REMOTE_DIR}/.env is missing (use /mqtt or ws://<host>:9001)" >&2
   exit 1
@@ -102,8 +103,12 @@ if [[ "\${ws_url}" != /* ]]; then
     echo "ERROR: VITE_MQTT_WS_URL=\${ws_url} is not /mqtt or ws://<host>:9001" >&2
     exit 1
   fi
-  if ! { hostname -I | tr ' ' '\n'; hostname; hostname -f; echo localhost; } | grep -qxF "\${ws_host}"; then
-    echo "ERROR: VITE_MQTT_WS_URL points at \${ws_host}, which is not an address of this Pi (\$(hostname -I | xargs))." >&2
+  # Collect the Pi's names/addresses first, tolerating a failing command (hostname -f exits
+  # non-zero when the hostname does not resolve): under pipefail that would otherwise fail
+  # the whole match even though grep found the host.
+  pi_names="\$({ hostname -I; hostname; hostname -f; echo localhost; } 2>/dev/null | tr ' ' '\\n' || true)"
+  if ! printf '%s\\n' "\${pi_names}" | grep -qxF "\${ws_host}"; then
+    echo "ERROR: VITE_MQTT_WS_URL points at \${ws_host}, which is not an address of this Pi (\$(hostname -I 2>/dev/null | xargs || true))." >&2
     echo "       The Pi's IP probably changed (new router). Use VITE_MQTT_WS_URL=/mqtt, or set ws://<current-ip>:9001 in ${REMOTE_DIR}/.env, and re-run." >&2
     exit 1
   fi
