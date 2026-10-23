@@ -1,0 +1,11 @@
+; driver-wattcycle: hub-side override, layered over the driver's own
+; config.default.ini. bin/deploy.sh seeds this to
+; /etc/renewvan/wattcycle/config.ini on first deploy.
+[mqtt]
+host = mosquitto
+
+[device]
+; BLE address of this van's battery BMS. Find it on the hub with
+; `bluetoothctl scan on`. Until it is set, bin/deploy.sh leaves the
+; driver-wattcycle service off instead of letting it crash-loop.
+mac =

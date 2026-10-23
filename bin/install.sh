@@ -161,6 +161,7 @@ else
     -e "s|^TEMPERATURE_STATE_PATH=.*|TEMPERATURE_STATE_PATH=/etc/renewvan/temperature/state|" \
     -e "s|^TILT_CONFIG_PATH=.*|TILT_CONFIG_PATH=/etc/renewvan/tilt/config.ini|" \
     -e "s|^TILT_STATE_PATH=.*|TILT_STATE_PATH=/etc/renewvan/tilt/state|" \
+    -e "s|^WATTCYCLE_CONFIG_PATH=.*|WATTCYCLE_CONFIG_PATH=/etc/renewvan/wattcycle/config.ini|" \
     -e "s|^DASHBOARD_BASEMAP_PATH=.*|DASHBOARD_BASEMAP_PATH=/etc/renewvan/dashboard/basemap.pmtiles|" \
     -e "s|^MOSQUITTO_CONFIG_PATH=.*|MOSQUITTO_CONFIG_PATH=/etc/renewvan/mosquitto|" \
     .env.example >"${ENV_TMP}"
@@ -198,6 +199,7 @@ Still manual, because each needs a decision or a login only you can make:
   - Tank calibration (sensor_min/max): edit /etc/renewvan/tank/config.ini, then
     docker compose restart node-tank
   - Tilt axis mapping, if the GY-521 is not mounted face-down: /etc/renewvan/tilt/config.ini
+  - Battery BLE address for driver-wattcycle: [device] mac in /etc/renewvan/wattcycle/config.ini (the service stays off until it is set)
   - Broker authentication is OFF (anonymous). See .env.example and hub issue 49
     before exposing the Pi beyond your own network.
 EOF

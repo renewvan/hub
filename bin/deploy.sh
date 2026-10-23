@@ -46,7 +46,7 @@ ssh "${HOST}" bash -s <<REMOTE
 set -euo pipefail
 cd "${REMOTE_DIR}"
 
-mkdir -p /etc/renewvan/mosquitto /etc/renewvan/tank /etc/renewvan/gps /etc/renewvan/temperature/state /etc/renewvan/tilt/state /etc/renewvan/dashboard
+mkdir -p /etc/renewvan/mosquitto /etc/renewvan/tank /etc/renewvan/gps /etc/renewvan/temperature/state /etc/renewvan/tilt/state /etc/renewvan/dashboard /etc/renewvan/wattcycle
 
 # plugin/kiosk: create venv (Bookworm externally-managed Python) and install deps
 python3 -m venv /opt/renewvan/venvs/kiosk
@@ -75,6 +75,7 @@ if [[ ! -f .env ]]; then
   sed -i 's|^TEMPERATURE_STATE_PATH=.*|TEMPERATURE_STATE_PATH=/etc/renewvan/temperature/state|' .env
   sed -i 's|^TILT_CONFIG_PATH=.*|TILT_CONFIG_PATH=/etc/renewvan/tilt/config.ini|' .env
   sed -i 's|^TILT_STATE_PATH=.*|TILT_STATE_PATH=/etc/renewvan/tilt/state|' .env
+  sed -i 's|^WATTCYCLE_CONFIG_PATH=.*|WATTCYCLE_CONFIG_PATH=/etc/renewvan/wattcycle/config.ini|' .env
   sed -i 's|^DASHBOARD_BASEMAP_PATH=.*|DASHBOARD_BASEMAP_PATH=/etc/renewvan/dashboard/basemap.pmtiles|' .env
   sed -i 's|^MOSQUITTO_CONFIG_PATH=.*|MOSQUITTO_CONFIG_PATH=/etc/renewvan/mosquitto|' .env
   echo
@@ -124,6 +125,8 @@ grep -q '^TEMPERATURE_STATE_PATH=' .env || echo 'TEMPERATURE_STATE_PATH=/etc/ren
 # Same for driver-tilt's keys.
 grep -q '^TILT_CONFIG_PATH=' .env || echo 'TILT_CONFIG_PATH=/etc/renewvan/tilt/config.ini' >> .env
 grep -q '^TILT_STATE_PATH=' .env || echo 'TILT_STATE_PATH=/etc/renewvan/tilt/state' >> .env
+# Same for driver-wattcycle's key.
+grep -q '^WATTCYCLE_CONFIG_PATH=' .env || echo 'WATTCYCLE_CONFIG_PATH=/etc/renewvan/wattcycle/config.ini' >> .env
 # Same for the dashboard's Basemap path.
 grep -q '^DASHBOARD_BASEMAP_PATH=' .env || echo 'DASHBOARD_BASEMAP_PATH=/etc/renewvan/dashboard/basemap.pmtiles' >> .env
 
@@ -177,6 +180,11 @@ if [[ ! -f /etc/renewvan/tank/config.ini ]]; then
   cp docker/tank/config.ini.default /etc/renewvan/tank/config.ini
 fi
 
+if [[ ! -f /etc/renewvan/wattcycle/config.ini ]]; then
+  echo "Seeding /etc/renewvan/wattcycle/config.ini from the repo default (sets [mqtt] host = mosquitto; set [device] mac to the battery's BLE address, or driver-wattcycle stays off)."
+  cp docker/wattcycle/config.ini.default /etc/renewvan/wattcycle/config.ini
+fi
+
 # driver-gps is behind the \`gps\` compose profile because its \`devices:\` entry
 # makes Docker refuse to create the container (and compose abort the whole
 # \`up -d\`) when /dev/ttyACM0 does not exist. Enable the profile only when the
@@ -201,6 +209,17 @@ if grep -Eq '^VENUS_MQTT_HOST=.+' .env; then
 else
   echo "==> No VENUS_MQTT_HOST in .env: skipping driver-venus (set it and re-run deploy on a van with Venus OS)"
   docker compose rm -sf driver-venus >/dev/null 2>&1 || true
+fi
+
+# driver-wattcycle is behind the \`wattcycle\` compose profile: without a \`mac\` in its config.ini
+# the driver exits at startup and crash-loops. Enable it only once a MAC is set; any previously
+# created container is stopped otherwise.
+if grep -Eq '^mac[[:space:]]*=[[:space:]]*[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}' /etc/renewvan/wattcycle/config.ini; then
+  export COMPOSE_PROFILES="\${COMPOSE_PROFILES:+\${COMPOSE_PROFILES},}wattcycle"
+  echo "==> Battery MAC set: enabling the wattcycle profile"
+else
+  echo "==> No battery MAC in /etc/renewvan/wattcycle/config.ini: skipping driver-wattcycle"
+  docker compose rm -sf driver-wattcycle >/dev/null 2>&1 || true
 fi
 
 echo "==> docker compose pull && up -d"

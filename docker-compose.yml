@@ -1,8 +1,8 @@
 # The single install/setup path for the hub (see README.md's Install
-# section): infra (Mosquitto, InfluxDB, Grafana) plus the six pinned,
-# independently-published backend service images (`tank`, `battery`,
-# `router`, `gps`, `logger`, `dashboard`) — per
-# docs/adr/0001-compose-services-via-pinned-images-not-git-submodules.md,
+# section): infra (Mosquitto, InfluxDB, Grafana), the device drivers, and the
+# backend service images (`logger`, `dashboard`). Every one is a pinned,
+# independently-published image, per
+# docs/adr/0001-compose-services-via-pinned-images-not-git-submodules.md;
 # none of them are built from local/submodule source here. Bumping a
 # service is a single-line `image:` tag edit below (git-tracked, no
 # env var indirection); see `.env.example` for every other config
@@ -20,6 +20,8 @@
 # Dashboard: http://<host> (port 80)
 
 services:
+  # --- infra -----------------------------------------------------------
+
   mosquitto:
     image: eclipse-mosquitto:2
     container_name: renewvan-mosquitto
@@ -64,26 +66,26 @@ services:
     volumes:
       - grafana-data:/var/lib/grafana
 
-  # Native MQTT tank device (fresh + grey ADS1115 senders) — see
-  # docs/porting-dbus-to-mqtt-device.md and
-  # .scratch/renewvan-hub-v0-build/issues/02-native-mqtt-tank-driver.md.
-  # Needs I2C device passthrough for the ADS1115; layered config.ini
-  # override lives on the bind-mounted host path below.
-  driver-tank:
-    image: ghcr.io/renewvan/driver-tank:v0.10.0
-    container_name: renewvan-tank
+  # --- drivers (alphabetical) -----------------------------------------
+
+  # Simulated van for Demo mode. Always running, and idle (one MQTT connection, a 1 Hz tick that
+  # publishes nothing) until a client asks for it: Settings -> General -> Demo mode publishes
+  # `renewvan/demo/enabled/set`, and while the retained `renewvan/demo/enabled` is true it
+  # replays hub/schema/demo scenarios into the `renewvan/demo/` namespace (never on a real
+  # entity topic), so it cannot overwrite real retained state, and the logger drops it (it only
+  # writes four-segment entity topics; demo ones have five). Nothing to start by hand. See
+  # docs/demo-mode.md.
+  driver-demo:
+    image: ghcr.io/renewvan/driver-demo:v0.6.3
+    container_name: renewvan-demo
     restart: unless-stopped
     depends_on:
       - mosquitto
-    devices:
-      - "/dev/i2c-1:/dev/i2c-1"
     environment:
       MQTT_HOST: ${RENEWVAN_HOST:-mosquitto}
       MQTT_PORT: ${RENEWVAN_PORT:-1883}
       MQTT_USERNAME: ${RENEWVAN_USERNAME:-}
       MQTT_PASSWORD: ${RENEWVAN_PASSWORD:-}
-    volumes:
-      - ${TANK_CONFIG_PATH:-./config/tank/config.ini}:/app/config.ini:ro
 
   # Native MQTT GPS/GLONASS/BeiDou device (NMEA 0183 over USB-serial,
   # u-blox-chip module) -- see driver-gps's own README's "Topics published"
@@ -114,6 +116,44 @@ services:
       MQTT_PASSWORD: ${RENEWVAN_PASSWORD:-}
     volumes:
       - ${GPS_CONFIG_PATH:-./config/gps/config.ini}:/app/config.ini:ro
+
+  # RUT-360 Data to Server MQTT -> renewvan-bus router remap. Single
+  # connection to this compose's own bus: subscribes the router's raw
+  # feed on renewvan/router/<id>/raw, republishes normalized retained
+  # fields. See .scratch/driver-router/map.md.
+  driver-router:
+    image: ghcr.io/renewvan/driver-router:v0.3.0
+    container_name: renewvan-router
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    environment:
+      MQTT_HOST: ${RENEWVAN_HOST:-mosquitto}
+      MQTT_PORT: ${RENEWVAN_PORT:-1883}
+      MQTT_USERNAME: ${RENEWVAN_USERNAME:-}
+      MQTT_PASSWORD: ${RENEWVAN_PASSWORD:-}
+      ROUTER_ID: ${ROUTER_ID:-main}
+
+  # Native MQTT tank device (fresh + grey ADS1115 senders) — see
+  # docs/porting-dbus-to-mqtt-device.md and
+  # .scratch/renewvan-hub-v0-build/issues/02-native-mqtt-tank-driver.md.
+  # Needs I2C device passthrough for the ADS1115; layered config.ini
+  # override lives on the bind-mounted host path below.
+  driver-tank:
+    image: ghcr.io/renewvan/driver-tank:v0.10.0
+    container_name: renewvan-tank
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    devices:
+      - "/dev/i2c-1:/dev/i2c-1"
+    environment:
+      MQTT_HOST: ${RENEWVAN_HOST:-mosquitto}
+      MQTT_PORT: ${RENEWVAN_PORT:-1883}
+      MQTT_USERNAME: ${RENEWVAN_USERNAME:-}
+      MQTT_PASSWORD: ${RENEWVAN_PASSWORD:-}
+    volumes:
+      - ${TANK_CONFIG_PATH:-./config/tank/config.ini}:/app/config.ini:ro
 
   # Native MQTT temperature device: 1-Wire DS18B20 probes + the Pi's own CPU
   # thermal zone -- see driver-temperature's own README's "Topics published"
@@ -198,41 +238,30 @@ services:
       VENUS_MQTT_PORT: ${VENUS_MQTT_PORT:-1883}
       VENUS_PORTAL_ID: ${VENUS_PORTAL_ID}
 
-  # RUT-360 Data to Server MQTT -> renewvan-bus router remap. Single
-  # connection to this compose's own bus: subscribes the router's raw
-  # feed on renewvan/router/<id>/raw, republishes normalized retained
-  # fields. See .scratch/driver-router/map.md.
-  driver-router:
-    image: ghcr.io/renewvan/driver-router:v0.3.0
-    container_name: renewvan-router
+  # Native MQTT battery device: a WattCycle 314Ah (DH04 BMS) read directly
+  # over BLE from the hub -- see driver-wattcycle's own README's "Topics
+  # published" section. Talks to the host's BlueZ through the system D-Bus
+  # socket (bleak), so the host must run bluetooth.service with the adapter
+  # unblocked. The BMS accepts one BLE central at a time: this must be the
+  # only client for its address.
+  #
+  # Behind the `wattcycle` profile: without a `mac` in its config.ini the
+  # driver exits at startup, so a van with no WattCycle would crash-loop
+  # (restart: unless-stopped) forever. bin/deploy.sh enables the profile only
+  # when /etc/renewvan/wattcycle/config.ini names a MAC. For a manual
+  # `docker compose up -d` use `docker compose --profile wattcycle up -d`.
+  driver-wattcycle:
+    profiles: ["wattcycle"]
+    image: ghcr.io/renewvan/driver-wattcycle:v0.1.1
+    container_name: renewvan-wattcycle
     restart: unless-stopped
     depends_on:
       - mosquitto
-    environment:
-      MQTT_HOST: ${RENEWVAN_HOST:-mosquitto}
-      MQTT_PORT: ${RENEWVAN_PORT:-1883}
-      MQTT_USERNAME: ${RENEWVAN_USERNAME:-}
-      MQTT_PASSWORD: ${RENEWVAN_PASSWORD:-}
-      ROUTER_ID: ${ROUTER_ID:-main}
+    volumes:
+      - /var/run/dbus:/var/run/dbus
+      - ${WATTCYCLE_CONFIG_PATH:-./config/wattcycle/config.ini}:/app/config.ini:ro
 
-  # Simulated van for Demo mode. Always running, and idle (one MQTT connection, a 1 Hz tick that
-  # publishes nothing) until a client asks for it: Settings -> General -> Demo mode publishes
-  # `renewvan/demo/enabled/set`, and while the retained `renewvan/demo/enabled` is true it
-  # replays hub/schema/demo scenarios into the `renewvan/demo/` namespace (never on a real
-  # entity topic), so it cannot overwrite real retained state, and the logger drops it (it only
-  # writes four-segment entity topics; demo ones have five). Nothing to start by hand. See
-  # docs/demo-mode.md.
-  driver-demo:
-    image: ghcr.io/renewvan/driver-demo:v0.6.3
-    container_name: renewvan-demo
-    restart: unless-stopped
-    depends_on:
-      - mosquitto
-    environment:
-      MQTT_HOST: ${RENEWVAN_HOST:-mosquitto}
-      MQTT_PORT: ${RENEWVAN_PORT:-1883}
-      MQTT_USERNAME: ${RENEWVAN_USERNAME:-}
-      MQTT_PASSWORD: ${RENEWVAN_PASSWORD:-}
+  # --- services ------------------------------------------------------
 
   # renewvan/# -> InfluxDB point writer, one point per message. See
   # .scratch/renewvan-hub-v0-build/issues/05-influxdb-logger.md.
@@ -274,6 +303,7 @@ services:
       # bin/deploy.sh creates an empty placeholder so Docker never invents a root-owned
       # directory at the source.
       - ${DASHBOARD_BASEMAP_PATH:-./config/dashboard/basemap.pmtiles}:/usr/share/nginx/html/maps/basemap.pmtiles:ro
+
 volumes:
   mosquitto-data:
   mosquitto-log:
