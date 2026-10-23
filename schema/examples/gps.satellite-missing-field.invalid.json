@@ -1,0 +1,5 @@
+{
+  "fix_quality": "gps",
+  "satellites_in_use": 8,
+  "satellites": [{ "constellation": "gps", "prn": 10, "elevation_deg": 45, "azimuth_deg": 110 }]
+}

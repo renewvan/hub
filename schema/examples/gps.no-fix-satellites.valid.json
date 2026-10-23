@@ -1,0 +1,16 @@
+{
+  "fix_quality": "no_fix",
+  "satellites_in_use": 0,
+  "avg_snr_db": 14,
+  "satellites": [
+    { "constellation": "gps", "prn": 7, "snr_db": 18, "elevation_deg": 12, "azimuth_deg": 301 },
+    { "constellation": "galileo", "prn": 4, "snr_db": 10, "elevation_deg": 8, "azimuth_deg": 77 },
+    {
+      "constellation": "other",
+      "prn": 193,
+      "snr_db": null,
+      "elevation_deg": null,
+      "azimuth_deg": null
+    }
+  ]
+}

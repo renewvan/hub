@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://renewvan.dev/schema/gps.schema.json",
   "title": "gps",
-  "description": "v0.1 device-model entity: position fix from a USB GPS/GLONASS/BeiDou (NMEA 0183) module, read directly by the renewvan/driver-gps device (sensing, not a feed remap). Published under renewvan/gps/<id>/<property>. Every field is live -- republished on every poll (default 3s), no identity/startup-only fields. fix_quality/satellites_in_use/avg_snr_db are unconditional (avg_snr_db absent only before the first GSV sentence is decoded); every position/motion field is present only once a fix is acquired (fix_quality != no_fix).",
+  "description": "v0.1 device-model entity: position fix from a USB GPS/GLONASS/BeiDou (NMEA 0183) module, read directly by the renewvan/driver-gps device (sensing, not a feed remap). Published under renewvan/gps/<id>/<property>. Every field is live -- republished on every poll (default 3s), no identity/startup-only fields. fix_quality/satellites_in_use/avg_snr_db are unconditional (avg_snr_db and satellites are absent only before the first GSV sentence is decoded); every position/motion field is present only once a fix is acquired (fix_quality != no_fix). satellites is one retained JSON array of every satellite the receiver reports in view (see docs/adr/0017-gps-satellites-as-one-retained-array.md).",
   "type": "object",
   "properties": {
     "fix_quality": {
@@ -29,6 +29,45 @@
       "type": "number",
       "minimum": 0,
       "description": "Mean carrier-to-noise ratio (C/N0, dB-Hz) across every satellite with a decoded SNR value in the GSV sentences seen during the poll, any constellation. Independent of fix_quality -- raw signal tracking is meaningful even before/without a fix, e.g. diagnosing \"I have satellites in view but not enough signal for a fix\". Not restricted to the fix_quality subset: it includes every tracked satellite, not only the ones GGA used for the fix. Absent only before the device has decoded its first GSV sentence."
+    },
+    "satellites": {
+      "type": "array",
+      "maxItems": 128,
+      "description": "Every satellite the receiver reports in view in its GSV sentences, any constellation, one entry each: the per-satellite detail behind avg_snr_db. Independent of fix_quality, like avg_snr_db: a receiver tracking satellites with no fix still lists them. An empty array means the receiver reported GSV with no satellites in view; absent only before the first GSV sentence is decoded. Not the same population as satellites_in_use (GGA): this lists satellites in view, not the subset used for the fix. Order is not significant.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "constellation": {
+            "type": "string",
+            "enum": ["gps", "glonass", "galileo", "beidou", "qzss", "other"],
+            "description": "Constellation, from the GSV talker ID (GP, GL, GA, GB/BD, GQ). 'other' for a talker ID this schema has no name for, so a new constellation never makes the whole array invalid."
+          },
+          "prn": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Satellite number exactly as the receiver reports it in GSV (NMEA 4.10 numbering). Unique only within a constellation, so (constellation, prn) identifies a satellite."
+          },
+          "snr_db": {
+            "type": ["number", "null"],
+            "minimum": 0,
+            "description": "Carrier-to-noise ratio (C/N0, dB-Hz) of this satellite. null when the satellite is in view but the receiver has no signal measurement for it yet (the SNR field of GSV is blank), never 0: 0 would read as a measured zero."
+          },
+          "elevation_deg": {
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "maximum": 90,
+            "description": "Elevation above the horizon, degrees. null when the receiver does not report it."
+          },
+          "azimuth_deg": {
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "maximum": 359,
+            "description": "Azimuth from true north, degrees clockwise. null when the receiver does not report it."
+          }
+        },
+        "required": ["constellation", "prn", "snr_db", "elevation_deg", "azimuth_deg"],
+        "additionalProperties": false
+      }
     },
     "latitude": {
       "type": "number",
