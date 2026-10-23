@@ -2,9 +2,14 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://renewvan.dev/schema/relay.schema.json",
   "title": "relay",
-  "description": "v0.2 device-model entity: a binary on/off load, one per channel, published under renewvan/relay/<id>/<property>. `state` is the output as commanded and latched, published only after the physical output changed; it does NOT mean the load is energised (no feedback sensor: a stuck relay or blown fuse is not detected). `name` is the optional, retained, human label and the only label on the wire. Command topics (unretained, not separate schema files): `renewvan/relay/<id>/set` carries JSON `true` or `false` only (no toggle: it is not idempotent); `renewvan/relay/<id>/name/set` carries a JSON string (five segments, so it never matches the four-segment entity topic). A consumer treats `state` as unknown whenever the owning Device's health is not `online` or is absent. After any restart every channel is off; the Device alone owns boot state and the hub never re-asserts a desired state. One source per id: two Devices must not publish the same renewvan/relay/<id>/... topic. A Device that stops publishing an id it knows about publishes an empty retained payload (no value). See docs/adr/0013-writable-relay-and-its-wire-contract.md.",
+  "description": "v0.2 device-model entity: a binary on/off load, one per channel, published under renewvan/relay/<id>/<property>. `state` is the output as commanded and latched, published only after the physical output changed; it does NOT mean the load is energised (no feedback sensor: a stuck relay or blown fuse is not detected). `name` is the optional, retained, human label and the only label on the wire. Command topics (unretained, not separate schema files): `renewvan/relay/<id>/set` carries JSON `true` or `false` only (no toggle: it is not idempotent); `renewvan/relay/<id>/name/set` carries a JSON string (five segments, so it never matches the four-segment entity topic). A consumer treats `state` as unknown whenever the owning Driver's health is not `online` or is absent. After any restart every channel is off; the Driver alone owns boot state and the hub never re-asserts a desired state. One source per id: two Drivers must not publish the same renewvan/relay/<id>/... topic. A Driver that stops publishing an id it knows about publishes an empty retained payload (no value). See docs/adr/0013-writable-relay-and-its-wire-contract.md.",
   "type": "object",
   "properties": {
+    "driver": {
+      "type": "string",
+      "pattern": "^(?!driver-)(?!demo$)[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+      "description": "Optional, retained. The key of the Driver publishing this instance: the <driver> segment of renewvan/<driver>/info, published as renewvan/relay/<id>/driver. Same slug rule as driver-info.schema.json. Identity field. A consumer must tolerate it being absent (a Driver that predates it) and then attributes the instance to every Driver whose info `publishes` lists 'relay'."
+    },
     "state": {
       "type": "boolean"
     },

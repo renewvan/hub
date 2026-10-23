@@ -4,6 +4,7 @@
   "description": "Unnamed relay, off and static",
   "loop_s": 120,
   "initial": {
+    "driver": "esp32-16x-relay",
     "state": false
   },
   "timeline": []

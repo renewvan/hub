@@ -30,7 +30,7 @@ Assistant, Signal K, and RV-C — rather than competing with them. Any
 
 driver, whether it's talking to a Victron MPPT over [VE.Direct](http://VE.Direct) or an
 
-ESP32 relay device over ESPHome, normalizes into the same schema and
+ESP32 relay driver over ESPHome, normalizes into the same schema and
 
 appears on the same bus.
 
@@ -76,7 +76,7 @@ Still manual, because each needs a decision or a login only you can make: `sudo 
 tank calibration (`sensor_min`/`sensor_max` in `/etc/renewvan/tank/config.ini`, which starts on the
 image's defaults); the tilt axis mapping if the GY-521 is not mounted face-down; and broker
 authentication, which is **off** by default (see `.env.example` and hub issue 49 before exposing the
-Pi beyond your own network). The ESP32 relay device (`renewvan/driver-esp32-16x-relay`) and the phone app
+Pi beyond your own network). The ESP32 relay driver (`renewvan/driver-esp32`) and the phone app
 (`renewvan/mobile`) are flashed and installed per their own READMEs.
 
 ### Offline map
@@ -102,12 +102,12 @@ smoke procedure for the script: `scripts/README.md`.
    infra layer (Mosquitto, InfluxDB, Grafana) alongside `driver-tank`, `logger`, and `dashboard` —
    each a pinned, independently-published image (own repo, own release; nothing built from source in
    `hub`, per `docs/adr/0001-compose-services-via-pinned-images-not-git-submodules.md`). Bumping a
-   service later is a single `image:` tag edit in `docker-compose.yml`. Two devices are behind compose
+   service later is a single `image:` tag edit in `docker-compose.yml`. Two drivers are behind compose
    profiles because they cannot start without their hardware or a required setting, and would
    otherwise abort or crash-loop the whole stack: `driver-gps` (`gps`, needs `/dev/ttyACM0`) and
    `driver-venus` (`venus`, needs `VENUS_MQTT_HOST` and `VENUS_PORTAL_ID`). Add `--profile gps` /
    `--profile venus`, or let `bin/deploy.sh` decide from the device and `.env`.
-3. **Flash the ESP32 16-channel relay device**, once, per `renewvan/driver-esp32-16x-relay`'s own README
+3. **Flash the ESP32 16-channel relay driver**, once, per `renewvan/driver-esp32`'s own README
    (ESPHome YAML, no custom firmware). Use release `v0.1.2` or later: `v0.1.1` does not build.
 4. **Install the phone app** per `renewvan/mobile`'s own README (React Native — sideload or
    app-store build, not part of this compose flow).
@@ -122,17 +122,17 @@ tracks — keep your own compose override outside version control.
 To try the dashboard without a van, turn on Settings → General → System → Demo mode in any
 dashboard. `driver-demo` is part of the compose stack and idle until asked; the switch is shared on
 the bus (`renewvan/demo/enabled`), so every client then shows a looping simulated van published
-under the `renewvan/demo/` namespace (see `docs/demo-mode.md`). Real devices and the logger keep
-running alongside it; nothing real is overwritten and nothing simulated is ever stored. Writing a device for an entity that already
-exists? You ship no demo: see `docs/porting-dbus-to-mqtt-device.md` ("Adding a device for an
+under the `renewvan/demo/` namespace (see `docs/demo-mode.md`). Real drivers and the logger keep
+running alongside it; nothing real is overwritten and nothing simulated is ever stored. Writing a driver for an entity that already
+exists? You ship no demo: see `docs/porting-dbus-to-mqtt-driver.md` ("Adding a driver for an
 existing entity").
 
 ### Validating schemas
 
 - `./schema/validate-examples.sh` checks the example fixtures in `schema/examples/` against each
-  schema (entities, plus `device-manifest` and `device-info`, the contract for a Device's `manifest.json`
-  and its retained `renewvan/<device>/info` payload). It also fails when an entity schema exists that
-  the `publishes` enum in `device-manifest.schema.json` and `device-info.schema.json` does not list, so
+  schema (entities, plus `driver-manifest` and `driver-info`, the contract for a Driver's `manifest.json`
+  and its retained `renewvan/<driver>/info` payload). It also fails when an entity schema exists that
+  the `publishes` enum in `driver-manifest.schema.json` and `driver-info.schema.json` does not list, so
   adding an entity means adding it to both enums.
 - `python3 schema/validate-demo.py` (needs `pip install jsonschema`) checks the demo scenarios in
   `schema/demo/`; every entity needs one.
@@ -143,10 +143,10 @@ The scripts `bin/install.sh` calls, for running one at a time against a Pi reach
 
 1. **One-time:** `bin/bootstrap-pi.sh [--host <ssh-alias>]` installs Docker Engine + the Compose
    plugin if missing, and creates `/opt/renewvan/hub` (deployed compose artifacts), `/etc/renewvan`
-   (host-specific config — Mosquitto broker config, device configs), and `/var/log/renewvan`.
+   (host-specific config — Mosquitto broker config, driver configs), and `/var/log/renewvan`.
    Defaults to the `renewvan` SSH host alias; set one up in `~/.ssh/config` first.
 2. **Repeatable:** `bin/deploy.sh [--host <ssh-alias>]` rsyncs `docker-compose.yml` and `docker/` to
-   `/opt/renewvan/hub`, seeds each device's `/etc/renewvan/<device>/config.ini` from `docker/<device>/`
+   `/opt/renewvan/hub`, seeds each driver's `/etc/renewvan/<driver>/config.ini` from `docker/<driver>/`
    if missing, then runs `docker compose pull && up -d` on the Pi. On a fresh Pi it seeds `.env`
    from `.env.example` and exits asking you to fill in the secrets (`INFLUXDB_ADMIN_PASSWORD`,
    `INFLUXDB_ADMIN_TOKEN`, `VITE_MQTT_WS_URL`, and `VENUS_*` if the van has Venus OS) before

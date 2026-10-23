@@ -8,22 +8,23 @@ Checks, per scenario file (`*.demo.json`):
     <entity>.schema.json, so a step can never leave the entity invalid;
   * `t` is non-decreasing and < `loop_s`.
 
-Coverage rule (the per-device demo requirement): every entity that has a
+Coverage rule (the per-driver demo requirement): every entity that has a
 <entity>.schema.json and appears in the demo envelope's `entity` enum must have
 at least one scenario file. Adding an entity without a demo scenario fails.
 
-Fleet pass: the simulated Devices in demo/fleet.demo-fleet.json (not matched by the
+Fleet pass: the simulated Drivers in demo/fleet.demo-fleet.json (not matched by the
 `*.demo.json` glob above). Checks the envelope against demo-fleet.schema.json;
-each entry's `info` against device-info.schema.json, with `info.device` equal to the
-entry's `device`; the reserved key `demo` is rejected (by the slug pattern in
-demo-fleet.schema.json and device-info.schema.json); every `publishes` type has an
+each entry's `info` against driver-info.schema.json, with `info.driver` equal to the
+entry's `driver`; the reserved key `demo` is rejected (by the slug pattern in
+demo-fleet.schema.json and driver-info.schema.json); every `publishes` type has an
 entity scenario; `health_timeline` times are non-decreasing and < `loop_s`; exactly
-one Device carries a `health_timeline`; versions and serials are visibly fake (`dev` or
+one Driver carries a `health_timeline`; versions and serials are visibly fake (`dev` or
 `*-demo`; a `DEMO` serial or a unicast, locally administered MAC; an `ip` in an RFC 5737
-documentation range); the device-key pattern matches
-device-info.schema.json's so the reserved key cannot drift; and the fleet shows every
-Device-page state (a device with no info, an offline device with retained info, a `dev`
-build, a MAC serial, an IP address, a multi-entity device) plus the `router`.
+documentation range); a scenario whose `initial` names a `driver` names a fleet driver whose
+info `publishes` that entity; the driver-key pattern matches
+driver-info.schema.json's so the reserved key cannot drift; and the fleet shows every
+Driver-page state (a driver with no info, an offline driver with retained info, a `dev`
+build, a MAC serial, an IP address, a multi-entity driver) plus the `router`.
 
 Requires `jsonschema` (pip install jsonschema). Exit 1 on any failure.
 """
@@ -42,7 +43,7 @@ DEMO_DIR = SCHEMA_DIR / "demo"
 FLEET_PATH = DEMO_DIR / "fleet.demo-fleet.json"
 
 # Schemas that are not bus entities (command/status topics, the envelope itself).
-NON_ENTITY_PREFIXES = ("kiosk-", "tailscale-", "hub-", "device-", "demo")
+NON_ENTITY_PREFIXES = ("kiosk-", "tailscale-", "hub-", "driver-", "demo")
 
 
 def load(path: Path):
@@ -69,36 +70,40 @@ FAKE_VERSION = re.compile(r"^(dev|.*-demo)$")
 FAKE_IP = re.compile(r"^(192\.0\.2|198\.51\.100|203\.0\.113)\.\d{1,3}$")
 
 
-def validate_fleet(covered: set[str]) -> list[str]:
-    """Fleet pass: returns failure messages (empty when the fleet is valid)."""
+def validate_fleet(covered: set[str], attributed: list[tuple[str, str, str]]) -> list[str]:
+    """Fleet pass: returns failure messages (empty when the fleet is valid).
+
+    `attributed` is every (scenario file, entity, driver) triple from a scenario whose `initial`
+    names its Driver.
+    """
     rel = FLEET_PATH.relative_to(SCHEMA_DIR)
     if not FLEET_PATH.exists():
         return [f"{rel}: fleet file is missing"]
     fleet = load(FLEET_PATH)
     fleet_schema = load(SCHEMA_DIR / "demo-fleet.schema.json")
-    info_schema = load(SCHEMA_DIR / "device-info.schema.json")
+    info_schema = load(SCHEMA_DIR / "driver-info.schema.json")
     env_errors = list(Draft7Validator(fleet_schema).iter_errors(fleet))
     if env_errors:
         return [f"{rel}: envelope: {env_errors[0].message}"]
 
-    # The reserved key `demo` is rejected by the device-key pattern in each schema; fail if the
+    # The reserved key `demo` is rejected by the driver-key pattern in each schema; fail if the
     # fleet's copy ever stops matching the real contract's.
-    fleet_pattern = fleet_schema["properties"]["devices"]["items"]["properties"]["device"][
+    fleet_pattern = fleet_schema["properties"]["drivers"]["items"]["properties"]["driver"][
         "pattern"
     ]
-    if fleet_pattern != info_schema["properties"]["device"]["pattern"]:
-        return [f"{rel}: device key pattern differs from device-info.schema.json"]
+    if fleet_pattern != info_schema["properties"]["driver"]["pattern"]:
+        return [f"{rel}: driver key pattern differs from driver-info.schema.json"]
 
     info_validator = Draft7Validator(info_schema)
     failures: list[str] = []
     flapping: list[str] = []
     seen: set[str] = set()
     valid_infos: list[dict] = []
-    for entry in fleet["devices"]:
-        key = entry["device"]
-        where = f"{rel}: device '{key}'"
+    for entry in fleet["drivers"]:
+        key = entry["driver"]
+        where = f"{rel}: driver '{key}'"
         if key in seen:
-            failures.append(f"{where}: duplicate device key")
+            failures.append(f"{where}: duplicate driver key")
         seen.add(key)
 
         info = entry.get("info")
@@ -106,8 +111,8 @@ def validate_fleet(covered: set[str]) -> list[str]:
             errs = list(info_validator.iter_errors(info))
             if errs:
                 failures.append(f"{where}: info: {errs[0].message}")
-            elif info["device"] != key:
-                failures.append(f"{where}: info.device is '{info['device']}', expected '{key}'")
+            elif info["driver"] != key:
+                failures.append(f"{where}: info.driver is '{info['driver']}', expected '{key}'")
             else:
                 valid_infos.append(info)
                 for entity in info["publishes"]:
@@ -144,30 +149,37 @@ def validate_fleet(covered: set[str]) -> list[str]:
 
     if len(flapping) != 1:
         found = ", ".join(flapping) or "none"
-        failures.append(f"{rel}: exactly one device must have a health_timeline, found: {found}")
+        failures.append(f"{rel}: exactly one driver must have a health_timeline, found: {found}")
 
     wanted = [
-        (any("info" not in e for e in fleet["devices"]), "a device with no info"),
+        (any("info" not in e for e in fleet["drivers"]), "a driver with no info"),
         (
-            any(e["health"] == "offline" and "info" in e for e in fleet["devices"]),
-            "an offline device with retained info",
+            any(e["health"] == "offline" and "info" in e for e in fleet["drivers"]),
+            "an offline driver with retained info",
         ),
         (any(i["version"] == "dev" for i in valid_infos), "a `dev` build"),
         (
             any(MAC_SERIAL.match(i.get("board_serial", "")) for i in valid_infos),
-            "a device with a MAC serial",
+            "a driver with a MAC serial",
         ),
         (
             any("ip" in i for i in valid_infos),
-            "a device with an IP address",
+            "a driver with an IP address",
         ),
         (
             any(len(i["publishes"]) > 1 for i in valid_infos),
-            "a device publishing more than one entity",
+            "a driver publishing more than one entity",
         ),
-        ("router" in seen, "the `router` device"),
+        ("router" in seen, "the `router` driver"),
     ]
     failures.extend(f"{rel}: fleet must include {what}" for ok, what in wanted if not ok)
+
+    publishes = {i["driver"]: set(i["publishes"]) for i in valid_infos}
+    for scenario_rel, entity, owner in attributed:
+        if entity not in publishes.get(owner, set()):
+            failures.append(
+                f"{scenario_rel}: driver '{owner}' is not a fleet driver that publishes '{entity}'"
+            )
     return failures
 
 
@@ -176,6 +188,7 @@ def main() -> int:
     envelope = Draft7Validator(load(SCHEMA_DIR / "demo.schema.json"))
     schemas = {name: Draft7Validator(load(p)) for name, p in entity_schemas().items()}
     covered: set[str] = set()
+    attributed: list[tuple[str, str, str]] = []
 
     for path in sorted(DEMO_DIR.glob("*.demo.json")):
         rel = path.relative_to(SCHEMA_DIR)
@@ -189,6 +202,8 @@ def main() -> int:
             failures.append(f"{rel}: no {entity}.schema.json to validate against")
             continue
         covered.add(entity)
+        if "driver" in scenario["initial"]:
+            attributed.append((str(rel), entity, scenario["initial"]["driver"]))
         validator = schemas[entity]
 
         state = dict(scenario["initial"])
@@ -213,7 +228,7 @@ def main() -> int:
     for entity in sorted(set(schemas) - covered):
         failures.append(f"entity '{entity}' has no demo scenario under schema/demo/")
 
-    fleet_failures = validate_fleet(covered)
+    fleet_failures = validate_fleet(covered, attributed)
     if not fleet_failures:
         print(f"PASS  {FLEET_PATH.relative_to(SCHEMA_DIR)}")
     failures.extend(fleet_failures)

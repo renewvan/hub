@@ -7,7 +7,10 @@
 # builds what the repo ships:
 #
 #   kind: image     a multi-arch Docker image to ghcr.io/<owner>/<image>
-#   kind: firmware  tag and GitHub release only; the tag is compiled as a gate, nothing is uploaded
+#   kind: firmware  tag and GitHub release only; the tag is compiled as a gate, nothing is uploaded.
+#                   The repo lists its variants with `python3 scripts/variants.py list` (a JSON array
+#                   of names); each one is built from firmware/<variant>.yaml with
+#                   manifests/<variant>.json, all stamped with the same tag.
 #
 # Stable releases are cut from `main`; a pre-release from whichever branch it is dispatched on
 # (tests gate it, `main` and `:latest` stay untouched).
@@ -35,8 +38,8 @@ on:
         description: "kind=image: image name under ghcr.io/<owner>/ (e.g. driver-tank)"
         type: string
         default: ""
-      device-version-arg:
-        description: "kind=image: pass the tag as the DEVICE_VERSION build arg (Devices that publish Device info)"
+      driver-version-arg:
+        description: "kind=image: pass the tag as the DRIVER_VERSION build arg (Drivers that publish Driver info)"
         type: boolean
         default: false
       stamp-package-json:
@@ -52,10 +55,6 @@ on:
         type: string
         default: ""
       python-version:
-        type: string
-        default: ""
-      esphome-yaml:
-        description: "kind=firmware: ESPHome config to build"
         type: string
         default: ""
       esphome-version:
@@ -213,18 +212,38 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: false
-          build-args: ${{ inputs.device-version-arg && format('DEVICE_VERSION={0}', needs.cut.outputs.tag) || '' }}
+          build-args: ${{ inputs.driver-version-arg && format('DRIVER_VERSION={0}', needs.cut.outputs.tag) || '' }}
           # A pre-release publishes only its own tag, so it can never take `:latest` from the stable line.
           tags: |
             ghcr.io/${{ github.repository_owner }}/${{ inputs.image }}:${{ needs.cut.outputs.tag }}
             ${{ !inputs.prerelease && format('ghcr.io/{0}/{1}:latest', github.repository_owner, inputs.image) || '' }}
 
-  build-firmware:
+  firmware-variants:
     if: ${{ inputs.kind == 'firmware' }}
     needs: cut
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    outputs:
+      variants: ${{ steps.list.outputs.variants }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.cut.outputs.tag }}
+
+      - name: List the firmware variants
+        id: list
+        run: echo "variants=$(python3 scripts/variants.py list)" >> "$GITHUB_OUTPUT"
+
+  build-firmware:
+    needs: [cut, firmware-variants]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: ${{ fromJSON(needs.firmware-variants.outputs.variants) }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -236,17 +255,18 @@ jobs:
       - name: Placeholder secrets (build gate only, never uploaded)
         run: cp secrets.yaml.example secrets.yaml
 
-      # The release tag is the firmware's version: manifest.json supplies the other stamped
-      # fields, exactly as scripts/flash.sh does locally.
+      # The release tag is the firmware's version, shared by every variant: the variant's
+      # manifest supplies the other stamped fields, exactly as scripts/flash.sh does locally.
       - name: Compose the manifest substitutions
         id: stamp
         env:
           VERSION: ${{ needs.cut.outputs.tag }}
+          VARIANT: ${{ matrix.variant }}
         run: |
           {
             echo "substitutions<<EOF"
             echo "version=${VERSION}"
-            python3 scripts/manifest_substitutions.py manifest.json
+            python3 scripts/manifest_substitutions.py "${VARIANT}"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
@@ -254,6 +274,6 @@ jobs:
         id: build
         uses: esphome/build-action@ae5408cdbc4f70692bf8e345c4982bca05a93667 # v8.1.0
         with:
-          yaml-file: ${{ inputs.esphome-yaml }}
+          yaml-file: firmware/${{ matrix.variant }}.yaml
           version: ${{ inputs.esphome-version }}
           substitutions: ${{ steps.stamp.outputs.substitutions }}

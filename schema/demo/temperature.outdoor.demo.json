@@ -4,6 +4,7 @@
   "description": "Outdoor probe",
   "loop_s": 120,
   "initial": {
+    "driver": "temperature",
     "name": "Outside",
     "unit": "C",
     "source": "w1",

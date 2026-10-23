@@ -5,6 +5,16 @@
   "description": "v0.2 device-model entity: a battery bank as seen by a shunt, BMS, or inverter-charger, regardless of vendor. Published under renewvan/battery/<id>/<property>. The four core measurements are required of every source; everything else is optional because not every source can supply it (a shunt has no charge stage, a BMS-less lead-acid bank has no temperature probe). Consumers MUST tolerate absent optional properties.",
   "type": "object",
   "properties": {
+    "driver": {
+      "type": "string",
+      "pattern": "^(?!driver-)(?!demo$)[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+      "description": "Optional, retained. The key of the Driver publishing this instance: the <driver> segment of renewvan/<driver>/info, published as renewvan/battery/<id>/driver. Same slug rule as driver-info.schema.json. Identity field. A consumer must tolerate it being absent (a Driver that predates it) and then attributes the instance to every Driver whose info `publishes` lists 'battery'."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional, retained. Human-readable label of this instance (e.g. 'House battery'), published as renewvan/battery/<id>/name. Identity field."
+    },
     "soc_pct": {
       "type": "number",
       "minimum": 0,

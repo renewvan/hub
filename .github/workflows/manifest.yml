@@ -1,4 +1,4 @@
-# Reusable: validate a Device repo's manifest.json against the hub's device-manifest schema.
+# Reusable: validate a Driver repo's manifest.json against the hub's driver-manifest schema.
 # See docs/adr/0015-one-release-process-via-reusable-workflows.md.
 #
 # `hub-ref` is the hub commit whose schema is used. Callers pin the same SHA they pin this
@@ -9,7 +9,7 @@ on:
   workflow_call:
     inputs:
       hub-ref:
-        description: Hub commit SHA whose schema/device-manifest.schema.json is the contract
+        description: Hub commit SHA whose schema/driver-manifest.schema.json is the contract
         type: string
         required: true
       manifest:
@@ -27,13 +27,13 @@ jobs:
           HUB_REF: ${{ inputs.hub-ref }}
         run: |
           curl --fail --silent --show-error --location \
-            "https://raw.githubusercontent.com/renewvan/hub/${HUB_REF}/schema/device-manifest.schema.json" \
-            --output device-manifest.schema.json
+            "https://raw.githubusercontent.com/renewvan/hub/${HUB_REF}/schema/driver-manifest.schema.json" \
+            --output driver-manifest.schema.json
 
       - name: Validate the manifest
         env:
           MANIFEST: ${{ inputs.manifest }}
-        run: npx --yes ajv-cli@5 validate -s device-manifest.schema.json -d "$MANIFEST" --strict=false
+        run: npx --yes ajv-cli@5 validate -s driver-manifest.schema.json -d "$MANIFEST" --strict=false
 
       # version and board_serial are stamped at runtime, never hand-written: the schema forbids them.
       - name: Gate rejects a manifest that contains version
@@ -41,7 +41,7 @@ jobs:
           MANIFEST: ${{ inputs.manifest }}
         run: |
           jq '. + {version: "v0.0.0"}' "$MANIFEST" > manifest-with-version.json
-          if npx --yes ajv-cli@5 validate -s device-manifest.schema.json -d manifest-with-version.json --strict=false; then
+          if npx --yes ajv-cli@5 validate -s driver-manifest.schema.json -d manifest-with-version.json --strict=false; then
             echo "gate accepted a manifest containing version" >&2
             exit 1
           fi

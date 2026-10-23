@@ -41,8 +41,8 @@ def edit_fleet(schema: Path, change) -> None:
     path.write_text(json.dumps(fleet))
 
 
-def device(fleet: dict, key: str) -> dict:
-    return next(n for n in fleet["devices"] if n["device"] == key)
+def driver(fleet: dict, key: str) -> dict:
+    return next(n for n in fleet["drivers"] if n["driver"] == key)
 
 
 def test_shipped_fleet_passes(schema_copy: Path) -> None:
@@ -59,7 +59,7 @@ def test_fleet_file_is_not_read_as_an_entity_scenario(schema_copy: Path) -> None
 
 
 def test_invalid_info_is_rejected(schema_copy: Path) -> None:
-    edit_fleet(schema_copy, lambda f: device(f, "tank")["info"].pop("version"))
+    edit_fleet(schema_copy, lambda f: driver(f, "tank")["info"].pop("version"))
     result = run_validator(schema_copy)
     assert result.returncode == 1
     assert "tank" in result.stdout and "version" in result.stdout
@@ -75,9 +75,9 @@ def test_publishes_type_without_entity_scenario_is_rejected(schema_copy: Path) -
 
 def test_reserved_key_demo_is_rejected(schema_copy: Path) -> None:
     def rename(fleet: dict) -> None:
-        n = device(fleet, "tank")
-        n["device"] = "demo"
-        n["info"]["device"] = "demo"
+        n = driver(fleet, "tank")
+        n["driver"] = "demo"
+        n["info"]["driver"] = "demo"
 
     edit_fleet(schema_copy, rename)
     result = run_validator(schema_copy)
@@ -86,8 +86,8 @@ def test_reserved_key_demo_is_rejected(schema_copy: Path) -> None:
     assert "'demo'" in result.stdout
 
 
-def test_info_device_key_must_match_entry_key(schema_copy: Path) -> None:
-    edit_fleet(schema_copy, lambda f: device(f, "tank")["info"].update(device="tilt"))
+def test_info_driver_key_must_match_entry_key(schema_copy: Path) -> None:
+    edit_fleet(schema_copy, lambda f: driver(f, "tank")["info"].update(driver="tilt"))
     result = run_validator(schema_copy)
     assert result.returncode == 1
     assert "tank" in result.stdout
@@ -95,7 +95,7 @@ def test_info_device_key_must_match_entry_key(schema_copy: Path) -> None:
 
 def test_timeline_time_at_or_past_loop_is_rejected(schema_copy: Path) -> None:
     def push_out_of_range(fleet: dict) -> None:
-        flapper = next(n for n in fleet["devices"] if n.get("health_timeline"))
+        flapper = next(n for n in fleet["drivers"] if n.get("health_timeline"))
         flapper["health_timeline"][-1]["t"] = fleet["loop_s"]
 
     edit_fleet(schema_copy, push_out_of_range)
@@ -106,7 +106,7 @@ def test_timeline_time_at_or_past_loop_is_rejected(schema_copy: Path) -> None:
 
 def test_unordered_timeline_is_rejected(schema_copy: Path) -> None:
     def reverse(fleet: dict) -> None:
-        flapper = next(n for n in fleet["devices"] if n.get("health_timeline"))
+        flapper = next(n for n in fleet["drivers"] if n.get("health_timeline"))
         flapper["health_timeline"].reverse()
 
     edit_fleet(schema_copy, reverse)
@@ -115,9 +115,9 @@ def test_unordered_timeline_is_rejected(schema_copy: Path) -> None:
     assert "goes backwards" in result.stdout
 
 
-def test_exactly_one_device_flaps(schema_copy: Path) -> None:
+def test_exactly_one_driver_flaps(schema_copy: Path) -> None:
     def remove_flapper(fleet: dict) -> None:
-        for n in fleet["devices"]:
+        for n in fleet["drivers"]:
             n.pop("health_timeline", None)
 
     edit_fleet(schema_copy, remove_flapper)
@@ -126,58 +126,58 @@ def test_exactly_one_device_flaps(schema_copy: Path) -> None:
     assert "exactly one" in result.stdout
 
 
-def test_fleet_must_show_a_device_with_no_info(schema_copy: Path) -> None:
+def test_fleet_must_show_a_driver_with_no_info(schema_copy: Path) -> None:
     edit_fleet(
         schema_copy,
-        lambda f: device(f, "gps").update(info=device(f, "tank")["info"] | {"device": "gps"}),
+        lambda f: driver(f, "gps").update(info=driver(f, "tank")["info"] | {"driver": "gps"}),
     )
     result = run_validator(schema_copy)
     assert result.returncode == 1
     assert "no info" in result.stdout
 
 
-def test_fleet_must_show_an_offline_device_with_retained_info(schema_copy: Path) -> None:
-    edit_fleet(schema_copy, lambda f: device(f, "tilt").update(health="online"))
+def test_fleet_must_show_an_offline_driver_with_retained_info(schema_copy: Path) -> None:
+    edit_fleet(schema_copy, lambda f: driver(f, "tilt").update(health="online"))
     result = run_validator(schema_copy)
     assert result.returncode == 1
     assert "offline" in result.stdout
 
 
 def test_fleet_must_show_a_dev_build(schema_copy: Path) -> None:
-    edit_fleet(schema_copy, lambda f: device(f, "tank")["info"].update(version="v0.0.0-demo"))
+    edit_fleet(schema_copy, lambda f: driver(f, "tank")["info"].update(version="v0.0.0-demo"))
     result = run_validator(schema_copy)
     assert result.returncode == 1
     assert "dev" in result.stdout
 
 
-def test_fleet_must_show_a_device_with_a_mac_serial(schema_copy: Path) -> None:
+def test_fleet_must_show_a_driver_with_a_mac_serial(schema_copy: Path) -> None:
     edit_fleet(
         schema_copy,
-        lambda f: device(f, "esp32-16x-relay")["info"].update(board_serial="DEMO0000000000B2"),
+        lambda f: driver(f, "esp32-16x-relay")["info"].update(board_serial="DEMO0000000000B2"),
     )
     result = run_validator(schema_copy)
     assert result.returncode == 1
     assert "MAC" in result.stdout
 
 
-def test_fleet_must_show_a_healthy_multi_entity_device(schema_copy: Path) -> None:
-    edit_fleet(schema_copy, lambda f: device(f, "venus")["info"].update(publishes=["battery"]))
+def test_fleet_must_show_a_healthy_multi_entity_driver(schema_copy: Path) -> None:
+    edit_fleet(schema_copy, lambda f: driver(f, "venus")["info"].update(publishes=["battery"]))
     result = run_validator(schema_copy)
     assert result.returncode == 1
     assert "more than one entity" in result.stdout
 
 
-def test_router_is_a_simulated_device(schema_copy: Path) -> None:
+def test_router_is_a_simulated_driver(schema_copy: Path) -> None:
     def rename_router(fleet: dict) -> None:
         # Keep exactly one flapper so only the router rule can fire.
-        router = device(fleet, "router")
-        router["device"] = "uplink"
-        router["info"]["device"] = "uplink"
+        router = driver(fleet, "router")
+        router["driver"] = "uplink"
+        router["info"]["driver"] = "uplink"
 
     edit_fleet(schema_copy, rename_router)
     result = run_validator(schema_copy)
     assert result.returncode == 1
-    assert "the `router` device" in result.stdout
+    assert "the `router` driver" in result.stdout
 
 
 @pytest.mark.parametrize(
@@ -186,14 +186,14 @@ def test_router_is_a_simulated_device(schema_copy: Path) -> None:
     ids=["real-looking-pi-serial", "pi-serial-not-marked-fake"],
 )
 def test_a_real_looking_pi_serial_is_rejected(schema_copy: Path, serial: str) -> None:
-    edit_fleet(schema_copy, lambda f: device(f, "venus")["info"].update(board_serial=serial))
+    edit_fleet(schema_copy, lambda f: driver(f, "venus")["info"].update(board_serial=serial))
     result = run_validator(schema_copy)
     assert result.returncode == 1
     assert "board_serial" in result.stdout
 
 
-def test_fleet_must_show_a_device_with_an_ip_address(schema_copy: Path) -> None:
-    edit_fleet(schema_copy, lambda f: device(f, "esp32-16x-relay")["info"].pop("ip"))
+def test_fleet_must_show_a_driver_with_an_ip_address(schema_copy: Path) -> None:
+    edit_fleet(schema_copy, lambda f: driver(f, "esp32-16x-relay")["info"].pop("ip"))
     result = run_validator(schema_copy)
     assert result.returncode == 1
     assert "an IP address" in result.stdout
@@ -201,7 +201,7 @@ def test_fleet_must_show_a_device_with_an_ip_address(schema_copy: Path) -> None:
 
 @pytest.mark.parametrize("address", ["192.168.10.57", "10.0.0.2", "198.51.101.4"])
 def test_a_real_looking_ip_is_rejected(schema_copy: Path, address: str) -> None:
-    edit_fleet(schema_copy, lambda f: device(f, "esp32-16x-relay")["info"].update(ip=address))
+    edit_fleet(schema_copy, lambda f: driver(f, "esp32-16x-relay")["info"].update(ip=address))
     result = run_validator(schema_copy)
     assert result.returncode == 1
     assert "ip" in result.stdout and "documentation range" in result.stdout
@@ -209,13 +209,13 @@ def test_a_real_looking_ip_is_rejected(schema_copy: Path, address: str) -> None:
 
 @pytest.mark.parametrize("version", ["v1.2.3", "0.8.0", "abc1234"])
 def test_a_real_looking_version_is_rejected(schema_copy: Path, version: str) -> None:
-    edit_fleet(schema_copy, lambda f: device(f, "venus")["info"].update(version=version))
+    edit_fleet(schema_copy, lambda f: driver(f, "venus")["info"].update(version=version))
     result = run_validator(schema_copy)
     assert result.returncode == 1
     assert "version" in result.stdout
 
 
-def test_device_slug_pattern_must_not_drift_between_schemas(schema_copy: Path) -> None:
+def test_driver_slug_pattern_must_not_drift_between_schemas(schema_copy: Path) -> None:
     path = schema_copy / "demo-fleet.schema.json"
     text = path.read_text().replace("(?!demo$)", "")
     path.write_text(text)
@@ -232,3 +232,25 @@ def test_a_relay_scenario_that_blanks_the_name_is_rejected(schema_copy: Path) ->
     result = run_validator(schema_copy)
     assert result.returncode == 1
     assert path.name in result.stdout
+
+
+def test_a_scenario_naming_a_driver_that_does_not_publish_its_entity_is_rejected(
+    schema_copy: Path,
+) -> None:
+    path = schema_copy / "demo" / "battery.wattcycle.demo.json"
+    scenario = json.loads(path.read_text())
+    scenario["initial"]["driver"] = "tank"
+    path.write_text(json.dumps(scenario))
+    result = run_validator(schema_copy)
+    assert result.returncode == 1
+    assert "driver 'tank' is not a fleet driver that publishes 'battery'" in result.stdout
+
+
+def test_a_scenario_naming_a_driver_missing_from_the_fleet_is_rejected(schema_copy: Path) -> None:
+    path = schema_copy / "demo" / "battery.house.demo.json"
+    scenario = json.loads(path.read_text())
+    scenario["initial"]["driver"] = "jk-bms"
+    path.write_text(json.dumps(scenario))
+    result = run_validator(schema_copy)
+    assert result.returncode == 1
+    assert "driver 'jk-bms' is not a fleet driver that publishes 'battery'" in result.stdout
