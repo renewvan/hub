@@ -155,6 +155,53 @@ The scripts `bin/install.sh` calls, for running one at a time against a Pi reach
 3. **Once, for the touchscreen:** `bin/bootstrap-kiosk-pi.sh [--host <ssh-alias>]`. See
    `plugins/kiosk/README.md`.
 
+### HTTPS for the dashboard on the LAN
+
+The kiosk dashboard is served over HTTPS on the LAN so a phone can install it as a PWA. Caddy terminates TLS with its own local CA (`tls internal`). Nothing is exposed to the internet, so don't port-forward 443 on your router.
+
+Published ports:
+
++- `caddy`: host port 443 (LAN).
++- `dashboard`: `127.0.0.1:80` only, for the kiosk browser (`http://localhost`).
+
+**Setup**
+
+1. Keep a `renewvan/dashboard` checkout next to this repo (`../dashboard`). `bin/deploy.sh` ships its `docker/Caddyfile` to the Pi, and compose mounts it from there.
+2. On the Pi, set `DASHBOARD_HOST` in `/opt/renewvan/hub/.env` to its LAN address (`hostname -I | awk '{print $1}'`). Deploy refuses to run while it's empty, because compose requires it for every service.
+3. Run `bin/deploy.sh`. It restarts Caddy, because the Caddyfile is a single-file bind mount that a redeploy doesn't reload.
+
+**Trust the root on each phone (once)**
+
+Caddy's root CA is in the `caddy-data` volume. Run these on the Pi in `/opt/renewvan/hub`, then copy `renewvan-root.cer` off it. The DER form is what Android installs directly:
+
+```
+docker cp renewvan-caddy:/data/caddy/pki/authorities/local/root.crt ./renewvan-root.crt
+openssl x509 -in renewvan-root.crt -outform DER -out renewvan-root.cer
+openssl x509 -in renewvan-root.cer -inform DER -noout -fingerprint -sha256
+```
+
+Copy `renewvan-root.cer` to the phone over a channel you trust (USB, email, or a cloud drive). Don't serve it from a long-lived LAN server.
+
+On Android (verified with Chrome):
+
+1. Settings → Security → Encryption & credentials → Install a certificate → **CA certificate**, then pick the file.
+2. Check it under Trusted credentials → **User**. Its subject is `Caddy Local Authority - 2026 ECC Root`, and its SHA-256 matches the command above.
+3. Close Chrome completely, reopen it, and load `https://<pi-lan-ip>`.
+
+Android may warn "Network may be monitored" after you install a user CA. That is expected. iOS hasn't been tested with this setup.
+
+**Certificate lifetime**
+
+The root is valid for 10 years. Caddy signs the server certificate directly with it (`sign_with_root`) for 90 days and renews it automatically, so renewals need no reinstall. Never delete the `caddy-data` volume or run `docker compose down -v`: it holds the root, and every device would have to trust a new one.
+
+**Troubleshooting**
+
+| Chrome message                                                          | Cause                                                                                                                   |
+| ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Server's certificate is not trusted (`NET::ERR_CERT_AUTHORITY_INVALID`) | Root not installed, installed under the wrong category (for example VPN & app user certificate), or the wrong file.     |
+| `NET::ERR_CERT_COMMON_NAME_INVALID`                                     | The URL isn't the LAN address. The certificate covers only `DASHBOARD_HOST`; a Tailscale or public address won't match. |
+| `NET::ERR_CERT_DATE_INVALID`                                            | The phone's clock is wrong.                                                                                             |
+
 ## Architecture
 
 See \[`/docs/[architecture.md](http://architecture.md)`\](docs/[architecture.md](http://architecture.md)) for the full layered
