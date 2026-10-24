@@ -30,6 +30,16 @@ ssh "${HOST}" "mkdir -p ${REMOTE_DIR} /opt/renewvan/plugins/kiosk /opt/renewvan/
 rsync -az docker-compose.yml "${HOST}:${REMOTE_DIR}/docker-compose.yml"
 rsync -az --delete docker/ "${HOST}:${REMOTE_DIR}/docker/"
 rsync -az .env.example "${HOST}:${REMOTE_DIR}/.env.example"
+# caddy (docker-compose.yml) bind-mounts ../dashboard/docker/Caddyfile, which resolves to
+# /opt/renewvan/dashboard/docker/Caddyfile on the Pi. Ship it from the sibling dashboard checkout:
+# if the source is missing on the Pi, Docker creates a root-owned directory at that path instead.
+CADDYFILE="${REPO_ROOT}/../dashboard/docker/Caddyfile"
+if [[ ! -f "${CADDYFILE}" ]]; then
+  echo "ERROR: ${CADDYFILE} not found: clone renewvan/dashboard next to this repo." >&2
+  exit 1
+fi
+ssh "${HOST}" "mkdir -p /opt/renewvan/dashboard/docker"
+rsync -az "${CADDYFILE}" "${HOST}:/opt/renewvan/dashboard/docker/Caddyfile"
 rsync -az --delete --exclude='.venv' plugins/kiosk/ "${HOST}:/opt/renewvan/plugins/kiosk/"
 rsync -az --delete plugins/tailscale/ "${HOST}:/opt/renewvan/plugins/tailscale/"
 rsync -az --delete plugins/hub/ "${HOST}:/opt/renewvan/plugins/hub/"
@@ -222,11 +232,22 @@ else
   docker compose rm -sf driver-wattcycle >/dev/null 2>&1 || true
 fi
 
+# caddy's compose entry requires DASHBOARD_HOST (`${DASHBOARD_HOST:?}`). Unset, `up -d` aborts for
+# every service, not just caddy, so refuse before pulling rather than half-deploy.
+if ! grep -Eq '^DASHBOARD_HOST=.+' .env; then
+  echo "ERROR: DASHBOARD_HOST in ${REMOTE_DIR}/.env is empty: set it to the Pi's LAN IP (hostname -I) and re-run." >&2
+  exit 1
+fi
+
 echo "==> docker compose pull && up -d"
 docker compose pull
 # --remove-orphans: containers have fixed container_name values, so a renamed service key leaves
 # the old container holding the name and a plain up -d aborts half-way (ADR 0014's rename did).
 docker compose up -d --remove-orphans
+# caddy bind-mounts the Caddyfile as a single file: each deploy replaces it with a new inode, which the
+# running container keeps reading until it restarts. Restart it here (brief TLS blip; the root CA lives in
+# the caddy-data volume, so devices keep trusting it).
+docker compose restart caddy
 REMOTE
 
 echo "==> Reloading kiosk browser"

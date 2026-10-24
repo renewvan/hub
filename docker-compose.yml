@@ -17,7 +17,7 @@
 # MQTT:      <host>:1883 (plain), <host>:9001 (websockets)
 # InfluxDB:  http://<host>:8086 (org=renewvan, bucket=renewvan)
 # Grafana:   http://<host>:3000 (admin/admin on first run)
-# Dashboard: http://<host> (port 80)
+# Dashboard: https://<host> (Caddy, 443); http://localhost:80 on the Pi only (kiosk)
 
 services:
   # --- infra -----------------------------------------------------------
@@ -290,8 +290,10 @@ services:
     image: ghcr.io/renewvan/dashboard:v0.11.0
     container_name: renewvan-dashboard
     restart: unless-stopped
+    # Loopback only: the kiosk browser (renewvan-kiosk-browser.sh, KIOSK_URL=http://localhost) reads
+    # it on the Pi. Caddy below is the only LAN entry point (TLS on 443); nothing else reaches :80.
     ports:
-      - "80:80"
+      - "127.0.0.1:80:80"
     environment:
       VITE_MQTT_WS_URL: ${VITE_MQTT_WS_URL}
       VITE_MQTT_USERNAME: ${VITE_MQTT_USERNAME:-}
@@ -304,8 +306,28 @@ services:
       # directory at the source.
       - ${DASHBOARD_BASEMAP_PATH:-./config/dashboard/basemap.pmtiles}:/usr/share/nginx/html/maps/basemap.pmtiles:ro
 
+  # TLS terminator for the kiosk dashboard, LAN-only, with a self-signed local CA (Caddy
+  # `tls internal`). Clients must trust the root once to install the PWA over https; see
+  # dashboard/docker/Caddyfile. Set DASHBOARD_HOST to the Pi's LAN IP or name.
+  caddy:
+    image: caddy:2
+    container_name: renewvan-caddy
+    restart: unless-stopped
+    depends_on:
+      - dashboard
+    ports:
+      - "443:443"
+    environment:
+      DASHBOARD_HOST: ${DASHBOARD_HOST:?set DASHBOARD_HOST to the Pi LAN IP or name}
+    volumes:
+      - ../dashboard/docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
 volumes:
   mosquitto-data:
   mosquitto-log:
   influxdb-data:
+  caddy-data:
+  caddy-config:
   grafana-data:
