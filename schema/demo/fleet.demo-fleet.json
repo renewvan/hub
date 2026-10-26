@@ -84,6 +84,18 @@
       }
     },
     {
+      "driver": "heater",
+      "health": "online",
+      "info": {
+        "driver": "heater",
+        "product": "Diesel heater driver",
+        "source": "Autoterm AIR 2D over UART",
+        "publishes": ["heater"],
+        "version": "v0.0.0-demo",
+        "board_serial": "DEMO0000000000A1"
+      }
+    },
+    {
       "driver": "router",
       "health": "online",
       "health_timeline": [

@@ -1,0 +1,105 @@
+{
+  "entity": "heater",
+  "id": "cabin",
+  "description": "Heater cycling through every phase, with an optional-absent step, an error step and a ventilating step",
+  "loop_s": 180,
+  "initial": {
+    "driver": "heater",
+    "name": "Cabin heater",
+    "phase": "off",
+    "status_code": "0.1",
+    "error_code": 0,
+    "internal_temperature_c": 17.5,
+    "voltage_v": 12.6,
+    "commands_enabled": false
+  },
+  "timeline": [
+    {
+      "t": 10,
+      "set": {
+        "phase": "starting",
+        "status_code": "1.1",
+        "internal_temperature_c": 17.6,
+        "voltage_v": 12.2,
+        "heater_temperature_c": 22.0,
+        "fuel_pump_hz": 0.5,
+        "fan_rpm": 1500,
+        "runtime_s": 0
+      }
+    },
+    {
+      "t": 30,
+      "set": {
+        "phase": "warming_up",
+        "status_code": "2.4",
+        "internal_temperature_c": 18.0,
+        "heater_temperature_c": 60.0,
+        "fuel_pump_hz": 1.2,
+        "fan_rpm": 2700,
+        "runtime_s": 20,
+        "power_level": 4,
+        "mode": "heater_temperature",
+        "setpoint_c": 21
+      }
+    },
+    {
+      "t": 50,
+      "set": {
+        "phase": "running",
+        "status_code": "3.0",
+        "internal_temperature_c": 19.4,
+        "external_temperature_c": 6.5,
+        "heater_temperature_c": 78.0,
+        "fuel_pump_hz": 1.85,
+        "fan_rpm": 4200,
+        "runtime_s": 40,
+        "voltage_v": 12.5
+      }
+    },
+    {
+      "t": 80,
+      "set": {
+        "phase": "shutting_down",
+        "status_code": "4.0",
+        "internal_temperature_c": 21.0,
+        "heater_temperature_c": 70.0,
+        "fuel_pump_hz": 0.0,
+        "fan_rpm": 3000,
+        "runtime_s": 70
+      }
+    },
+    {
+      "t": 100,
+      "set": {
+        "phase": "off",
+        "status_code": "0.1",
+        "internal_temperature_c": 20.2,
+        "heater_temperature_c": 35.0,
+        "fuel_pump_hz": 0.0,
+        "fan_rpm": 0
+      }
+    },
+    {
+      "t": 110,
+      "set": {
+        "phase": "off",
+        "status_code": "0.1",
+        "error_code": 17,
+        "internal_temperature_c": 19.8,
+        "heater_temperature_c": 25.0
+      }
+    },
+    {
+      "t": 130,
+      "set": {
+        "phase": "running",
+        "status_code": "3.35",
+        "error_code": 0,
+        "ventilating": true,
+        "internal_temperature_c": 19.0,
+        "fan_rpm": 2400,
+        "power_level": 4
+      }
+    }
+  ]
+}

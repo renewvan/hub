@@ -115,3 +115,5 @@ mosquitto_pub -t renewvan/demo/enabled/set -m true    # on, for every client
 mosquitto_pub -t renewvan/demo/enabled/set -m false   # off
 mosquitto_sub -t renewvan/demo/enabled -v             # current shared state (retained)
 ```
+
+The demo `heater` is read-only like every Demo entity: it publishes `commands_enabled: false` and simulates no command topics. Demo ids can overlap real ids (ADR 0010), so no consumer may send a heater command (`renewvan/heater/<id>/set`) while Demo mode is on (ADR 0021).

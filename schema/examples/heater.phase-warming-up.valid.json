@@ -1,0 +1,8 @@
+{
+  "phase": "warming_up",
+  "status_code": "2.4",
+  "error_code": 0,
+  "internal_temperature_c": 18.5,
+  "voltage_v": 12.4,
+  "commands_enabled": false
+}

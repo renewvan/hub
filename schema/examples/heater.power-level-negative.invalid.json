@@ -1,0 +1,9 @@
+{
+  "phase": "off",
+  "status_code": "0.1",
+  "error_code": 0,
+  "internal_temperature_c": 18.5,
+  "voltage_v": 12.4,
+  "commands_enabled": false,
+  "power_level": -1
+}

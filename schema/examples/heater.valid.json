@@ -1,0 +1,18 @@
+{
+  "phase": "running",
+  "status_code": "3.0",
+  "error_code": 0,
+  "internal_temperature_c": 18.5,
+  "voltage_v": 12.4,
+  "commands_enabled": true,
+  "heater_temperature_c": 74.0,
+  "external_temperature_c": 9.5,
+  "setpoint_c": 21,
+  "power_level": 5,
+  "mode": "heater_temperature",
+  "runtime_s": 1820,
+  "fan_rpm": 4200,
+  "fuel_pump_hz": 1.85,
+  "driver": "heater",
+  "name": "Cabin heater"
+}
