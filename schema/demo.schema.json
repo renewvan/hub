@@ -12,6 +12,7 @@
       "enum": [
         "tank",
         "relay",
+        "heater",
         "battery",
         "solar",
         "charger",

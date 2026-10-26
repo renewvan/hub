@@ -32,6 +32,7 @@
           "battery",
           "charger",
           "gps",
+          "heater",
           "relay",
           "router",
           "solar",

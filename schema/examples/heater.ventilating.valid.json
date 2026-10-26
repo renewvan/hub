@@ -1,0 +1,11 @@
+{
+  "phase": "running",
+  "status_code": "3.35",
+  "error_code": 0,
+  "internal_temperature_c": 18.5,
+  "voltage_v": 12.4,
+  "commands_enabled": false,
+  "ventilating": true,
+  "power_level": 4,
+  "fan_rpm": 2400
+}

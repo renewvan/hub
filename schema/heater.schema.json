@@ -1,0 +1,117 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://renewvan.dev/schema/heater.schema.json",
+  "title": "heater",
+  "description": "v0.1 device-model entity: a fuel-fired space heater that reports its own operating phase and faults, one per heater, published under renewvan/heater/<id>/<property>, all retained. Named for what the hardware is, not the brand (ADR 0008); first source is an Autoterm AIR 2D read over UART by renewvan/driver-heater. Unknown is absent: a value the heater cannot supply is an empty retained payload (ADR 0008 'no value'), never null and never 0, so a missing sensor is not mistaken for a reading. `phase` is what the heater reports; `status_code` is the raw code beside it, so an unknown code still shows something. `ventilating` is true only for status 3.35 (fan only), otherwise absent. `commands_enabled` is published by the Driver and defaults to false: when false every command below is ignored. Command topics (unretained, strict JSON, not separate schema files, per ADR 0013): `renewvan/heater/<id>/set` carries true (start) or false (stop), never a toggle; `mode/set` carries a JSON string; `setpoint_c/set` an integer 1-30; `power_level/set` an integer 0-9; `ventilating/set` true or false; `clear_error/set` true only. Per phase: `set` true starts only from phase off with error_code 0, using the settings the heater reported; `ventilating/set` true starts fan-only (using the read power_level) only from phase off; settings writes are refused during shutting_down and while ventilating; stop is always accepted. `clear_error/set` rests on an unverified frame and never starts the heater. A rejected command produces no reply topic (the Driver logs a WARNING): a command is confirmed only when the retained field changes, so a consumer shows 'pending' and times out. A consumer treats the heater as unknown whenever the owning Driver's health is not `online` or is absent; after stale_after_s (5 s) without telemetry the Driver rejects commands and clears the live fields (empty retained payloads); an instance whose live fields are absent is unknown, not invalid. The Driver never stops or re-commands the heater by itself. UNVERIFIED on AIR 2D hardware (confidence Low-Medium): the phase mapping for every status code except 0.1 and 3.35, the 0x0D unblock and init sequence, live settings changes, and the setpoint_c bounds; to be revisited after a hardware pass. Logger view: static driver, name, commands_enabled; slow-changing mode, setpoint_c, power_level, phase, status_code, error_code; continuous the temperatures, voltage_v, fan_rpm, fuel_pump_hz, runtime_s. See docs/adr/0021-writable-heater-and-its-command-safety-rules.md.",
+  "type": "object",
+  "properties": {
+    "driver": {
+      "type": "string",
+      "pattern": "^(?!driver-)(?!demo$)[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+      "description": "Optional, retained. The key of the Driver publishing this instance: the <driver> segment of renewvan/<driver>/info, published as renewvan/heater/<id>/driver. Same slug rule as driver-info.schema.json. Identity field. A consumer must tolerate it being absent and then attributes the instance to every Driver whose info `publishes` lists 'heater'."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional, retained. The human label and the only label on the wire."
+    },
+    "phase": {
+      "type": "string",
+      "enum": ["off", "starting", "warming_up", "running", "shutting_down"],
+      "description": "What the heater reports it is doing. Mapping from status_code is unverified except 0.1 (off) and 3.35 (running)."
+    },
+    "status_code": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+$",
+      "description": "The heater's raw status as 'major.minor', e.g. \"3.35\". A string, never a number."
+    },
+    "error_code": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "0 means no fault. The contract promises only zero versus non-zero."
+    },
+    "internal_temperature_c": {
+      "type": "number",
+      "minimum": -55,
+      "maximum": 125,
+      "description": "Temperature at the heater's internal sensor, degrees Celsius."
+    },
+    "heater_temperature_c": {
+      "type": "number",
+      "minimum": -55,
+      "maximum": 240,
+      "description": "Optional. Heat exchanger temperature, degrees Celsius."
+    },
+    "external_temperature_c": {
+      "type": "number",
+      "minimum": -55,
+      "maximum": 125,
+      "description": "Optional. External probe temperature, degrees Celsius; absent when no probe is fitted (the 0x7F sentinel)."
+    },
+    "voltage_v": {
+      "type": "number",
+      "description": "Supply voltage, volts, to 1 decimal."
+    },
+    "setpoint_c": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 30,
+      "description": "Optional. Target temperature as read back from the heater, degrees Celsius. Bounds are unverified."
+    },
+    "power_level": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9,
+      "description": "Optional. Power level as read back from the heater."
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["heater_temperature", "external_temperature", "power"],
+      "description": "Optional. Control mode as read back from the heater. controller_temperature is excluded in v1."
+    },
+    "runtime_s": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Optional. Seconds since the current run started."
+    },
+    "fan_rpm": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Optional. Fan speed in rpm (the heater's byte x 60)."
+    },
+    "fuel_pump_hz": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Optional. Fuel pump frequency in Hz, to 2 decimals."
+    },
+    "ventilating": {
+      "type": "boolean",
+      "description": "Optional. True only while the heater is in fan-only mode (status 3.35); absent otherwise. When present, status_code must be \"3.35\" and phase \"running\"."
+    },
+    "commands_enabled": {
+      "type": "boolean",
+      "description": "Whether the Driver accepts commands. Defaults to false; see ADR 0021."
+    }
+  },
+  "required": [
+    "phase",
+    "status_code",
+    "error_code",
+    "internal_temperature_c",
+    "voltage_v",
+    "commands_enabled"
+  ],
+  "additionalProperties": false,
+  "dependencies": {
+    "ventilating": {
+      "properties": {
+        "status_code": {
+          "const": "3.35"
+        },
+        "phase": {
+          "const": "running"
+        }
+      }
+    }
+  }
+}

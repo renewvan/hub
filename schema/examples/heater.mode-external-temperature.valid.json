@@ -1,0 +1,11 @@
+{
+  "phase": "off",
+  "status_code": "0.1",
+  "error_code": 0,
+  "internal_temperature_c": 18.5,
+  "voltage_v": 12.4,
+  "commands_enabled": false,
+  "mode": "external_temperature",
+  "setpoint_c": 30,
+  "external_temperature_c": -55
+}
