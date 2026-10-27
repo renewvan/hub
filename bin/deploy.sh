@@ -56,7 +56,7 @@ ssh "${HOST}" bash -s <<REMOTE
 set -euo pipefail
 cd "${REMOTE_DIR}"
 
-mkdir -p /etc/renewvan/mosquitto /etc/renewvan/tank /etc/renewvan/gps /etc/renewvan/temperature/state /etc/renewvan/tilt/state /etc/renewvan/dashboard /etc/renewvan/wattcycle
+mkdir -p /etc/renewvan/mosquitto /etc/renewvan/tank /etc/renewvan/gps /etc/renewvan/temperature/state /etc/renewvan/tilt/state /etc/renewvan/dashboard /etc/renewvan/wattcycle /etc/renewvan/autoterm
 
 # plugin/kiosk: create venv (Bookworm externally-managed Python) and install deps
 python3 -m venv /opt/renewvan/venvs/kiosk
@@ -86,6 +86,7 @@ if [[ ! -f .env ]]; then
   sed -i 's|^TILT_CONFIG_PATH=.*|TILT_CONFIG_PATH=/etc/renewvan/tilt/config.ini|' .env
   sed -i 's|^TILT_STATE_PATH=.*|TILT_STATE_PATH=/etc/renewvan/tilt/state|' .env
   sed -i 's|^WATTCYCLE_CONFIG_PATH=.*|WATTCYCLE_CONFIG_PATH=/etc/renewvan/wattcycle/config.ini|' .env
+  sed -i 's|^AUTOTERM_CONFIG_PATH=.*|AUTOTERM_CONFIG_PATH=/etc/renewvan/autoterm/config.ini|' .env
   sed -i 's|^DASHBOARD_BASEMAP_PATH=.*|DASHBOARD_BASEMAP_PATH=/etc/renewvan/dashboard/basemap.pmtiles|' .env
   sed -i 's|^MOSQUITTO_CONFIG_PATH=.*|MOSQUITTO_CONFIG_PATH=/etc/renewvan/mosquitto|' .env
   echo
@@ -137,6 +138,8 @@ grep -q '^TILT_CONFIG_PATH=' .env || echo 'TILT_CONFIG_PATH=/etc/renewvan/tilt/c
 grep -q '^TILT_STATE_PATH=' .env || echo 'TILT_STATE_PATH=/etc/renewvan/tilt/state' >> .env
 # Same for driver-wattcycle's key.
 grep -q '^WATTCYCLE_CONFIG_PATH=' .env || echo 'WATTCYCLE_CONFIG_PATH=/etc/renewvan/wattcycle/config.ini' >> .env
+# Same for driver-autoterm's key.
+grep -q '^AUTOTERM_CONFIG_PATH=' .env || echo 'AUTOTERM_CONFIG_PATH=/etc/renewvan/autoterm/config.ini' >> .env
 # Same for the dashboard's Basemap path.
 grep -q '^DASHBOARD_BASEMAP_PATH=' .env || echo 'DASHBOARD_BASEMAP_PATH=/etc/renewvan/dashboard/basemap.pmtiles' >> .env
 
@@ -175,6 +178,11 @@ if [[ ! -f /etc/renewvan/gps/config.ini ]]; then
   cp docker/gps/config.ini.default /etc/renewvan/gps/config.ini
 fi
 
+if [[ ! -f /etc/renewvan/autoterm/config.ini ]]; then
+  echo "Seeding /etc/renewvan/autoterm/config.ini from the repo default (sets [mqtt] host = mosquitto; commands_enabled stays false until you set it)."
+  cp docker/autoterm/config.ini.default /etc/renewvan/autoterm/config.ini
+fi
+
 if [[ ! -f /etc/renewvan/temperature/config.ini ]]; then
   echo "Seeding /etc/renewvan/temperature/config.ini from the repo default (sets [mqtt] host = mosquitto and state_dir; map probes to ids/names there)."
   cp docker/temperature/config.ini.default /etc/renewvan/temperature/config.ini
@@ -209,6 +217,17 @@ else
   docker compose rm -sf driver-gps >/dev/null 2>&1 || true
 fi
 
+# driver-autoterm is behind the \`autoterm\` compose profile for the same reason as gps: its
+# \`devices:\` entry aborts the whole \`up -d\` when /dev/ttyAUTOTERM (the udev symlink from the
+# driver's README) does not exist. Enable it only when the adapter is set up.
+if [[ -e /dev/ttyAUTOTERM ]]; then
+  export COMPOSE_PROFILES="\${COMPOSE_PROFILES:+\${COMPOSE_PROFILES},}autoterm"
+  echo "==> Heater device /dev/ttyAUTOTERM present: enabling the autoterm profile"
+else
+  echo "==> No /dev/ttyAUTOTERM: skipping driver-autoterm (install the udev rule and re-run deploy to enable it)"
+  docker compose rm -sf driver-autoterm >/dev/null 2>&1 || true
+fi
+
 # driver-venus is behind the \`venus\` compose profile: it needs VENUS_MQTT_HOST and
 # VENUS_PORTAL_ID (a hard lookup, no default), so on a van with no Venus OS device
 # it would crash-loop. Enable it only when .env names a Venus device; any
@@ -232,7 +251,7 @@ else
   docker compose rm -sf driver-wattcycle >/dev/null 2>&1 || true
 fi
 
-# caddy's compose entry requires DASHBOARD_HOST (`${DASHBOARD_HOST:?}`). Unset, `up -d` aborts for
+# caddy's compose entry requires DASHBOARD_HOST (\${DASHBOARD_HOST:?}). Unset, \`up -d\` aborts for
 # every service, not just caddy, so refuse before pulling rather than half-deploy.
 if ! grep -Eq '^DASHBOARD_HOST=.+' .env; then
   echo "ERROR: DASHBOARD_HOST in ${REMOTE_DIR}/.env is empty: set it to the Pi's LAN IP (hostname -I) and re-run." >&2

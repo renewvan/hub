@@ -1,8 +1,8 @@
 {
-  "driver": "heater",
+  "driver": "autoterm",
   "product": "Diesel heater driver",
   "source": "Autoterm AIR 2D over UART",
   "publishes": ["heater"],
   "manufacturer": "renewvan",
-  "homepage": "https://github.com/renewvan/driver-heater"
+  "homepage": "https://github.com/renewvan/driver-autoterm"
 }

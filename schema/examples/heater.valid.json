@@ -13,6 +13,6 @@
   "runtime_s": 1820,
   "fan_rpm": 4200,
   "fuel_pump_hz": 1.85,
-  "driver": "heater",
+  "driver": "autoterm",
   "name": "Cabin heater"
 }

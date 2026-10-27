@@ -4,7 +4,7 @@
   "description": "Heater cycling through every phase, with an optional-absent step, an error step and a ventilating step",
   "loop_s": 180,
   "initial": {
-    "driver": "heater",
+    "driver": "autoterm",
     "name": "Cabin heater",
     "phase": "off",
     "status_code": "0.1",
