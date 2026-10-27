@@ -117,6 +117,36 @@ services:
     volumes:
       - ${GPS_CONFIG_PATH:-./config/gps/config.ini}:/app/config.ini:ro
 
+  # Native MQTT heater driver: an Autoterm AIR 2D diesel heater read over a
+  # 9600 8N1 UART through a USB-serial adapter -- see driver-autoterm's own
+  # README's "Topics published" section and
+  # docs/adr/0021-writable-heater-and-its-command-safety-rules.md. Commands
+  # (start/stop/setpoint) are off until `commands_enabled = true` in the
+  # bind-mounted config.ini: the broker is anonymous.
+  #
+  # Behind the `autoterm` profile: with a `devices:` entry, a missing
+  # /dev/ttyAUTOTERM (the udev symlink from driver-autoterm's README) makes
+  # Docker refuse to create the container and aborts the whole
+  # `docker compose up -d`. bin/deploy.sh enables the profile only when the
+  # device exists. For a manual `docker compose up -d` on a Pi with the
+  # adapter, use `docker compose --profile autoterm up -d`.
+  driver-autoterm:
+    profiles: ["autoterm"]
+    image: ghcr.io/renewvan/driver-autoterm:v0.1.0
+    container_name: renewvan-autoterm
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    devices:
+      - "/dev/ttyAUTOTERM:/dev/ttyAUTOTERM"
+    environment:
+      MQTT_HOST: ${RENEWVAN_HOST:-mosquitto}
+      MQTT_PORT: ${RENEWVAN_PORT:-1883}
+      MQTT_USERNAME: ${RENEWVAN_USERNAME:-}
+      MQTT_PASSWORD: ${RENEWVAN_PASSWORD:-}
+    volumes:
+      - ${AUTOTERM_CONFIG_PATH:-./config/autoterm/config.ini}:/app/config.ini:ro
+
   # RUT-360 Data to Server MQTT -> renewvan-bus router remap. Single
   # connection to this compose's own bus: subscribes the router's raw
   # feed on renewvan/router/<id>/raw, republishes normalized retained
@@ -287,7 +317,7 @@ services:
   # not a polling backend. See
   # .scratch/renewvan-hub-v0-build/issues/06-dashboard-web-app.md.
   dashboard:
-    image: ghcr.io/renewvan/dashboard:v0.11.0
+    image: ghcr.io/renewvan/dashboard:v0.13.0
     container_name: renewvan-dashboard
     restart: unless-stopped
     # Loopback only: the kiosk browser (renewvan-kiosk-browser.sh, KIOSK_URL=http://localhost) reads

@@ -1,0 +1,13 @@
+[mqtt]
+host = mosquitto
+
+[device]
+; serial_device defaults to /dev/ttyAUTOTERM in the image's config.default.ini:
+; a udev symlink to the USB-serial adapter wired to the heater (see
+; driver-autoterm's README, "Installing"). Compose passes that symlink through.
+; serial_device = /dev/ttyAUTOTERM
+;
+; WARNING: the broker accepts anonymous clients. With this true, anyone who can
+; reach port 1883 can start and stop the heater. Keep it false unless the broker
+; is only reachable from the van's own network.
+commands_enabled = false
