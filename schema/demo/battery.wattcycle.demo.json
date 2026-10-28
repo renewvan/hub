@@ -1,7 +1,7 @@
 {
   "entity": "battery",
   "id": "wattcycle",
-  "description": "The same house battery bank as `house`, seen by a second source: the WattCycle 314Ah BMS read over BLE by driver-wattcycle (the Venus SmartShunt is `house`). Two sources for one bank: the Primary battery setting picks which instance is the headline. Synthetic, not captured: values sit slightly off the shunt's (a BMS and a shunt never agree exactly) and follow the same load steps as `house`. No time-to-go: a BMS does not report it. Carries the BMS's per-cell data (4 cells, 4 probes): cell voltages sag under the load steps, one cell balances at the end of the loop, and a brief `cell_undervoltage` protection shows at the heaviest load (values synthetic).",
+  "description": "The same house battery bank as `house`, seen by a second source: the WattCycle 314Ah BMS read over BLE by driver-wattcycle (the Venus SmartShunt is `house`). Two sources for one bank: the Primary battery setting picks which instance is the headline. Synthetic, not captured: values sit slightly off the shunt's (a BMS and a shunt never agree exactly) and follow the same load steps as `house`. No time-to-go: a BMS does not report it. Carries the BMS's per-cell data (4 cells, 4 probes): cell voltages sag under the load steps, one cell balances at the end of the loop, a brief `cell_undervoltage` protection (danger) shows at the heaviest load, and later a brief `cell_imbalance` protection (advisory) shows while a cell balances; the two windows never overlap, so the dashboard's amber and danger BMS alerts are seen one after the other (values synthetic).",
   "loop_s": 120,
   "initial": {
     "driver": "wattcycle",
@@ -64,6 +64,16 @@
         "cell_balancing": [false, false, false, true],
         "protections": [],
         "temperatures_c": [22.8, 22.4, 22.5, 23.2]
+      }
+    },
+    {
+      "t": 105,
+      "set": {
+        "cell_voltages_v": [3.301, 3.304, 3.302, 3.238],
+        "cell_voltage_max_v": 3.304,
+        "cell_voltage_min_v": 3.238,
+        "cell_voltage_delta_v": 0.066,
+        "protections": ["cell_imbalance"]
       }
     }
   ]
