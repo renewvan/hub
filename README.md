@@ -4,10 +4,7 @@ Open-source, open-hardware campervan control hub for Raspberry Pi, built on MQTT
 
 ## What is this?
 
-There's no shortage of ways to monitor a campervan's battery, tanks, and
-
-appliances — but every option forces a trade-off. Victron's Venus OS is
-
+There's no shortage of ways to monitor a campervan's battery, tanks, and appliances — but every option forces a trade-off. Victron's Venus OS is
 mature but centered on Victron's own hardware. Home Assistant is fully
 
 open but has no van-domain packaging out of the box: no tank calibration
@@ -18,7 +15,7 @@ interlocks. Existing DIY platforms tend to drift toward their own
 
 commercial hardware over time.
 
-deseavan/hub takes a different approach: an MQTT broker as the single
+renewvan/hub takes a different approach: an MQTT broker as the single
 
 source of truth, a unified device model for van-specific entities
 
