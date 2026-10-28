@@ -32,6 +32,16 @@
       "type": "number",
       "description": "Signed: positive = charging, negative = discharging."
     },
+    "capacity_ah": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Optional: nominal/design capacity of the bank in amp-hours, as reported by the source (a BMS reports it from its pack data; a plain shunt does not). Publish the source's own value, not a computed one."
+    },
+    "remaining_ah": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Optional: remaining capacity of the bank in amp-hours, as reported by the source's own fuel gauge (coulomb counting). Pairs with capacity_ah: consumers can cross-check soc_pct against remaining_ah / capacity_ah."
+    },
     "temperature_c": {
       "type": "number",
       "description": "Optional: only sources with a temperature probe publish it."

@@ -10,6 +10,8 @@
     "voltage_v": 13.21,
     "current_a": -7.6,
     "power_w": -100.4,
+    "capacity_ah": 314.0,
+    "remaining_ah": 295.16,
     "temperature_c": 22.5
   },
   "timeline": [
