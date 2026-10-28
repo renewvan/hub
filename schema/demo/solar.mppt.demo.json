@@ -1,19 +1,19 @@
 {
   "entity": "solar",
   "id": "mppt",
-  "description": "Solar charge controller. REAL (Venus capture, MPPT at first light): power_w, battery_voltage_v, battery_current_a, pv_voltage_v, yield_today_wh, charge_state. ADDED, not captured: pv_current_a, yield_history_wh (14 days, newest first, null = no data). The timeline is synthetic motion.",
+  "description": "Solar charge controller. REAL (Venus capture, MPPT at first light): power_w, battery_voltage_v, battery_current_a, pv_voltage_v, charge_state. ADDED, not captured: pv_current_a, yield_today_wh (a mid-morning 1.84 kWh so today's bar in the history chart is visible; index 0 of the history equals it) and yield_history_wh (14 days, newest first, null = no data). The timeline is synthetic motion.",
   "loop_s": 120,
   "initial": {
     "driver": "venus",
     "battery_current_a": 0.5,
     "battery_voltage_v": 13.19,
-    "yield_today_wh": 0.0,
+    "yield_today_wh": 1840.0,
     "pv_voltage_v": 46.7,
     "charge_state": "bulk",
     "power_w": 7.0,
     "pv_current_a": 0.15,
     "yield_history_wh": [
-      0,
+      1840,
       2980,
       3410,
       1220,
@@ -45,8 +45,24 @@
         "power_w": 96.0,
         "battery_current_a": 7.3,
         "pv_voltage_v": 47.9,
-        "yield_today_wh": 1.0,
-        "pv_current_a": 2.06
+        "yield_today_wh": 1841.0,
+        "pv_current_a": 2.06,
+        "yield_history_wh": [
+          1841,
+          2980,
+          3410,
+          1220,
+          null,
+          2640,
+          3100,
+          2860,
+          3250,
+          940,
+          2110,
+          3380,
+          1760,
+          2520
+        ]
       }
     },
     {
