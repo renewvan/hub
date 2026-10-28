@@ -76,7 +76,7 @@ services:
   # writes four-segment entity topics; demo ones have five). Nothing to start by hand. See
   # docs/demo-mode.md.
   driver-demo:
-    image: ghcr.io/renewvan/driver-demo:v0.7.2
+    image: ghcr.io/renewvan/driver-demo:v0.8.0
     container_name: renewvan-demo
     restart: unless-stopped
     depends_on:
