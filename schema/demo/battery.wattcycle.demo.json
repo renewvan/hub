@@ -1,7 +1,7 @@
 {
   "entity": "battery",
   "id": "wattcycle",
-  "description": "The same house battery bank as `house`, seen by a second source: the WattCycle 314Ah BMS read over BLE by driver-wattcycle (the Venus SmartShunt is `house`). Two sources for one bank: the Primary battery setting picks which instance is the headline. Synthetic, not captured: values sit slightly off the shunt's (a BMS and a shunt never agree exactly) and follow the same load steps as `house`. No time-to-go: a BMS does not report it.",
+  "description": "The same house battery bank as `house`, seen by a second source: the WattCycle 314Ah BMS read over BLE by driver-wattcycle (the Venus SmartShunt is `house`). Two sources for one bank: the Primary battery setting picks which instance is the headline. Synthetic, not captured: values sit slightly off the shunt's (a BMS and a shunt never agree exactly) and follow the same load steps as `house`. No time-to-go: a BMS does not report it. Carries the BMS's per-cell data (4 cells, 4 probes): cell voltages sag under the load steps, one cell balances at the end of the loop, and a brief `cell_undervoltage` protection shows at the heaviest load (values synthetic).",
   "loop_s": 120,
   "initial": {
     "driver": "wattcycle",
@@ -12,7 +12,16 @@
     "power_w": -100.4,
     "capacity_ah": 314.0,
     "remaining_ah": 295.16,
-    "temperature_c": 22.5
+    "temperature_c": 22.5,
+    "cell_voltages_v": [3.303, 3.305, 3.304, 3.302],
+    "cell_voltage_max_v": 3.305,
+    "cell_voltage_min_v": 3.302,
+    "cell_voltage_delta_v": 0.003,
+    "cell_balancing": [false, false, false, false],
+    "temperatures_c": [22.5, 22.1, 22.3, 22.9],
+    "allow_charge": true,
+    "allow_discharge": true,
+    "protections": []
   },
   "timeline": [
     {
@@ -20,7 +29,11 @@
       "set": {
         "current_a": -12.1,
         "power_w": -159.0,
-        "voltage_v": 13.14
+        "voltage_v": 13.14,
+        "cell_voltages_v": [3.285, 3.288, 3.286, 3.284],
+        "cell_voltage_max_v": 3.288,
+        "cell_voltage_min_v": 3.284,
+        "cell_voltage_delta_v": 0.004
       }
     },
     {
@@ -29,7 +42,13 @@
         "current_a": -30.2,
         "power_w": -394.7,
         "voltage_v": 13.07,
-        "soc_pct": 93.9
+        "soc_pct": 93.9,
+        "cell_voltages_v": [3.262, 3.268, 3.264, 3.25],
+        "cell_voltage_max_v": 3.268,
+        "cell_voltage_min_v": 3.25,
+        "cell_voltage_delta_v": 0.018,
+        "temperatures_c": [23.4, 22.9, 23.0, 24.1],
+        "protections": ["cell_undervoltage"]
       }
     },
     {
@@ -37,7 +56,14 @@
       "set": {
         "current_a": -5.8,
         "power_w": -76.4,
-        "voltage_v": 13.17
+        "voltage_v": 13.17,
+        "cell_voltages_v": [3.298, 3.301, 3.3, 3.296],
+        "cell_voltage_max_v": 3.301,
+        "cell_voltage_min_v": 3.296,
+        "cell_voltage_delta_v": 0.005,
+        "cell_balancing": [false, false, false, true],
+        "protections": [],
+        "temperatures_c": [22.8, 22.4, 22.5, 23.2]
       }
     }
   ]
