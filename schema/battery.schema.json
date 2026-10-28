@@ -63,7 +63,7 @@
     "cell_voltage_max_v": {
       "type": "number",
       "minimum": 0,
-      "description": "Optional: highest cell voltage in volts. A driver that derives it computes it over the non-null cells of cell_voltages_v (and omits it with fewer than 2), and then publishes cell_voltage_max_v, cell_voltage_min_v and cell_voltage_delta_v together, in the same cycle as cell_voltages_v. A source that reports only some of the three (Venus) publishes what it has. Absent when cell_voltages_v is absent."
+      "description": "Optional: highest cell voltage in volts. A driver that derives it computes it over the non-null cells of cell_voltages_v (and omits it with fewer than 2), and then publishes cell_voltage_max_v, cell_voltage_min_v and cell_voltage_delta_v together, in the same cycle as cell_voltages_v. A source that reports only some of the three (Venus) publishes what it has, and may publish them without cell_voltages_v (a BMS that reports cell extremes but no per-cell array). A driver that derives them omits them when cell_voltages_v is absent."
     },
     "cell_voltage_min_v": {
       "type": "number",
