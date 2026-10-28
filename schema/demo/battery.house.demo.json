@@ -5,7 +5,7 @@
   "loop_s": 120,
   "initial": {
     "driver": "venus",
-    "name": "House battery",
+    "name": "Leisure battery",
     "soc_pct": 95.5,
     "voltage_v": 13.18,
     "current_a": -8.0,

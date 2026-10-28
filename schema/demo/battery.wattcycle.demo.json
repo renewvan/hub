@@ -1,7 +1,7 @@
 {
   "entity": "battery",
   "id": "wattcycle",
-  "description": "The same house battery bank as `house`, seen by a second source: the WattCycle 314Ah BMS read over BLE by driver-wattcycle (the Venus SmartShunt is `house`). Two sources for one bank: the Primary battery setting picks which instance is the headline. Synthetic, not captured: values sit slightly off the shunt's (a BMS and a shunt never agree exactly) and follow the same load steps as `house`. No time-to-go: a BMS does not report it. Carries the BMS's per-cell data (4 cells, 4 probes): cell voltages sag under the load steps, one cell balances at the end of the loop, a brief `cell_undervoltage` protection (danger) shows at the heaviest load, and later a brief `cell_imbalance` protection (advisory) shows while a cell balances; the two windows never overlap, so the dashboard's amber and danger BMS alerts are seen one after the other (values synthetic).",
+  "description": "The same house battery bank as `house`, seen by a second source: the WattCycle 314Ah BMS read over BLE by driver-wattcycle (the Venus SmartShunt is `house`). Two sources for one bank: the Primary battery setting picks which instance is the headline. Synthetic, not captured: values sit slightly off the shunt's (a BMS and a shunt never agree exactly) and follow the same load steps as `house`. Like driver-wattcycle it publishes `charge_state: discharging` and a derived `time_to_go_s` (`remaining_ah` over the discharge current). Carries the BMS's per-cell data (4 cells, 4 probes): cell voltages sag under the load steps, a cell actively balances (`cell_balancing`) from the end of the load steps until the loop restarts, a brief `cell_undervoltage` protection (danger) shows at the heaviest load, and later a brief `cell_imbalance` protection (advisory) shows while a cell balances; the two windows never overlap, so the dashboard's amber and danger BMS alerts are seen one after the other (values synthetic).",
   "loop_s": 120,
   "initial": {
     "driver": "wattcycle",
@@ -19,6 +19,8 @@
     "cell_voltage_delta_v": 0.003,
     "cell_balancing": [false, false, false, false],
     "temperatures_c": [22.5, 22.1, 22.3, 22.9],
+    "charge_state": "discharging",
+    "time_to_go_s": 139813,
     "allow_charge": true,
     "allow_discharge": true,
     "protections": []
@@ -27,6 +29,7 @@
     {
       "t": 30,
       "set": {
+        "time_to_go_s": 87816,
         "current_a": -12.1,
         "power_w": -159.0,
         "voltage_v": 13.14,
@@ -39,6 +42,7 @@
     {
       "t": 60,
       "set": {
+        "time_to_go_s": 35185,
         "current_a": -30.2,
         "power_w": -394.7,
         "voltage_v": 13.07,
@@ -54,6 +58,7 @@
     {
       "t": 90,
       "set": {
+        "time_to_go_s": 183203,
         "current_a": -5.8,
         "power_w": -76.4,
         "voltage_v": 13.17,
