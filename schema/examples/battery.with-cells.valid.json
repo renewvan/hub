@@ -1,0 +1,19 @@
+{
+  "soc_pct": 94,
+  "voltage_v": 13.33,
+  "current_a": -7.6,
+  "power_w": -101.3,
+  "driver": "wattcycle",
+  "name": "WattCycle 314Ah",
+  "capacity_ah": 314.0,
+  "temperature_c": 13.85,
+  "cell_voltages_v": [3.331, 3.334, 3.333, 3.333],
+  "cell_voltage_max_v": 3.334,
+  "cell_voltage_min_v": 3.331,
+  "cell_voltage_delta_v": 0.003,
+  "cell_balancing": [false, false, false, false],
+  "temperatures_c": [13.85, 13.65, 13.75, 14.15],
+  "allow_charge": true,
+  "allow_discharge": true,
+  "protections": []
+}

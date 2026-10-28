@@ -1,0 +1,7 @@
+{
+  "soc_pct": 94,
+  "voltage_v": 13.33,
+  "current_a": -7.6,
+  "power_w": -101.3,
+  "protections": ["cell_overvoltage", "fire"]
+}

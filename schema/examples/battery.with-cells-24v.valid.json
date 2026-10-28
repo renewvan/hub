@@ -1,0 +1,10 @@
+{
+  "soc_pct": 94,
+  "voltage_v": 13.33,
+  "current_a": -7.6,
+  "power_w": -101.3,
+  "cell_voltages_v": [3.331, 3.334, 3.333, 3.333, 3.329, 3.335, 3.332, 3.333],
+  "cell_balancing": [false, false, true, false, false, false, false, false],
+  "temperatures_c": [21.5, 21.0, null, 22.0],
+  "protections": ["cell_overvoltage", "charge_overtemperature"]
+}

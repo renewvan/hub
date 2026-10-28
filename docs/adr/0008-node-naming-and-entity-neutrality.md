@@ -26,7 +26,7 @@ Concretely, this change:
 
 - Node name = source (protocol or brand). Entity name = what it is, never a brand. Avoid `node-<entity>` names (`node-charger`, `node-booster`): they read like a vendor-neutral claim the node can't keep.
 - One source per entity id. Two nodes must not publish the same `renewvan/<entity>/<id>/...`; the id is derived from the source (for `node-venus`, the Venus device instance).
-- A shunt and a BMS on the same physical battery are two different views, not duplicates. When a BMS node exists it publishes its own `bms` entity (cell voltages, cell temperatures, protection flags) linked to the `battery` by id, rather than overwriting the shunt's `battery`. Fusing the two into one canonical SoC is a later, separate service.
+- A shunt and a BMS on the same physical battery are two different views, not duplicates. When a BMS node exists it publishes its own `bms` entity (cell voltages, cell temperatures, protection flags) linked to the `battery` by id, rather than overwriting the shunt's `battery`. _(Superseded in part by ADR 0022: a BMS's per-cell data is published as optional properties on its own `battery` instance, not a separate `bms` entity. The two-views-not-fused rule stands.)_ Fusing the two into one canonical SoC is a later, separate service.
 
 ## Why this is an ADR
 

@@ -1,0 +1,15 @@
+{
+  "soc_pct": 94,
+  "voltage_v": 13.33,
+  "current_a": -7.6,
+  "power_w": -101.3,
+  "driver": "venus",
+  "allow_charge": true,
+  "allow_discharge": false,
+  "protections": ["undertemperature", "other"],
+  "charge_voltage_limit_v": 14.2,
+  "charge_current_limit_a": 100,
+  "discharge_current_limit_a": 150,
+  "cell_voltage_max_v": 3.36,
+  "cell_voltage_min_v": 3.31
+}
