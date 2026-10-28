@@ -254,7 +254,7 @@ services:
   # `docker compose --profile venus up -d`.
   driver-venus:
     profiles: ["venus"]
-    image: ghcr.io/renewvan/driver-venus:v0.6.0
+    image: ghcr.io/renewvan/driver-venus:v0.7.0
     container_name: renewvan-venus
     restart: unless-stopped
     depends_on:
@@ -282,7 +282,7 @@ services:
   # `docker compose up -d` use `docker compose --profile wattcycle up -d`.
   driver-wattcycle:
     profiles: ["wattcycle"]
-    image: ghcr.io/renewvan/driver-wattcycle:v0.2.0
+    image: ghcr.io/renewvan/driver-wattcycle:v0.4.0
     container_name: renewvan-wattcycle
     restart: unless-stopped
     depends_on:
