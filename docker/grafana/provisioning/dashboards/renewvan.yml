@@ -1,0 +1,15 @@
+apiVersion: 1
+
+# Loads every dashboard JSON under /etc/grafana/dashboards (docker/grafana/dashboards
+# in this repo) into the "renewvan" folder. Edit the JSON, not the UI: see
+# docs/reference.md, "Grafana".
+providers:
+  - name: renewvan
+    orgId: 1
+    folder: renewvan
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/dashboards
