@@ -10,9 +10,9 @@
 #
 # `docker compose pull && docker compose up -d` from a copy of
 # `.env.example` (as `.env`) is the whole install. Data persists in
-# named Docker volumes — for a host-path/bind-mount deployment (e.g.
-# TrueNAS's Custom App "Install via YAML"), see your own deployment's
-# compose override instead; this file is the plain-Compose-host path.
+# named Docker volumes. This file is the plain-Compose-host path; a
+# host needing bind mounts keeps its own override outside this repo.
+# Full operator reference: docs/reference.md.
 #
 # MQTT:      <host>:1883 (plain), <host>:9001 (websockets)
 # InfluxDB:  http://<host>:8086 (org=renewvan, bucket=renewvan)
