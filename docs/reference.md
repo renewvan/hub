@@ -105,7 +105,9 @@ Grafana is for history: charts over what the `logger` wrote to InfluxDB. It is s
 
 **Datasource.** `InfluxDB` (Flux, `http://influxdb:8086`, org and bucket `renewvan`) is provisioned from `docker/grafana/provisioning/datasources/influxdb.yml`. Its token is `INFLUXDB_ADMIN_TOKEN`, passed to the container by compose, so nothing secret is in git. Check it under Connections → Data sources → InfluxDB → Save & test. If you change the token in `.env`, re-run `bin/deploy.sh`, which restarts Grafana.
 
-**Dashboard.** "Van overview" (folder `renewvan`, default range last 6 hours, refresh 30 s) comes from `docker/grafana/dashboards/van-overview.json`: current tank and battery gauges and solar power, then time series for tank levels, battery state of charge, battery voltage, solar power and battery temperature. It only charts what the logger stores: `tank`, `relay`, `battery`, `solar`, `charger` and `router` measurements, tagged by `id`. Temperature probes and tilt are not logged yet, so there is no panel for them.
+**Dashboard.** "Van overview" is the Grafana home page (folder `renewvan`, default range last 6 hours, refresh 30 s) comes from `docker/grafana/dashboards/van-overview.json`: current tank and battery gauges and solar power, then time series for tank levels, battery state of charge, battery voltage, solar power and battery temperature. It only charts what the logger stores: `tank`, `relay`, `battery`, `solar`, `charger` and `router` measurements, tagged by `id`. Temperature probes and tilt are not logged yet, so there is no panel for them.
+
+The home page is set by `GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH` in `docker-compose.yml`. A home dashboard chosen in the Grafana UI (your profile or the organisation preferences) takes precedence over it; clear that choice to get Van overview back.
 
 **Add a panel.** Provisioned dashboards are read-only in the UI, so changes go through the file:
 
