@@ -105,7 +105,7 @@ Grafana is for history: charts over what the `logger` wrote to InfluxDB. It is s
 
 **Datasource.** `InfluxDB` (Flux, `http://influxdb:8086`, org and bucket `renewvan`) is provisioned from `docker/grafana/provisioning/datasources/influxdb.yml`. Its token is `INFLUXDB_ADMIN_TOKEN`, passed to the container by compose, so nothing secret is in git. Check it under Connections → Data sources → InfluxDB → Save & test. If you change the token in `.env`, re-run `bin/deploy.sh`, which restarts Grafana.
 
-**Dashboard.** "Van overview" (folder `renewvan`, default range last 6 hours, refresh 30 s) comes from `docker/grafana/dashboards/van-overview.json`: current tank and battery gauges and solar power, a loads block (below), then time series for tank levels, battery state of charge, battery voltage, solar power and battery temperature. It only charts what the logger stores: `tank`, `relay`, `battery`, `solar`, `charger` and `router` measurements, tagged by `id`. Temperature probes and tilt are not logged yet, so there is no panel for them.
+**Dashboard.** "Van overview", the Grafana home page (folder `renewvan`, default range last 6 hours, refresh 30 s) comes from `docker/grafana/dashboards/van-overview.json`: current tank and battery gauges and solar power, a loads block (below), then time series for tank levels, battery state of charge, battery voltage, solar power and battery temperature. It only charts what the logger stores: `tank`, `relay`, `battery`, `solar`, `charger` and `router` measurements, tagged by `id`. Temperature probes and tilt are not logged yet, so there is no panel for them.
 
 **Loads (power consumption).** No entity reports consumption, so the dashboard derives it from the energy balance: loads = solar power + charger power − battery net power (`battery.power_w` is positive while charging). It gives "Power balance" (solar, battery and loads over time), "Loads now", "Energy used in range", "Energy used per hour" in Wh, and a "Relay state" timeline of when each relay was on. Things to know:
 
@@ -113,6 +113,8 @@ Grafana is for history: charts over what the `logger` wrote to InfluxDB. It is s
 - The loads figure is an estimate. It includes inverter and conversion losses and misses any power source the logger does not store, such as an alternator charger with no `charger` entity.
 - Relay state is the latched command, not measured current ([CONTEXT.md](../CONTEXT.md), Relay). The timeline, like the tank series, is empty when no relay changed within the selected range.
 - To see consumption per circuit you need a current sensor per load; the hub has no such entity yet.
+
+The home page is set by `GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH` in `docker-compose.yml`. A home dashboard chosen in the Grafana UI (your profile or the organisation preferences) takes precedence over it; clear that choice to get Van overview back.
 
 **Add a panel.** Provisioned dashboards are read-only in the UI, so changes go through the file:
 
