@@ -12,7 +12,23 @@
     "to": "now"
   },
   "templating": {
-    "list": []
+    "list": [
+      {
+        "name": "battery",
+        "label": "Battery",
+        "type": "query",
+        "datasource": {
+          "type": "influxdb",
+          "uid": "renewvan-influxdb"
+        },
+        "query": "import \"influxdata/influxdb/schema\"\n\nschema.tagValues(bucket: \"renewvan\", tag: \"id\", predicate: (r) => r._measurement == \"battery\", start: -30d)",
+        "refresh": 1,
+        "includeAll": false,
+        "multi": false,
+        "sort": 1,
+        "description": "Battery source used for the derived loads. Pick the one that shares a bank with the solar controller."
+      }
+    ]
   },
   "annotations": {
     "list": []
@@ -197,6 +213,326 @@
       }
     },
     {
+      "id": 9,
+      "title": "Power balance",
+      "description": "Loads = solar + charger - battery net power. Derived, not measured: it includes inverter and conversion losses, and misses any source the logger does not store.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "renewvan-influxdb"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 16,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "renewvan-influxdb"
+          },
+          "query": "from(bucket: \"renewvan\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"solar\" and r._field == \"power_w\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> group(columns: [\"_time\"])\n  |> sum()\n  |> group()\n\n  |> set(key: \"id\", value: \"Solar in\")\n  |> group(columns: [\"id\"])"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "renewvan-influxdb"
+          },
+          "query": "from(bucket: \"renewvan\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"battery\" and r._field == \"power_w\" and r.id == \"$battery\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> group(columns: [\"_time\"])\n  |> sum()\n  |> group()\n\n  |> set(key: \"id\", value: \"Battery (+ charging)\")\n  |> group(columns: [\"id\"])"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "renewvan-influxdb"
+          },
+          "query": "from(bucket: \"renewvan\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._field == \"power_w\" and (r._measurement == \"solar\" or r._measurement == \"charger\" or (r._measurement == \"battery\" and r.id == \"$battery\")))\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> map(fn: (r) => ({r with _value: if r._measurement == \"battery\" then -r._value else r._value}))\n  |> group(columns: [\"_time\"])\n  |> sum()\n  |> group()\n  |> sort(columns: [\"_time\"])\n  |> map(fn: (r) => ({_time: r._time, _value: if r._value < 0.0 then 0.0 else r._value}))\n  |> set(key: \"id\", value: \"Loads (derived)\")\n  |> group(columns: [\"id\"])"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "watt",
+          "displayName": "${__field.labels.id}",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "title": "Loads now",
+      "description": "Latest derived load over the last 10 minutes.",
+      "type": "stat",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "renewvan-influxdb"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 6,
+        "w": 8,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "renewvan-influxdb"
+          },
+          "query": "from(bucket: \"renewvan\")\n  |> range(start: -10m)\n  |> filter(fn: (r) => r._field == \"power_w\" and (r._measurement == \"solar\" or r._measurement == \"charger\" or (r._measurement == \"battery\" and r.id == \"$battery\")))\n  |> aggregateWindow(every: 1m, fn: mean, createEmpty: false)\n  |> map(fn: (r) => ({r with _value: if r._measurement == \"battery\" then -r._value else r._value}))\n  |> group(columns: [\"_time\"])\n  |> sum()\n  |> group()\n  |> sort(columns: [\"_time\"])\n  |> map(fn: (r) => ({_time: r._time, _value: if r._value < 0.0 then 0.0 else r._value}))\n  |> last()"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "watt",
+          "displayName": "${__field.labels.id}",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      }
+    },
+    {
+      "id": 11,
+      "title": "Energy used in range",
+      "description": "Derived load integrated over the dashboard time range (5-minute steps).",
+      "type": "stat",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "renewvan-influxdb"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 10,
+        "w": 8,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "renewvan-influxdb"
+          },
+          "query": "from(bucket: \"renewvan\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._field == \"power_w\" and (r._measurement == \"solar\" or r._measurement == \"charger\" or (r._measurement == \"battery\" and r.id == \"$battery\")))\n  |> aggregateWindow(every: 5m, fn: mean, createEmpty: false)\n  |> map(fn: (r) => ({r with _value: if r._measurement == \"battery\" then -r._value else r._value}))\n  |> group(columns: [\"_time\"])\n  |> sum()\n  |> group()\n  |> sort(columns: [\"_time\"])\n  |> map(fn: (r) => ({_time: r._time, _value: if r._value < 0.0 then 0.0 else r._value}))\n  |> map(fn: (r) => ({r with _value: r._value * 5.0 / 60.0}))\n  |> sum()"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "watth",
+          "displayName": "${__field.labels.id}",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      }
+    },
+    {
+      "id": 12,
+      "title": "Energy used per hour",
+      "description": "Mean derived load per hour; watts averaged over one hour equal watt-hours.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "renewvan-influxdb"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 15,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "renewvan-influxdb"
+          },
+          "query": "from(bucket: \"renewvan\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._field == \"power_w\" and (r._measurement == \"solar\" or r._measurement == \"charger\" or (r._measurement == \"battery\" and r.id == \"$battery\")))\n  |> aggregateWindow(every: 5m, fn: mean, createEmpty: false)\n  |> map(fn: (r) => ({r with _value: if r._measurement == \"battery\" then -r._value else r._value}))\n  |> group(columns: [\"_time\"])\n  |> sum()\n  |> group()\n  |> sort(columns: [\"_time\"])\n  |> map(fn: (r) => ({_time: r._time, _value: if r._value < 0.0 then 0.0 else r._value}))\n  |> aggregateWindow(every: 1h, fn: mean, createEmpty: false)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "watth",
+          "displayName": "${__field.labels.id}",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 60,
+            "showPoints": "never",
+            "spanNulls": true,
+            "drawStyle": "bars"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 13,
+      "title": "Relay state",
+      "description": "When each relay was commanded on. Latched state, not measured current: see CONTEXT.md.",
+      "type": "state-timeline",
+      "datasource": {
+        "type": "influxdb",
+        "uid": "renewvan-influxdb"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 15,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "renewvan-influxdb"
+          },
+          "query": "from(bucket: \"renewvan\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"relay\" and r._field == \"state\")\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\n  |> map(fn: (r) => ({r with _value: if r._value then 1 else 0}))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "displayName": "${__field.labels.id}",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "off",
+                  "color": "text"
+                },
+                "1": {
+                  "text": "on",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "showValue": "never",
+        "mergeValues": true,
+        "alignValue": "left",
+        "rowHeight": 0.8,
+        "legend": {
+          "showLegend": false
+        }
+      }
+    },
+    {
       "id": 4,
       "title": "Tank levels",
       "description": "",
@@ -207,7 +543,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 6,
+        "y": 23,
         "w": 12,
         "h": 8
       },
@@ -271,7 +607,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 6,
+        "y": 23,
         "w": 12,
         "h": 8
       },
@@ -335,7 +671,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 14,
+        "y": 31,
         "w": 12,
         "h": 8
       },
@@ -397,7 +733,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 14,
+        "y": 31,
         "w": 12,
         "h": 8
       },
@@ -460,7 +796,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 22,
+        "y": 39,
         "w": 12,
         "h": 8
       },
