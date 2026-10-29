@@ -64,7 +64,7 @@ overwrites an existing `.env`.
 | `--venus-portal-id <id>` | Its VRM portal ID. Asked for if `--venus-host` is given without it. |
 | `--public-host <h>`      | Address phones and laptops use to reach the Pi. Default: its IP.    |
 | `--no-kiosk`             | Headless hub: skip the touchscreen session.                         |
-| `--no-rotate`            | Skip the 180° panel rotation.                                       |
+| `--no-rotate`            | No 180° panel rotation; removes it if an earlier run added it.      |
 | `--yes`                  | Never prompt; fail instead if something is missing.                 |
 
 Reboot the Pi once afterwards to start the touchscreen session.
