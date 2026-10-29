@@ -43,6 +43,7 @@ Switch on Settings → General → System → Demo mode in any dashboard. A simu
 | [Architecture](docs/architecture.md)                               | Layered design, principles, and the unified device model             |
 | [Authoring a driver](docs/authoring-a-driver.md)                   | Writing a driver that conforms to the schema                         |
 | [Porting a Venus dbus driver](docs/porting-dbus-to-mqtt-driver.md) | Moving an existing driver onto MQTT                                  |
+| [Agent skills](docs/agent-skills.md)                               | Claude Code skills that automate drivers, maps, deploys              |
 | [Demo mode](docs/demo-mode.md)                                     | The simulated van                                                    |
 | [Kiosk display sleep and wake](docs/kiosk-display-sleep-wake.md)   | Touchscreen power behavior                                           |
 | [Domain vocabulary](CONTEXT.md)                                    | Terms used across the project                                        |

@@ -1,6 +1,6 @@
 # Hub reference
 
-Operator reference for the renewvan hub: install, configuration, services, deployment, networking, and troubleshooting. This page is written to be published as-is on the documentation website. For the design, read [architecture.md](architecture.md). For domain vocabulary, read [`CONTEXT.md`](../CONTEXT.md).
+Operator reference for the renewvan hub: install, configuration, services, deployment, networking, and troubleshooting. This page is written to be published as-is on the documentation website. For the design, read [architecture.md](architecture.md). For domain vocabulary, read [`CONTEXT.md`](../CONTEXT.md). To automate deploys, driver scaffolding, and basemap builds with Claude Code, read [agent-skills.md](agent-skills.md).
 
 Contents:
 

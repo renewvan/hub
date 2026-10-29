@@ -2,6 +2,8 @@
 
 How to make a new **Driver** (see `Driver` in `CONTEXT.md`) describe itself on the renewvan bus, so the dashboard's Settings › Drivers and Firmware pages can list it. The decision and its rejected alternatives are in [ADR 0011](adr/0011-node-manifest-and-retained-info-topic.md). For the sensing side of a new Driver, see [porting-dbus-to-mqtt-driver.md](porting-dbus-to-mqtt-driver.md).
 
+**Shortcut:** the `/scaffold-driver` skill bootstraps a new `renewvan/driver-<entity>` repo (MQTT skeleton, layered config, systemd unit, Dockerfile, CI) and runs a design round for its topics and hardware interface. See [agent-skills.md](agent-skills.md).
+
 This applies to Drivers only. Host-level plugins (`plugins/kiosk`, `plugins/tailscale`) and `driver-demo` are not Drivers and have no manifest or info.
 
 A Driver does three things: ships a `manifest.json`, publishes **Driver info** built from it, and passes the CI gate. The contract is two schemas in this repo: [`driver-manifest.schema.json`](../schema/driver-manifest.schema.json) and [`driver-info.schema.json`](../schema/driver-info.schema.json). If this guide and a schema disagree, the schema wins.
