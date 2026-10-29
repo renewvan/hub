@@ -66,7 +66,7 @@ Every service runs from a pinned, independently published image. Nothing is buil
 | ----------- | ---------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------- |
 | `mosquitto` | `eclipse-mosquitto:2`        | 1883 (MQTT), 9001 (WebSocket) | The MQTT broker, the single source of truth.                                                |
 | `influxdb`  | `influxdb:2`                 | 8086                          | History store (org and bucket `renewvan`).                                                  |
-| `grafana`   | `grafana/grafana`            | 3000                          | Ad-hoc history charts over InfluxDB. First login is `admin`/`admin`.                        |
+| `grafana`   | `grafana/grafana`            | 3000                          | History charts over InfluxDB, provisioned from code ([Grafana](#grafana)).                  |
 | `logger`    | `ghcr.io/renewvan/logger`    | none                          | Writes one InfluxDB point per four-segment `renewvan/#` topic.                              |
 | `dashboard` | `ghcr.io/renewvan/dashboard` | `127.0.0.1:80` (Pi only)      | The web app. The kiosk browser loads `http://localhost`.                                    |
 | `caddy`     | `caddy:2`                    | 443 (LAN)                     | TLS terminator, the only LAN entry point for the dashboard. See [HTTPS](#https-on-the-lan). |
@@ -94,6 +94,26 @@ The ESP32 relay driver is firmware, not a container. It is flashed once from `re
 ### Volumes
 
 Data persists in named Docker volumes: `mosquitto-data`, `mosquitto-log`, `influxdb-data`, `grafana-data`, `caddy-data`, `caddy-config`. Do not run `docker compose down -v` casually: `caddy-data` holds the TLS root every phone trusts.
+
+## Grafana
+
+Grafana is for history: charts over what the `logger` wrote to InfluxDB. It is separate from the live dashboard and is not on the kiosk. Open `http://<pi-ip>:3000`.
+
+**Login.** First login is `admin` / `admin`; Grafana then asks you to set a new password. Do that straight away, because port 3000 is open on the LAN. The password lives in the `grafana-data` volume, so it survives redeploys.
+
+**After a deploy.** An existing install keeps the admin password already set in the `grafana-data` volume, so `admin` / `admin` only works on a fresh volume. Log in, open Connections → Data sources → InfluxDB and press Save & test: it should say "datasource is working". Then open Dashboards → `renewvan` → Van overview. The tank time series is empty when no tank value changed within the selected range; the gauges still show the last value.
+
+**Datasource.** `InfluxDB` (Flux, `http://influxdb:8086`, org and bucket `renewvan`) is provisioned from `docker/grafana/provisioning/datasources/influxdb.yml`. Its token is `INFLUXDB_ADMIN_TOKEN`, passed to the container by compose, so nothing secret is in git. Check it under Connections → Data sources → InfluxDB → Save & test. If you change the token in `.env`, re-run `bin/deploy.sh`, which restarts Grafana.
+
+**Dashboard.** "Van overview" (folder `renewvan`, default range last 6 hours, refresh 30 s) comes from `docker/grafana/dashboards/van-overview.json`: current tank and battery gauges and solar power, then time series for tank levels, battery state of charge, battery voltage, solar power and battery temperature. It only charts what the logger stores: `tank`, `relay`, `battery`, `solar`, `charger` and `router` measurements, tagged by `id`. Temperature probes and tilt are not logged yet, so there is no panel for them.
+
+**Add a panel.** Provisioned dashboards are read-only in the UI, so changes go through the file:
+
+1. Open the dashboard, choose Edit → Save as to make a scratch copy, and build the panel there. A query looks like `from(bucket: "renewvan") |> range(start: v.timeRangeStart, stop: v.timeRangeStop) |> filter(fn: (r) => r._measurement == "battery" and r._field == "power_w")`. The measurement is the entity, the field is the topic's last segment, and `id` is its third.
+2. Copy the panel JSON (panel menu → Inspect → Panel JSON) into `panels` in `van-overview.json`, or export the whole dashboard (Share → Export → Export as JSON) and replace the file.
+3. Commit it and run `bin/deploy.sh`. Grafana reloads dashboard files every 30 seconds.
+
+To add a new dashboard, drop another JSON file in `docker/grafana/dashboards/`.
 
 ## Configuration
 

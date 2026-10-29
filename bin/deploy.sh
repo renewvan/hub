@@ -267,6 +267,9 @@ docker compose up -d --remove-orphans
 # running container keeps reading until it restarts. Restart it here (brief TLS blip; the root CA lives in
 # the caddy-data volume, so devices keep trusting it).
 docker compose restart caddy
+# grafana reads its datasource provisioning only at startup, and a changed bind-mounted file does not
+# make \`up -d\` recreate it. Restart so an edited datasource loads (dashboard JSON reloads on its own).
+docker compose restart grafana
 REMOTE
 
 echo "==> Reloading kiosk browser"

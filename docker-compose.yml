@@ -16,7 +16,8 @@
 #
 # MQTT:      <host>:1883 (plain), <host>:9001 (websockets)
 # InfluxDB:  http://<host>:8086 (org=renewvan, bucket=renewvan)
-# Grafana:   http://<host>:3000 (admin/admin on first run)
+# Grafana:   http://<host>:3000 (admin/admin on first run); the InfluxDB datasource and the
+#            "Van overview" dashboard are provisioned from docker/grafana/ (docs/reference.md)
 # Dashboard: https://<host> (Caddy, 443); http://localhost:80 on the Pi only (kiosk)
 
 services:
@@ -54,7 +55,10 @@ services:
       - influxdb-data:/var/lib/influxdb2
 
   # Ad-hoc/ops history charts (Grafana over InfluxDB), separate from the
-  # v0 read-only mobile/web/kiosk dashboard (React app).
+  # v0 read-only mobile/web/kiosk dashboard (React app). The datasource and
+  # dashboards are code: docker/grafana/provisioning (datasource + dashboard
+  # provider) and docker/grafana/dashboards (JSON). The datasource reads its
+  # token from INFLUXDB_ADMIN_TOKEN below, so nothing secret is in git.
   grafana:
     image: grafana/grafana:11.2.0
     container_name: renewvan-grafana
@@ -63,8 +67,12 @@ services:
       - "3000:3000"
     depends_on:
       - influxdb
+    environment:
+      INFLUXDB_ADMIN_TOKEN: ${INFLUXDB_ADMIN_TOKEN:-renewvan-dev-token}
     volumes:
       - grafana-data:/var/lib/grafana
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docker/grafana/dashboards:/etc/grafana/dashboards:ro
 
   # --- drivers (alphabetical) -----------------------------------------
 
