@@ -1,53 +1,110 @@
 # Automating hub work with agent skills
 
-Several recurring hub tasks can be driven by [Claude Code](https://claude.com/claude-code) skills. A skill is a packaged set of instructions the agent follows for one kind of task. You invoke it by typing its name as a slash command, for example `/scaffold-driver`, or by describing the task and letting the agent pick it.
+Recurring hub tasks can be driven by agent skills. A skill is a packaged set of instructions an AI coding agent follows for one kind of task. The renewvan skills live in their own repo, [`renewvan/skills`](https://github.com/renewvan/skills), and work with Claude Code and with any harness that reads `.agents/skills/` (Codex, Cursor, OpenCode, and others).
 
 Skills are optional. Every task below can also be done by hand with the linked doc.
 
-## Skills for hub tasks
+## Install
 
-| Skill              | Use it to                                                                                                                                                                                  | Manual equivalent                                                |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
-| `/scaffold-driver` | Bootstrap a new `renewvan/driver-<entity>` repo (MQTT skeleton, layered config, systemd unit, Dockerfile, CI) from the `driver-tank` shape, then design its topics and hardware interface. | [Authoring a driver](authoring-a-driver.md)                      |
-| `/build-basemap`   | Build the offline PMTiles basemap for a region, city or country, verify it covers a point, and optionally push it to the Pi.                                                               | [Offline map](reference.md#offline-map)                          |
-| `/deploy`          | Deploy the hub with `bin/deploy.sh`: pre-flight checks (Pi reachable, uncommitted changes), the run, and verification afterwards.                                                          | [Deploying to a Pi](reference.md#deploying-to-a-pi-step-by-step) |
+Clone the skills repo and copy the skill directories into your harness's skills root. Use a project-local root (`.claude/skills` or `.agents/skills` inside a checkout) to scope a skill to that checkout, or the user-wide root to have it everywhere.
 
-`/deploy` lives in this repo under `.claude/skills/deploy` and `.agents/skills/deploy`. `/scaffold-driver` and `/build-basemap` are installed in your own Claude Code setup, not shipped in this repo.
+```bash
+git clone git@github.com:renewvan/skills.git /tmp/renewvan-skills
 
-## Porting a D-Bus driver to native MQTT
+# Claude Code
+mkdir -p ~/.claude/skills
+cp -R /tmp/renewvan-skills/claude/* ~/.claude/skills/
 
-There is no single "port" skill. The port is a recipe ([porting-dbus-to-mqtt-driver.md](porting-dbus-to-mqtt-driver.md)), and you chain skills along its steps:
+# Any other harness that reads .agents/skills
+mkdir -p ~/.agents/skills
+cp -R /tmp/renewvan-skills/skills/* ~/.agents/skills/
+```
 
-| Step                                                   | Skill                                                                                             |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
-| 1. Settle the entity, topics and vocabulary            | `domain-modeling` (also records an ADR), `grilling` to stress-test the design                     |
-| 2. Create the repo skeleton                            | `/scaffold-driver`                                                                                |
-| 3. Port the sensing logic test-first                   | `tdd`                                                                                             |
-| 4. Write `manifest.json` and Driver info               | follow [Authoring a driver](authoring-a-driver.md); validate with `./schema/validate-examples.sh` |
-| 5. Add the entity schema, examples and a demo scenario | edit `schema/`, then run both validators ([Validating schemas](reference.md#validating-schemas))  |
-| 6. Chase failures                                      | `diagnosing-bugs`                                                                                 |
-| 7. Review before merging                               | `code-review`                                                                                     |
-| 8. Pin the image in compose and ship                   | edit the `image:` tag in `docker-compose.yml`, then `/deploy`                                     |
+A GitHub-source skill installer works too: point it at `renewvan/skills` with skill path `claude/<name>/SKILL.md` (Claude Code) or `skills/<name>/SKILL.md` (general).
 
-Start with `/scaffold-driver` and tell it which D-Bus package you are porting (`dbus-ads1115`, `dbus_wattcycle_ble`, `dbus-autoterm`, `dbus-giandel-bridge`). Its design round is where the topics and hardware interface get decided, so have the recipe open.
+### Two variants
+
+Every skill ships in two variants with the same name and version:
+
+| Variant     | Directory        | Notes                                                                                                                               |
+| ----------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| General     | `skills/<name>/` | Harness-neutral wording. This is the source of truth; edit here.                                                                    |
+| Claude Code | `claude/<name>/` | Same skill plus `allowed-tools` frontmatter and Claude-specific notes. Generated by `python3 scripts/build_claude.py`. Do not edit. |
+
+Contributors: edit `skills/<name>/`, run the build script, commit both, and run `pytest tests/ -v`. The tests fail if `claude/` is stale or the versions differ.
+
+## Using a skill
+
+Type the skill's name as a slash command, for example `/create-driver`, or describe the task and let the agent pick it. Run hub skills from the right checkout: `deploy` needs `renewvan/hub`, `flash-esp32` needs `renewvan/driver-esp32`. A skill that cannot find what it needs stops and says so instead of improvising.
+
+## The skills
+
+| Skill              | Version | Use it to                                                            | Manual equivalent                                                |
+| ------------------ | ------- | -------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `create-driver`    | 2.0.0   | Bootstrap a new `driver-<entity>` repo and run its design round      | [Authoring a driver](authoring-a-driver.md)                      |
+| `port-dbus-driver` | 1.0.0   | Port a Venus OS D-Bus package to a native MQTT driver                | [Porting a D-Bus driver](porting-dbus-to-mqtt-driver.md)         |
+| `flash-esp32`      | 1.0.0   | Build and flash an ESP32 firmware variant, then verify it on the bus | the `renewvan/driver-esp32` README                               |
+| `build-basemap`    | 1.1.0   | Build the dashboard's offline PMTiles basemap                        | [Offline map](reference.md#offline-map)                          |
+| `deploy`           | 1.0.0   | Deploy the hub to the Pi                                             | [Deploying to a Pi](reference.md#deploying-to-a-pi-step-by-step) |
+
+The hub repo carries its own copy of `deploy`, so inside a hub checkout you do not need to install it. Versions above were current when this page was written; the skills repo is authoritative.
+
+### `create-driver`
+
+Scaffolds a new `renewvan/driver-<entity>` repo in the shape `driver-tank` documents: MQTT publisher skeleton, layered `config.default.ini` and `config.ini`, `manifest.json` with retained Driver info, systemd unit, Dockerfile, and CI (tests, manifest gate, release). It does not write the device's sensing logic. It ends with a fixed design round on sensing versus remapping, published fields, hub schema, hardware config, and hub integration, so the new driver gets designed rather than left half built.
+
+### `port-dbus-driver`
+
+Turns `dbus-ads1115`, `dbus_wattcycle_ble`, `dbus-autoterm`, or `dbus-giandel-bridge` into a native MQTT driver by following [porting-dbus-to-mqtt-driver.md](porting-dbus-to-mqtt-driver.md). It does not scaffold or implement on its own. It inventories the package into strip, keep, and add, asks for your go-ahead, then sequences the work:
+
+1. Settle the entity and topics.
+2. Run `create-driver` for the skeleton.
+3. Port the sensing logic test-first.
+4. Write the manifest and Driver info.
+5. If the entity is new: add the hub schema and a demo scenario, then run both validators ([Validating schemas](reference.md#validating-schemas)).
+6. Diagnose failures, then review.
+7. Pin the image in the hub's `docker-compose.yml` and hand off to `deploy`.
+
+Genuine Victron gear is out of scope: that is the remap shape of `driver-venus`.
+
+### `flash-esp32`
+
+Builds and flashes an ESP32 board from the `renewvan/driver-esp32` checkout by driving its `scripts/flash.sh`, which stamps the version from `git describe`. It asks for what is missing: the variant, USB first flash or OTA update, the serial port, and the `secrets.yaml` values (WiFi, broker, OTA password, API key). It never prints or commits secrets. It checks `esphome` and the layout, warns about `-dirty` versions, the relay board's `OE` pull-up and the one-board-per-van limit, then verifies the retained state, info, and health topics on the bus.
+
+### `build-basemap`
+
+Builds the offline `basemap.pmtiles` from a region, city, or country name. It resolves a bounding box through Nominatim, picks a Protomaps v4 build, dry-runs `pmtiles extract` to size the result, extracts, verifies the file (including that tiles exist under a point you name), and optionally pushes it to the Pi with `scripts/push-basemap.sh`. Needs the `pmtiles` CLI. Building from raw OpenStreetMap data is out of scope.
+
+### `deploy`
+
+Runs `bin/deploy.sh` from the hub checkout. It checks the Pi is reachable (`ssh renewvan exit`, or `--host`), warns about uncommitted changes because the script rsyncs the working tree, runs the deploy, then checks `docker compose ps` and logs for any service that is not `running`. It also covers what the script does not do on its own: restarting systemd plugin services (`renewvan-kiosk`, `renewvan-tailscale`) after a `.service` change, and the optional GPS profile. The script is idempotent, so re-run it after a failure. For a brand-new Pi, start with `bin/bootstrap-pi.sh`.
+
+## Chaining skills
+
+A new driver for hardware that already has a D-Bus package:
+
+```text
+/port-dbus-driver   →  /create-driver  →  (test-first port)  →  /deploy
+```
+
+A new driver for hardware with no existing package: `/create-driver`, implement, then `/deploy`. A new ESP32 variant: build it in `renewvan/driver-esp32`, then `/flash-esp32`.
 
 ## Other useful skills
 
-These are general-purpose skills from the Claude Code plugins used on this project. Availability depends on your setup.
+General-purpose skills from the Claude Code plugins used on this project. Availability depends on your setup.
 
 | Task                                            | Skill             |
 | ----------------------------------------------- | ----------------- |
 | Build a feature or fix a bug test-first         | `tdd`             |
-| Diagnose something broken, throwing or slow     | `diagnosing-bugs` |
+| Diagnose something broken, throwing, or slow    | `diagnosing-bugs` |
 | Review a branch or PR against repo standards    | `code-review`     |
 | Sharpen terminology or record an ADR            | `domain-modeling` |
 | Stress-test a plan before building              | `grilling`        |
 | Throwaway prototype to answer a design question | `prototype`       |
-| Sync docs from source-of-truth files            | `update-docs`     |
 
 ## Conventions skills must respect
 
-Skills operate under the repo's `AGENTS.md`:
+Skills operate under the hub's `AGENTS.md`:
 
 - Services ship as pinned images; do not add a Dockerfile or local build to the hub.
 - Run `./schema/validate-examples.sh` after any schema change, and `python3 schema/validate-demo.py` when an entity gains a schema or a required property.

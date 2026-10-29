@@ -2,7 +2,7 @@
 
 How to make a new **Driver** (see `Driver` in `CONTEXT.md`) describe itself on the renewvan bus, so the dashboard's Settings › Drivers and Firmware pages can list it. The decision and its rejected alternatives are in [ADR 0011](adr/0011-node-manifest-and-retained-info-topic.md). For the sensing side of a new Driver, see [porting-dbus-to-mqtt-driver.md](porting-dbus-to-mqtt-driver.md).
 
-**Shortcut:** the `/scaffold-driver` skill bootstraps a new `renewvan/driver-<entity>` repo (MQTT skeleton, layered config, systemd unit, Dockerfile, CI) and runs a design round for its topics and hardware interface. See [agent-skills.md](agent-skills.md).
+**Shortcut:** the `/create-driver` skill (from [`renewvan/skills`](https://github.com/renewvan/skills)) bootstraps a new `renewvan/driver-<entity>` repo (MQTT skeleton, layered config, systemd unit, Dockerfile, CI) and runs a design round for its topics and hardware interface. See [agent-skills.md](agent-skills.md).
 
 This applies to Drivers only. Host-level plugins (`plugins/kiosk`, `plugins/tailscale`) and `driver-demo` are not Drivers and have no manifest or info.
 
