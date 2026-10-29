@@ -15,6 +15,8 @@ not the entity it publishes (see
 
 Worked example throughout: `dbus-ads1115` → `renewvan/tank`.
 
+**Automating the port:** there is no single port skill. Start with `/scaffold-driver` for the repo skeleton, then chain `tdd`, `diagnosing-bugs` and `code-review` along the steps below. The full mapping is in [agent-skills.md](agent-skills.md#porting-a-d-bus-driver-to-native-mqtt).
+
 ## What to strip
 
 - **D-Bus service registration** (`vedbus.py`) — no `VeDbusService`,
