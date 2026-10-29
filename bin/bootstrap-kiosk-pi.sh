@@ -7,7 +7,8 @@
 #
 # Usage: bin/bootstrap-kiosk-pi.sh [--host <ssh-alias-or-user@host>] [--no-rotate]
 #
-#   --no-rotate   skip the 180° panel rotation (cmdline.txt + touch udev rule)
+#   --no-rotate   no 180° panel rotation (cmdline.txt + touch udev rule); also
+#                 removes both if an earlier run added them
 #
 # What it sets up on the Pi:
 #   packages   cage, chromium, curl
@@ -105,6 +106,16 @@ if [[ "${ROTATE}" == "1" ]]; then
 SUBSYSTEM=="input", ATTRS{name}=="10-0038 generic ft5x06 (00)", \
   ENV{LIBINPUT_CALIBRATION_MATRIX}="-1 0 1 0 -1 1"
 RULE
+else
+  # Undo an earlier rotated run: a stale touch rule would leave touch flipped
+  # against an upright display, and a stale panel_orientation the reverse.
+  echo "==> No panel rotation (removing any earlier rotation)"
+  sudo rm -f /etc/udev/rules.d/99-ft5x06-rotation.rules
+  if grep -q 'panel_orientation=upside_down' "${BOOT_DIR}/cmdline.txt"; then
+    sudo cp -n "${BOOT_DIR}/cmdline.txt" "${BOOT_DIR}/cmdline.txt.pre-renewvan"
+    sudo sed -i '1 s|,panel_orientation=upside_down||' "${BOOT_DIR}/cmdline.txt"
+    echo "    cmdline.txt updated (backup: cmdline.txt.pre-renewvan)"
+  fi
 fi
 
 # bl_power is root-writable only by default; kiosk.py runs as the kiosk user.
