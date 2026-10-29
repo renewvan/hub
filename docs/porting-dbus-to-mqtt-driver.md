@@ -15,7 +15,7 @@ not the entity it publishes (see
 
 Worked example throughout: `dbus-ads1115` → `renewvan/tank`.
 
-**Automating the port:** there is no single port skill. Start with `/scaffold-driver` for the repo skeleton, then chain `tdd`, `diagnosing-bugs` and `code-review` along the steps below. The full mapping is in [agent-skills.md](agent-skills.md#porting-a-d-bus-driver-to-native-mqtt).
+**Automating the port:** the `/port-dbus-driver` skill (from [`renewvan/skills`](https://github.com/renewvan/skills)) follows this recipe. It inventories the package into strip, keep and add, then sequences `/create-driver`, a test-first port, the manifest, the hub schema and demo scenario, and the hand-off to `/deploy`. Install and usage are in [agent-skills.md](agent-skills.md#port-dbus-driver).
 
 ## What to strip
 
