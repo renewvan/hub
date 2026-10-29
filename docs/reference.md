@@ -101,6 +101,8 @@ Grafana is for history: charts over what the `logger` wrote to InfluxDB. It is s
 
 **Login.** First login is `admin` / `admin`; Grafana then asks you to set a new password. Do that straight away, because port 3000 is open on the LAN. The password lives in the `grafana-data` volume, so it survives redeploys.
 
+**After a deploy.** An existing install keeps the admin password already set in the `grafana-data` volume, so `admin` / `admin` only works on a fresh volume. Log in, open Connections → Data sources → InfluxDB and press Save & test: it should say "datasource is working". Then open Dashboards → `renewvan` → Van overview. The tank time series is empty when no tank value changed within the selected range; the gauges still show the last value.
+
 **Datasource.** `InfluxDB` (Flux, `http://influxdb:8086`, org and bucket `renewvan`) is provisioned from `docker/grafana/provisioning/datasources/influxdb.yml`. Its token is `INFLUXDB_ADMIN_TOKEN`, passed to the container by compose, so nothing secret is in git. Check it under Connections → Data sources → InfluxDB → Save & test. If you change the token in `.env`, re-run `bin/deploy.sh`, which restarts Grafana.
 
 **Dashboard.** "Van overview" (folder `renewvan`, default range last 6 hours, refresh 30 s) comes from `docker/grafana/dashboards/van-overview.json`: current tank and battery gauges and solar power, then time series for tank levels, battery state of charge, battery voltage, solar power and battery temperature. It only charts what the logger stores: `tank`, `relay`, `battery`, `solar`, `charger` and `router` measurements, tagged by `id`. Temperature probes and tilt are not logged yet, so there is no panel for them.
