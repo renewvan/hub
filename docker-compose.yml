@@ -35,9 +35,9 @@ services:
       - mosquitto-data:/mosquitto/data
       - mosquitto-log:/mosquitto/log
 
-  # History for tank/relay/battery/router topics (docs/architecture.md
-  # "Application services" row). Written by renewvan/logger, one point
-  # per renewvan/# message.
+  # History for tank/relay/battery/solar/charger/router/temperature topics
+  # (docs/architecture.md "Application services" row). Written by
+  # renewvan/logger, one point per renewvan/# message.
   influxdb:
     image: influxdb:2
     container_name: renewvan-influxdb
@@ -50,6 +50,12 @@ services:
       DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_ADMIN_PASSWORD:-renewvan-dev-only}
       DOCKER_INFLUXDB_INIT_ORG: renewvan
       DOCKER_INFLUXDB_INIT_BUCKET: renewvan
+      # Bucket retention; InfluxDB duration ("8760h" = 1 year) or 0 = forever.
+      # Applies only when setup creates the bucket (fresh install); an existing
+      # bucket keeps its retention until updated once:
+      #   docker exec renewvan-influxdb influx bucket update \
+      #     --name renewvan --retention <duration> --token "$INFLUXDB_ADMIN_TOKEN"
+      DOCKER_INFLUXDB_INIT_BUCKET_RETENTION: ${INFLUXDB_RETENTION:-0}
       DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_ADMIN_TOKEN:-renewvan-dev-token}
     volumes:
       - influxdb-data:/var/lib/influxdb2
@@ -305,7 +311,7 @@ services:
   # renewvan/# -> InfluxDB point writer, one point per message. See
   # .scratch/renewvan-hub-v0-build/issues/05-influxdb-logger.md.
   logger:
-    image: ghcr.io/renewvan/logger:v0.1.4
+    image: ghcr.io/renewvan/logger:v0.1.5
     container_name: renewvan-logger
     restart: unless-stopped
     depends_on:
@@ -326,7 +332,7 @@ services:
   # not a polling backend. See
   # .scratch/renewvan-hub-v0-build/issues/06-dashboard-web-app.md.
   dashboard:
-    image: ghcr.io/renewvan/dashboard:v0.18.0
+    image: ghcr.io/renewvan/dashboard:v0.20.0
     container_name: renewvan-dashboard
     restart: unless-stopped
     # Loopback only: the kiosk browser (renewvan-kiosk-browser.sh, KIOSK_URL=http://localhost) reads
