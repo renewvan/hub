@@ -197,7 +197,7 @@ InfluxDB credentials are in /opt/renewvan/hub/.env on the Pi.
 Still manual, because each needs a decision or a login only you can make:
   - Tailscale:  ssh ${HOST} sudo tailscale up
   - Tank calibration (sensor_min/max): edit /etc/renewvan/tank/config.ini, then
-    docker compose restart node-tank
+    docker compose restart driver-tank
   - Tilt axis mapping, if the GY-521 is not mounted face-down: /etc/renewvan/tilt/config.ini
   - Battery BLE address for driver-wattcycle: [driver] mac in /etc/renewvan/wattcycle/config.ini (the service stays off until it is set)
   - Broker authentication is OFF (anonymous). See .env.example and hub issue 49
