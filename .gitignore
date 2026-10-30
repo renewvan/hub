@@ -2,6 +2,9 @@
 .DS_Store
 Thumbs.db
 
+# Agent skills (installed locally, see renewvan/skills README)
+.claude/skills/
+
 # Editors
 .vscode/
 .idea/
@@ -41,3 +44,5 @@ logs/
 # Python
 __pycache__/
 *.pyc
+# graphify knowledge graph output
+graphify-out/
