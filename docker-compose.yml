@@ -52,9 +52,12 @@ services:
       DOCKER_INFLUXDB_INIT_BUCKET: renewvan
       # Bucket retention; InfluxDB duration ("8760h" = 1 year) or 0 = forever.
       # Applies only when setup creates the bucket (fresh install); an existing
-      # bucket keeps its retention until updated once:
-      #   docker exec renewvan-influxdb influx bucket update \
-      #     --name renewvan --retention <duration> --token "$INFLUXDB_ADMIN_TOKEN"
+      # bucket keeps its retention until updated once (bucket update selects
+      # by id, not name):
+      #   BID=$(docker exec renewvan-influxdb influx bucket list --name renewvan \
+      #     --token "$INFLUXDB_ADMIN_TOKEN" --hide-headers | awk '{print $1}')
+      #   docker exec renewvan-influxdb influx bucket update --id "$BID" \
+      #     --retention <duration> --token "$INFLUXDB_ADMIN_TOKEN"
       DOCKER_INFLUXDB_INIT_BUCKET_RETENTION: ${INFLUXDB_RETENTION:-0}
       DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_ADMIN_TOKEN:-renewvan-dev-token}
     volumes:
