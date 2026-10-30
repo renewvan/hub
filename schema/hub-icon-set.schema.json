@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://renewvan.dev/schema/hub-icon-set.schema.json",
+  "title": "hub-icon-set",
+  "description": "Command payload for the shared entity icons setting: sent unretained by a client to renewvan/hub/icons/set. 'key' is '<entity>/<id>' (e.g. 'temperature/outdoor'), 'icon' is a lucide component name (PascalCase, letters and digits only) or null to clear the entry so the consumer's own icon draws again. The hub plugin persists the change on the Pi and republishes the whole map retained on renewvan/hub/icons (hub-icons.schema.json); a client never writes the state topic.",
+  "type": "object",
+  "properties": {
+    "key": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*/[^/#+\\s]+$",
+      "description": "'<entity>/<id>': the entity domain and instance id of renewvan/<entity>/<id>/..."
+    },
+    "icon": {
+      "type": ["string", "null"],
+      "pattern": "^[A-Z][A-Za-z0-9]{0,63}$",
+      "description": "A lucide component name, or null to clear the entry."
+    }
+  },
+  "required": ["key", "icon"],
+  "additionalProperties": false
+}
