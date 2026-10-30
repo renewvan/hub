@@ -9,6 +9,8 @@ Publishes the Pi's own local-network address and the hub's version to the renewv
 | `renewvan/hub/status`              | yes      | plugin → bus    |
 | `renewvan/hub/primary-battery`     | yes      | plugin → bus    |
 | `renewvan/hub/primary-battery/set` | no       | client → plugin |
+| `renewvan/hub/icons`               | yes      | plugin → bus    |
+| `renewvan/hub/icons/set`           | no       | client → plugin |
 
 ### `renewvan/hub/status`
 
@@ -52,6 +54,31 @@ A client changes it by publishing the same payload, unretained, to `renewvan/hub
 - **Not validated against instances.** The plugin does not know which batteries exist. It rejects only a payload that is not a non-empty JSON string (non-JSON, a number, an empty string): the payload is ignored and logged, the state is left as it was. An id that is not on the bus (or not complete) is the consumer's problem: the dashboard falls back to `auto` and says so.
 - If the file cannot be written, the command is logged as an error and not applied, rather than publishing a value that would silently revert on restart.
 
+### `renewvan/hub/icons`
+
+Which icon every client draws an entity instance with. An icon is a presentation choice, so it is a shared setting here and never a property of the entity (`docs/adr/0023-entity-icons-are-a-shared-hub-setting.md`): the kiosk, a phone and a laptop read the same map, and no Driver has to know a dashboard's icon vocabulary.
+
+**Payload** (JSON object, `schema/hub-icons.schema.json`): each key is `<entity>/<id>`, the entity domain and instance id of `renewvan/<entity>/<id>/...`; each value is a lucide component name (PascalCase, letters and digits only).
+
+```json
+{ "temperature/outdoor": "Park", "tank/fresh": "Droplet" }
+```
+
+A client changes one entry by publishing a command, unretained, to `renewvan/hub/icons/set` (`schema/hub-icon-set.schema.json`); `icon: null` clears the entry:
+
+```json
+{ "key": "tank/fresh", "icon": "Waves" }
+```
+
+The plugin persists the whole map and republishes it retained on `renewvan/hub/icons`; clients never write the state topic themselves.
+
+- **Default `{}`.** Nothing is persisted until the first valid command.
+- **Persisted on the Pi** in `/var/lib/renewvan-hub/icons.json` (override with `ICONS_PATH`), replaced atomically, so the icons survive a plugin, broker or Pi restart.
+- **Published on every (re)connect**, retained, so a broker that lost retained state heals as soon as the plugin reconnects.
+- **Shape only.** The plugin does not know which instances exist or which icons a consumer can draw. It rejects a command that is not exactly `{key, icon}` with a `<entity>/<id>` key and a PascalCase name (or `null`): the command is ignored and logged. A stored entry of the wrong shape is dropped on its own, never costing the others. A consumer ignores an entry whose instance is not on the bus and falls back to its own icon for a name it cannot draw.
+- If the file cannot be written, the command is logged as an error and not applied, rather than publishing a map that would silently revert on restart.
+- The last command wins when two clients set the same key at once.
+
 ## Setup
 
 `bin/deploy.sh` installs and restarts the plugin on every deploy. No authentication step.
@@ -67,6 +94,7 @@ Override defaults in `/etc/renewvan/hub.env` (seeded on first deploy):
 # MQTT_PASSWORD=
 # POLL_INTERVAL=30
 # PRIMARY_BATTERY_PATH=/var/lib/renewvan-hub/primary-battery.json
+# ICONS_PATH=/var/lib/renewvan-hub/icons.json
 ```
 
 Restart the service after changes: `sudo systemctl restart renewvan-hub`
@@ -76,6 +104,8 @@ Restart the service after changes: `sudo systemctl restart renewvan-hub`
 ```sh
 mosquitto_sub -h <pi> -t renewvan/hub/status -C 1
 mosquitto_sub -h <pi> -t renewvan/hub/primary-battery -C 1
+mosquitto_sub -h <pi> -t renewvan/hub/icons -C 1
+mosquitto_pub -h <pi> -t renewvan/hub/icons/set -m '{"key":"tank/fresh","icon":"Droplet"}'
 mosquitto_pub -h <pi> -t renewvan/hub/primary-battery/set -m '"auto"'
 journalctl -u renewvan-hub -n 20
 ```

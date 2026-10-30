@@ -28,6 +28,19 @@ and republishes the retained state. On every (re)connect it publishes the
 persisted value (default "auto"). It does not know which instances exist, so it
 only rejects payloads that are not a non-empty JSON string (ignored and logged).
 
+Entity icons: which icon every client draws an entity instance with. A presentation
+choice, so it lives here and never on the entity's own topics (ADR 0023). Shared, so
+no client may keep its own:
+
+  renewvan/hub/icons       (retained)      state, JSON object: {"<entity>/<id>": "<LucideName>"}
+  renewvan/hub/icons/set   (not retained)  command, {"key": "<entity>/<id>", "icon": name|null}
+                           (schema/hub-icons.schema.json, schema/hub-icon-set.schema.json)
+
+A client publishes the command (icon null clears the entry); this plugin persists the
+whole map to ICONS_PATH and republishes it retained. On every (re)connect it publishes
+the persisted map (default {}). It does not know which instances exist or which icons
+a consumer can draw, so it only rejects a command or a stored entry of the wrong shape.
+
 Configuration via environment (or /etc/renewvan/hub.env):
   MQTT_HOST              default: localhost
   MQTT_PORT              default: 1883
@@ -35,11 +48,13 @@ Configuration via environment (or /etc/renewvan/hub.env):
   MQTT_PASSWORD          default: (empty)
   POLL_INTERVAL          default: 30  (seconds)
   PRIMARY_BATTERY_PATH   default: /var/lib/renewvan-hub/primary-battery.json
+  ICONS_PATH             default: /var/lib/renewvan-hub/icons.json
 """
 
 import json
 import logging
 import os
+import re
 import socket
 import time
 from pathlib import Path
@@ -56,10 +71,18 @@ POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", "30"))
 PRIMARY_BATTERY_PATH = Path(
     os.environ.get("PRIMARY_BATTERY_PATH", "/var/lib/renewvan-hub/primary-battery.json")
 )
+ICONS_PATH = Path(os.environ.get("ICONS_PATH", "/var/lib/renewvan-hub/icons.json"))
 
 TOPIC_STATUS = "renewvan/hub/status"
 TOPIC_PRIMARY_BATTERY = "renewvan/hub/primary-battery"
 TOPIC_PRIMARY_BATTERY_SET = "renewvan/hub/primary-battery/set"
+TOPIC_ICONS = "renewvan/hub/icons"
+TOPIC_ICONS_SET = "renewvan/hub/icons/set"
+
+# '<entity>/<id>' and a lucide component name: the same patterns as
+# schema/hub-icons.schema.json.
+ICON_KEY_RE = re.compile(r"^[a-z][a-z0-9]*/[^/#+\s]+$")
+ICON_NAME_RE = re.compile(r"^[A-Z][A-Za-z0-9]{0,63}$")
 
 DEFAULT_PRIMARY_BATTERY = "auto"
 
@@ -141,19 +164,77 @@ def load_primary_battery() -> str:
     return value
 
 
-def save_primary_battery(value: str) -> None:
-    """Persist `value` atomically: a crash mid-write never leaves a torn file."""
-    PRIMARY_BATTERY_PATH.parent.mkdir(parents=True, exist_ok=True)
-    tmp = PRIMARY_BATTERY_PATH.with_name(PRIMARY_BATTERY_PATH.name + ".tmp")
+def _write_atomic(path: Path, text: str) -> None:
+    """Replace `path` with `text` atomically: a crash mid-write never leaves a torn file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
     with open(tmp, "w", encoding="utf-8") as f:
-        f.write(json.dumps(value))
+        f.write(text)
         f.flush()
         os.fsync(f.fileno())
-    os.replace(tmp, PRIMARY_BATTERY_PATH)
+    os.replace(tmp, path)
+
+
+def save_primary_battery(value: str) -> None:
+    _write_atomic(PRIMARY_BATTERY_PATH, json.dumps(value))
 
 
 def publish_primary_battery(client: mqtt.Client, value: str) -> None:
     client.publish(TOPIC_PRIMARY_BATTERY, json.dumps(value), qos=1, retain=True)
+
+
+def parse_icon_command(raw: bytes) -> tuple[str, str | None] | None:
+    """The (key, icon) of an icons command, None when invalid. icon None clears the entry.
+
+    Valid is the contract of schema/hub-icon-set.schema.json: exactly `key` and `icon`,
+    a '<entity>/<id>' key and a lucide component name or null.
+    """
+    try:
+        value = json.loads(raw.decode())
+    except (UnicodeDecodeError, ValueError):
+        return None
+    if not isinstance(value, dict) or set(value) != {"key", "icon"}:
+        return None
+    key, icon = value["key"], value["icon"]
+    if not isinstance(key, str) or not ICON_KEY_RE.match(key):
+        return None
+    if icon is not None and (not isinstance(icon, str) or not ICON_NAME_RE.match(icon)):
+        return None
+    return key, icon
+
+
+def load_icons() -> dict[str, str]:
+    """The persisted icons map, or {} when nothing valid is stored.
+
+    An entry of the wrong shape is dropped on its own: one bad entry never costs the rest.
+    """
+    try:
+        raw = ICONS_PATH.read_bytes()
+    except FileNotFoundError:
+        return {}
+    except OSError as exc:
+        log.error("Cannot read %s: %s — using no icons", ICONS_PATH, exc)
+        return {}
+    try:
+        value = json.loads(raw.decode())
+    except (UnicodeDecodeError, ValueError):
+        value = None
+    if not isinstance(value, dict):
+        log.warning("Ignoring invalid %s — using no icons", ICONS_PATH)
+        return {}
+    return {
+        key: icon
+        for key, icon in value.items()
+        if ICON_KEY_RE.match(key) and isinstance(icon, str) and ICON_NAME_RE.match(icon)
+    }
+
+
+def save_icons(icons: dict[str, str]) -> None:
+    _write_atomic(ICONS_PATH, json.dumps(icons))
+
+
+def publish_icons(client: mqtt.Client, icons: dict[str, str]) -> None:
+    client.publish(TOPIC_ICONS, json.dumps(icons), qos=1, retain=True)
 
 
 def on_connect(client: mqtt.Client, userdata, flags, rc, properties=None):
@@ -167,8 +248,41 @@ def on_connect(client: mqtt.Client, userdata, flags, rc, properties=None):
     publish_primary_battery(client, value)
     log.info("Published primary battery: %s", value)
 
+    client.subscribe(TOPIC_ICONS_SET, qos=1)
+    icons = load_icons()
+    publish_icons(client, icons)
+    log.info("Published %d entity icon(s)", len(icons))
+
+
+def on_icons_message(client: mqtt.Client, msg) -> None:
+    command = parse_icon_command(msg.payload)
+    if command is None:
+        log.warning(
+            'Ignoring invalid icons command %r (want {"key": "<entity>/<id>", "icon": name|null})',
+            msg.payload,
+        )
+        return
+    key, icon = command
+    icons = load_icons()
+    if icon is None:
+        icons.pop(key, None)
+    else:
+        icons[key] = icon
+    try:
+        save_icons(icons)
+    except OSError as exc:
+        # Publishing a map that would silently revert on restart is worse than
+        # visibly not applying it.
+        log.error("Cannot persist icons to %s: %s — not applied", ICONS_PATH, exc)
+        return
+    publish_icons(client, icons)
+    log.info("Icon for %s set to %s", key, icon)
+
 
 def on_message(client: mqtt.Client, userdata, msg):
+    if msg.topic == TOPIC_ICONS_SET:
+        on_icons_message(client, msg)
+        return
     if msg.topic != TOPIC_PRIMARY_BATTERY_SET:
         return
     value = parse_primary_battery(msg.payload)

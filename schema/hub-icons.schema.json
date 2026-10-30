@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://renewvan.dev/schema/hub-icons.schema.json",
+  "title": "hub-icons",
+  "description": "State for the shared entity icons setting: which icon every client draws an entity instance with. A presentation choice, so it lives here and never on the entity's own topics. Published retained by the hub plugin to renewvan/hub/icons, restored from the value it persisted on the Pi and published on every (re)connect, default {}; changed by a client sending a command (hub-icon-set.schema.json) unretained to renewvan/hub/icons/set. Each key is '<entity>/<id>' (the entity domain and the instance id of renewvan/<entity>/<id>/..., e.g. 'temperature/outdoor', 'tank/fresh'); each value is a lucide component name (PascalCase, letters and digits only, e.g. 'Park'). The hub plugin does not know which instances exist or which icons a consumer can draw, so it checks only the shape: a consumer ignores an entry whose instance is not on the bus and falls back to its own icon for a name it cannot draw.",
+  "type": "object",
+  "propertyNames": {
+    "pattern": "^[a-z][a-z0-9]*/[^/#+\\s]+$"
+  },
+  "additionalProperties": {
+    "type": "string",
+    "pattern": "^[A-Z][A-Za-z0-9]{0,63}$"
+  }
+}
