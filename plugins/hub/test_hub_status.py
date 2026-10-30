@@ -185,6 +185,9 @@ class PrimaryBatteryTests(unittest.TestCase):
         patcher = mock.patch.object(hub_status, "PRIMARY_BATTERY_PATH", self.path)
         patcher.start()
         self.addCleanup(patcher.stop)
+        icons = mock.patch.object(hub_status, "ICONS_PATH", Path(tmp.name) / "state" / "icons.json")
+        icons.start()
+        self.addCleanup(icons.stop)
         self.client = _FakeClient()
 
     def _connect(self):
@@ -199,7 +202,7 @@ class PrimaryBatteryTests(unittest.TestCase):
 
     def test_connect_with_nothing_persisted_publishes_auto_retained(self):
         self._connect()
-        self.assertEqual(self.client.subscribed, [hub_status.TOPIC_PRIMARY_BATTERY_SET])
+        self.assertIn(hub_status.TOPIC_PRIMARY_BATTERY_SET, self.client.subscribed)
         self.assertEqual(
             self._state_publishes(), [(hub_status.TOPIC_PRIMARY_BATTERY, '"auto"', True)]
         )
@@ -242,7 +245,8 @@ class PrimaryBatteryTests(unittest.TestCase):
         restarted = _FakeClient()
         hub_status.on_connect(restarted, None, {}, 0)
         self.assertEqual(
-            restarted.published, [(hub_status.TOPIC_PRIMARY_BATTERY, '"wattcycle"', True)]
+            [p for p in restarted.published if p[0] == hub_status.TOPIC_PRIMARY_BATTERY],
+            [(hub_status.TOPIC_PRIMARY_BATTERY, '"wattcycle"', True)],
         )
 
     def test_auto_is_a_valid_command(self):
@@ -295,6 +299,143 @@ class PrimaryBatteryTests(unittest.TestCase):
 
     def test_status_payload_is_untouched_by_the_setting(self):
         self.assertEqual(set(hub_status.hub_status()), {"ip", "hostname", "version"})
+
+
+def _icon_msg(payload, topic: str = hub_status.TOPIC_ICONS_SET):
+    raw = payload if isinstance(payload, bytes) else json.dumps(payload).encode()
+    return types.SimpleNamespace(topic=topic, payload=raw)
+
+
+class EntityIconsTests(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        # A directory that does not exist yet: the plugin must create it.
+        self.path = Path(tmp.name) / "state" / "icons.json"
+        for name, path in (
+            ("ICONS_PATH", self.path),
+            ("PRIMARY_BATTERY_PATH", Path(tmp.name) / "state" / "primary-battery.json"),
+        ):
+            patcher = mock.patch.object(hub_status, name, path)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.client = _FakeClient()
+
+    def _state_publishes(self):
+        return [p for p in self.client.published if p[0] == hub_status.TOPIC_ICONS]
+
+    def _set(self, key, icon):
+        hub_status.on_message(self.client, None, _icon_msg({"key": key, "icon": icon}))
+
+    def test_topics_follow_the_contract(self):
+        self.assertEqual(hub_status.TOPIC_ICONS, "renewvan/hub/icons")
+        self.assertEqual(hub_status.TOPIC_ICONS_SET, "renewvan/hub/icons/set")
+
+    def test_connect_subscribes_and_publishes_an_empty_map_retained(self):
+        hub_status.on_connect(self.client, None, {}, 0)
+        self.assertIn(hub_status.TOPIC_ICONS_SET, self.client.subscribed)
+        self.assertEqual(self._state_publishes(), [(hub_status.TOPIC_ICONS, "{}", True)])
+
+    def test_connect_publishes_the_persisted_map(self):
+        self.path.parent.mkdir(parents=True)
+        self.path.write_text('{"tank/fresh": "Droplet"}')
+        hub_status.on_connect(self.client, None, {}, 0)
+        self.assertEqual(
+            self._state_publishes(), [(hub_status.TOPIC_ICONS, '{"tank/fresh": "Droplet"}', True)]
+        )
+
+    def test_a_command_persists_and_republishes_the_whole_map_retained(self):
+        self._set("temperature/outdoor", "Park")
+        self._set("tank/fresh", "Droplet")
+        self.assertEqual(
+            json.loads(self.path.read_text()),
+            {"temperature/outdoor": "Park", "tank/fresh": "Droplet"},
+        )
+        topic, payload, retained = self._state_publishes()[-1]
+        self.assertTrue(retained)
+        self.assertEqual(
+            json.loads(payload), {"temperature/outdoor": "Park", "tank/fresh": "Droplet"}
+        )
+
+    def test_a_later_command_replaces_the_entry(self):
+        self._set("tank/fresh", "Droplet")
+        self._set("tank/fresh", "Waves")
+        self.assertEqual(json.loads(self.path.read_text()), {"tank/fresh": "Waves"})
+
+    def test_null_clears_the_entry_and_leaves_the_others(self):
+        self._set("tank/fresh", "Droplet")
+        self._set("tank/grey", "Waves")
+        self._set("tank/fresh", None)
+        self.assertEqual(json.loads(self.path.read_text()), {"tank/grey": "Waves"})
+
+    def test_clearing_an_entry_that_is_not_there_is_harmless(self):
+        self._set("tank/fresh", None)
+        self.assertEqual(json.loads(self.path.read_text()), {})
+
+    def test_the_map_survives_a_restart(self):
+        self._set("temperature/outdoor", "Park")
+        restarted = _FakeClient()
+        hub_status.on_connect(restarted, None, {}, 0)
+        published = [p for p in restarted.published if p[0] == hub_status.TOPIC_ICONS]
+        self.assertEqual(json.loads(published[0][1]), {"temperature/outdoor": "Park"})
+
+    def test_save_is_atomic_and_leaves_no_temp_file(self):
+        hub_status.save_icons({"tank/fresh": "Droplet"})
+        hub_status.save_icons({"tank/fresh": "Waves"})
+        self.assertEqual([p.name for p in self.path.parent.iterdir()], [self.path.name])
+
+    def test_invalid_commands_are_ignored_and_change_nothing(self):
+        self._set("tank/fresh", "Droplet")
+        self.client.published.clear()
+        invalid = [
+            b"",
+            b"not json",
+            b"\xff\xfe",
+            b'"tank/fresh"',
+            b"[]",
+            {"key": "tank/fresh"},  # no icon
+            {"icon": "Droplet"},  # no key
+            {"key": "tank/fresh", "icon": "Droplet", "extra": 1},
+            {"key": "fresh", "icon": "Droplet"},  # not <entity>/<id>
+            {"key": "Tank/fresh", "icon": "Droplet"},  # entity is lower case
+            {"key": "tank/fresh/x", "icon": "Droplet"},  # too many segments
+            {"key": "tank/fr esh", "icon": "Droplet"},
+            {"key": 3, "icon": "Droplet"},
+            {"key": "tank/fresh", "icon": "droplet"},  # not PascalCase
+            {"key": "tank/fresh", "icon": "not an icon"},
+            {"key": "tank/fresh", "icon": ""},
+            {"key": "tank/fresh", "icon": 3},
+        ]
+        for payload in invalid:
+            with self.subTest(payload=payload):
+                hub_status.on_message(self.client, None, _icon_msg(payload))
+        self.assertEqual(self.client.published, [])
+        self.assertEqual(json.loads(self.path.read_text()), {"tank/fresh": "Droplet"})
+
+    def test_unreadable_persisted_map_falls_back_to_empty(self):
+        for bad in (b"", b"not json", b'"x"', b"[]", b"\xff\xfe"):
+            with self.subTest(bad=bad):
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                self.path.write_bytes(bad)
+                self.assertEqual(hub_status.load_icons(), {})
+
+    def test_one_bad_stored_entry_does_not_cost_the_others(self):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(
+            '{"tank/fresh": "Droplet", "bad": "Waves", "tank/grey": "waves", "tank/black": 3}'
+        )
+        self.assertEqual(hub_status.load_icons(), {"tank/fresh": "Droplet"})
+
+    def test_unwritable_state_is_not_applied_or_published(self):
+        with mock.patch.object(hub_status, "save_icons", side_effect=OSError("ro")):
+            self._set("tank/fresh", "Droplet")
+        self.assertEqual(self.client.published, [])
+
+    def test_the_icons_do_not_touch_the_primary_battery(self):
+        self._set("tank/fresh", "Droplet")
+        self.assertFalse(
+            any(p[0] == hub_status.TOPIC_PRIMARY_BATTERY for p in self.client.published)
+        )
 
 
 if __name__ == "__main__":

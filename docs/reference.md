@@ -226,11 +226,11 @@ Give every client its credential first, then require authentication, and keep th
 
 Plugins under `plugins/` are Pi-level systemd services that run outside Docker.
 
-| Plugin              | What it does                                                                           | Docs                                                                            |
-| ------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `plugins/hub`       | Publishes the Pi's LAN address and the hub version; holds the primary-battery setting. | [README](../plugins/hub/README.md)                                              |
-| `plugins/kiosk`     | Display power, brightness, and idle auto-sleep for the touchscreen.                    | [README](../plugins/kiosk/README.md), [sleep/wake](kiosk-display-sleep-wake.md) |
-| `plugins/tailscale` | Installs Tailscale and publishes VPN status. Active after `sudo tailscale up`.         | [README](../plugins/tailscale/README.md)                                        |
+| Plugin              | What it does                                                                                             | Docs                                                                            |
+| ------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `plugins/hub`       | Publishes the Pi's LAN address and the hub version; holds the primary-battery and entity-icons settings. | [README](../plugins/hub/README.md)                                              |
+| `plugins/kiosk`     | Display power, brightness, and idle auto-sleep for the touchscreen.                                      | [README](../plugins/kiosk/README.md), [sleep/wake](kiosk-display-sleep-wake.md) |
+| `plugins/tailscale` | Installs Tailscale and publishes VPN status. Active after `sudo tailscale up`.                           | [README](../plugins/tailscale/README.md)                                        |
 
 Remote access uses Tailscale, with no port forwarding or public IP. Note that the HTTPS certificate only covers `DASHBOARD_HOST`, so use the `http` path or the MQTT-WS proxy when connecting over a Tailscale address.
 

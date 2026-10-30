@@ -23,6 +23,7 @@ if [[ ! -f "${ENV_FILE}" ]]; then
 # MQTT_PASSWORD=
 # POLL_INTERVAL=30
 # PRIMARY_BATTERY_PATH=/var/lib/renewvan-hub/primary-battery.json
+# ICONS_PATH=/var/lib/renewvan-hub/icons.json
 ENV
   echo "==> Seeded ${ENV_FILE}"
 fi
