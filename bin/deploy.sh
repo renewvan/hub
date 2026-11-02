@@ -27,7 +27,7 @@ cd "${REPO_ROOT}"
 
 echo "==> Syncing compose artifacts to ${HOST}:${REMOTE_DIR}"
 ssh "${HOST}" "mkdir -p ${REMOTE_DIR} /opt/renewvan/plugins/kiosk /opt/renewvan/plugins/tailscale /opt/renewvan/plugins/hub /opt/renewvan/venvs"
-rsync -az docker-compose.yml "${HOST}:${REMOTE_DIR}/docker-compose.yml"
+rsync -az docker-compose.yml docker-compose.lan.yml "${HOST}:${REMOTE_DIR}/"
 ssh "${HOST}" "mkdir -p ${REMOTE_DIR}/bin"
 rsync -az bin/vedirect-gate.sh "${HOST}:${REMOTE_DIR}/bin/vedirect-gate.sh"
 rsync -az --delete docker/ "${HOST}:${REMOTE_DIR}/docker/"
@@ -282,7 +282,16 @@ if ! grep -Eq '^DASHBOARD_HOST=.+' .env; then
   exit 1
 fi
 
-# The broker is published on loopback and on MQTT_BIND_ADDR only (docker-compose.yml), so it is
+# The Pi publishes the broker on its van-LAN address too, through docker-compose.lan.yml. Selecting
+# it in .env (COMPOSE_FILE) makes every plain \`docker compose\` run on the Pi use it, not just this script.
+if ! grep -q '^COMPOSE_FILE=' .env; then
+  echo 'COMPOSE_FILE=docker-compose.yml:docker-compose.lan.yml' >> .env
+elif ! grep '^COMPOSE_FILE=' .env | grep -q 'docker-compose.lan.yml'; then
+  echo "ERROR: COMPOSE_FILE in ${REMOTE_DIR}/.env does not include docker-compose.lan.yml; add it (docker-compose.yml:docker-compose.lan.yml) and re-run." >&2
+  exit 1
+fi
+
+# The broker is published on loopback and on MQTT_BIND_ADDR only (docker-compose.lan.yml), so it is
 # unreachable from an uplink interface. Seed it from DASHBOARD_HOST when that is an IPv4 address
 # (an existing .env predates the key), then require it to be an address this Pi has right now:
 # a stale DHCP address would otherwise make mosquitto fail to start.

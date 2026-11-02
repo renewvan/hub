@@ -29,7 +29,7 @@ That is the whole install. It checks the Pi, installs Docker, generates credenti
 
 Optional flags: `--venus-host`, `--venus-portal-id`, `--public-host`, `--no-kiosk`, `--no-rotate`, `--yes`. All of them, and the manual steps that remain (Tailscale login, tank calibration, broker authentication), are in the [reference](docs/reference.md#install).
 
-The broker (ports 1883 and 9001) listens only on the Pi's van-LAN address (`MQTT_BIND_ADDR`) and on loopback, so an uplink interface such as cellular or Starlink cannot reach it. Check it with [Broker reachability](docs/reference.md#broker-reachability).
+The broker (ports 1883 and 9001) listens only on loopback locally, and on the Pi also on its van-LAN address (`MQTT_BIND_ADDR`), so an uplink interface such as cellular or Starlink cannot reach it. Check it with [Broker reachability](docs/reference.md#broker-reachability).
 
 Broker authentication is **off** by default. Read [Broker security](docs/reference.md#broker-security) before exposing the Pi beyond your own network.
 

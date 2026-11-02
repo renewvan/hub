@@ -1,0 +1,9 @@
+# Pi override: also publish the broker on the van-LAN address, never on 0.0.0.0, so an uplink
+# interface (cellular/Starlink) cannot reach it. Selected on the Pi by
+# COMPOSE_FILE=docker-compose.yml:docker-compose.lan.yml in its .env (bin/deploy.sh seeds it).
+# Local dev does not use this file. docs/reference.md "Broker reachability".
+services:
+  mosquitto:
+    ports:
+      - "${MQTT_BIND_ADDR:?set MQTT_BIND_ADDR to the Pi LAN IP}:1883:1883"
+      - "${MQTT_BIND_ADDR:?set MQTT_BIND_ADDR to the Pi LAN IP}:9001:9001"
