@@ -5,7 +5,7 @@ After=network-online.target tailscaled.service mosquitto.service
 Wants=network-online.target
 
 [Service]
-User=pi-user
+User=@SERVICE_USER@
 EnvironmentFile=-/etc/renewvan/tailscale.env
 ExecStart=/opt/renewvan/venvs/tailscale/bin/python /opt/renewvan/plugins/tailscale/tailscale_status.py
 Restart=on-failure

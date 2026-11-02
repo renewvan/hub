@@ -28,7 +28,13 @@ ENV
   echo "==> Seeded ${ENV_FILE}"
 fi
 
-cp "${PLUGIN_DIR}/${SERVICE_FILE}" /etc/systemd/system/
+# The unit ships User=@SERVICE_USER@; run as the ssh user that invoked sudo.
+SERVICE_USER="${SUDO_USER:-}"
+if [[ -z "${SERVICE_USER}" || "${SERVICE_USER}" == "root" ]]; then
+  echo "error: run via sudo from the Pi's login user (SUDO_USER is unset or root)" >&2
+  exit 1
+fi
+sed "s|@SERVICE_USER@|${SERVICE_USER}|" "${PLUGIN_DIR}/${SERVICE_FILE}" > "/etc/systemd/system/${SERVICE_FILE}"
 systemctl daemon-reload
 systemctl enable "${SERVICE_FILE%.service}"
 # restart, not enable --now alone: that leaves a running service on its old script

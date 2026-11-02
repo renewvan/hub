@@ -61,7 +61,7 @@ mkdir -p /etc/renewvan/mosquitto /etc/renewvan/tank /etc/renewvan/gps /etc/renew
 # plugin/kiosk: create venv (Bookworm externally-managed Python) and install deps
 python3 -m venv /opt/renewvan/venvs/kiosk
 /opt/renewvan/venvs/kiosk/bin/pip install --quiet -r /opt/renewvan/plugins/kiosk/requirements.txt
-sudo cp /opt/renewvan/plugins/kiosk/renewvan-kiosk.service /etc/systemd/system/
+sed "s|@SERVICE_USER@|\$(whoami)|" /opt/renewvan/plugins/kiosk/renewvan-kiosk.service | sudo tee /etc/systemd/system/renewvan-kiosk.service >/dev/null
 sudo systemctl daemon-reload
 sudo systemctl enable --now renewvan-kiosk.service
 # The cage kiosk session unit (renewvan-cage.service) is installed by

@@ -7,7 +7,7 @@ After=network.target mosquitto.service
 SupplementaryGroups=input video
 Environment=WAYLAND_DISPLAY=wayland-0
 Environment=XDG_RUNTIME_DIR=/run/user/1000
-User=pi-user
+User=@SERVICE_USER@
 EnvironmentFile=-/etc/renewvan/kiosk.env
 ExecStart=/opt/renewvan/venvs/kiosk/bin/python /opt/renewvan/plugins/kiosk/kiosk.py
 Restart=on-failure

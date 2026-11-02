@@ -5,7 +5,7 @@ After=network-online.target docker.service
 Wants=network-online.target
 
 [Service]
-User=pi-user
+User=@SERVICE_USER@
 EnvironmentFile=-/etc/renewvan/hub.env
 # /var/lib/renewvan-hub, owned by User, holds the persisted primary battery.
 StateDirectory=renewvan-hub
