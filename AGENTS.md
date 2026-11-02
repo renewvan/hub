@@ -12,7 +12,7 @@ For deployment changes specific to this host repo, bump a service by editing its
 
 ### Code formatting/linting (new repo? read this first)
 
-Every `renewvan/*` repo formats/lints on every commit via a pre-commit hook — never CI-only. Per `docs/adr/0007-per-language-formatting-linting-convention.md`: Prettier (or Biome, where already adopted) + oxlint for JS/TS, ruff for Python, enforced via `husky`+`lint-staged` (JS/TS) or the `pre-commit` framework (Python/config-only repos). Starting a new repo: copy the setup from the nearest sibling of the same language (`renewvan/dashboard` for JS/TS, `renewvan/driver-tank` for Python) rather than designing it from scratch.
+Every `renewvan/*` repo formats/lints on every commit via a pre-commit hook — never CI-only. Per `docs/adr/0007-per-language-formatting-linting-convention.md`: Prettier (or Biome, where already adopted) + oxlint for JS/TS, ruff for Python, enforced via `husky`+`lint-staged` (JS/TS) or the `pre-commit` framework (Python/config-only repos). Starting a new repo: copy the setup from the nearest sibling of the same language (`renewvan/dashboard` for JS/TS, `renewvan/driver-template` for Python drivers) rather than designing it from scratch.
 
 ## Verify
 
