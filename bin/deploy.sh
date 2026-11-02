@@ -30,6 +30,7 @@ ssh "${HOST}" "mkdir -p ${REMOTE_DIR} /opt/renewvan/plugins/kiosk /opt/renewvan/
 rsync -az docker-compose.yml "${HOST}:${REMOTE_DIR}/docker-compose.yml"
 rsync -az --delete docker/ "${HOST}:${REMOTE_DIR}/docker/"
 rsync -az .env.example "${HOST}:${REMOTE_DIR}/.env.example"
+rsync -az bin/heater-hint.sh "${HOST}:${REMOTE_DIR}/heater-hint.sh"
 # caddy (docker-compose.yml) bind-mounts ../dashboard/docker/Caddyfile, which resolves to
 # /opt/renewvan/dashboard/docker/Caddyfile on the Pi. Ship it from the sibling dashboard checkout:
 # if the source is missing on the Pi, Docker creates a root-owned directory at that path instead.
@@ -224,7 +225,8 @@ if [[ -e /dev/ttyAUTOTERM ]]; then
   export COMPOSE_PROFILES="\${COMPOSE_PROFILES:+\${COMPOSE_PROFILES},}autoterm"
   echo "==> Heater device /dev/ttyAUTOTERM present: enabling the autoterm profile"
 else
-  echo "==> No /dev/ttyAUTOTERM: skipping driver-autoterm (install the udev rule and re-run deploy to enable it)"
+  # Skipping is fine (many vans have no heater): explain it, install no rules, keep going.
+  bash ${REMOTE_DIR}/heater-hint.sh "${HOST}" || true
   docker compose rm -sf driver-autoterm >/dev/null 2>&1 || true
 fi
 
