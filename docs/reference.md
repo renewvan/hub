@@ -89,6 +89,14 @@ Drivers marked with a profile do not start by default, because without their har
 
 Example: `docker compose --profile gps --profile venus up -d`.
 
+**Heater adapter (`/dev/ttyAUTOTERM`).** Plug the heater's FTDI USB-serial adapter into the Pi, then run from your machine:
+
+```bash
+bin/bootstrap-pi.sh --with-heater
+```
+
+It finds the adapter's serial (and asks which one if several are plugged in), writes `/etc/udev/rules.d/99-renewvan-autoterm.rules`, reloads udev (also on a re-run if `/dev/ttyAUTOTERM` is missing) and adds the login user to `dialout` (so that user can open the device for debugging; the driver container gets it through its compose `devices:` entry). It refuses adapters with no serial or duplicate serials, and warns if the symlink does not appear. It is safe to re-run; run it again to point the symlink at a replacement adapter. Log in again for the `dialout` membership to apply, then re-run `bin/deploy.sh` to enable the `autoterm` profile.
+
 The ESP32 relay driver is firmware, not a container. It is flashed once from `renewvan/driver-esp32`.
 
 ### Volumes

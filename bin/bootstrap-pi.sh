@@ -3,7 +3,11 @@
 # the Compose plugin if missing, and creates the directory layout
 # bin/deploy.sh rsyncs into. Idempotent — safe to re-run.
 #
-# Usage: bin/bootstrap-pi.sh [--host <ssh-alias-or-user@host>]
+# Usage: bin/bootstrap-pi.sh [--host <ssh-alias-or-user@host>] [--with-heater]
+#
+#   --with-heater   also install the udev rule that makes /dev/ttyAUTOTERM exist
+#                   for driver-autoterm (see bin/install-heater-udev.sh). Plug the
+#                   heater's USB adapter in first. Re-run it to swap the adapter.
 #
 # Runs the remote steps via `ssh -t` (not piped stdin) so `sudo` can prompt
 # for a password interactively if the account isn't passwordless-sudo.
@@ -15,12 +19,17 @@
 set -euo pipefail
 
 HOST="renewvan"
+WITH_HEATER=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --host)
       HOST="$2"
       shift 2
+      ;;
+    --with-heater)
+      WITH_HEATER=1
+      shift
       ;;
     *)
       echo "Unknown argument: $1" >&2
@@ -109,6 +118,17 @@ sudo chown -R "$(whoami)":"$(whoami)" /opt/renewvan /etc/renewvan /var/log/renew
 echo "==> Bootstrap complete"
 EOF
 
+# Copy a local script to the Pi, run it over `ssh -t` (so sudo can prompt), clean up.
+run_remote() {
+  local script="$1" remote="$2"
+  scp -q "${script}" "${HOST}:${remote}"
+  ssh -t "${HOST}" "bash ${remote}; status=\$?; rm -f ${remote}; exit \$status"
+}
+
 echo "==> Bootstrapping ${HOST}"
-scp -q "${REMOTE_SCRIPT}" "${HOST}:/tmp/renewvan-bootstrap.sh"
-ssh -t "${HOST}" "bash /tmp/renewvan-bootstrap.sh; status=\$?; rm -f /tmp/renewvan-bootstrap.sh; exit \$status"
+run_remote "${REMOTE_SCRIPT}" /tmp/renewvan-bootstrap.sh
+
+if [[ "${WITH_HEATER}" == "1" ]]; then
+  echo "==> Installing heater udev rule on ${HOST}"
+  run_remote "$(dirname "$0")/install-heater-udev.sh" /tmp/renewvan-heater-udev.sh
+fi
