@@ -264,6 +264,38 @@ services:
       - ${TILT_CONFIG_PATH:-./config/tilt/config.ini}:/app/config.ini:ro
       - ${TILT_STATE_PATH:-./config/tilt/state}:/app/state
 
+  # Native MQTT Victron driver: SmartShunt, SmartSolar MPPT, Orion XS and Blue Smart
+  # chargers read over VE.Direct text mode on USB serial (read-only) -- see
+  # driver-vedirect's own README's "Topics published" section. It publishes the same
+  # battery/solar/charger entities as driver-venus; run one or the other on the same devices.
+  #
+  # Generic serial access, no per-device edits: the driver scans /dev/serial/by-id itself, so
+  # /dev is mounted (a `devices:` entry would pin one path and abort `up -d` when it is
+  # missing) and the cgroup rules allow the USB-serial majors, 188 (ttyUSB) and 166 (ttyACM).
+  #
+  # Behind the `vedirect` profile so a van without a Victron USB cable runs no useless
+  # container. bin/deploy.sh enables it only when a /dev/serial/by-id entry matches the
+  # driver's port_globs (bin/vedirect-gate.sh). For a manual `docker compose up -d`, use
+  # `docker compose --profile vedirect up -d`.
+  driver-vedirect:
+    profiles: ["vedirect"]
+    image: ghcr.io/renewvan/driver-vedirect:v0.1.0-beta.1
+    container_name: renewvan-vedirect
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    device_cgroup_rules:
+      - "c 188:* rmw"
+      - "c 166:* rmw"
+    environment:
+      MQTT_HOST: ${RENEWVAN_HOST:-mosquitto}
+      MQTT_PORT: ${RENEWVAN_PORT:-1883}
+      MQTT_USERNAME: ${RENEWVAN_USERNAME:-}
+      MQTT_PASSWORD: ${RENEWVAN_PASSWORD:-}
+    volumes:
+      - /dev:/dev
+      - ${VEDIRECT_CONFIG_PATH:-./config/vedirect/config.ini}:/app/config.ini:ro
+
   # Venus OS MQTT -> renewvan bus remap (battery, solar, charger). Only for
   # vans that already run Venus OS (Cerbo GX, Pi with Venus): subscribes
   # against that device's own broker (VENUS_*), publishes onto this

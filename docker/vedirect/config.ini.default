@@ -1,0 +1,8 @@
+[mqtt]
+host = mosquitto
+
+[serial]
+; port_globs defaults to "usb-Duppa_srl_*, usb-VictronEnergy_*, usb-FTDI_*" (names under
+; /dev/serial/by-id). Uncomment to narrow it when other USB serial adapters share the
+; directory; bin/deploy.sh gates the vedirect profile on the same value.
+; port_globs = usb-Duppa_srl_*, usb-VictronEnergy_*, usb-FTDI_*

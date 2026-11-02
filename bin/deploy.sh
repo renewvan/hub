@@ -28,6 +28,8 @@ cd "${REPO_ROOT}"
 echo "==> Syncing compose artifacts to ${HOST}:${REMOTE_DIR}"
 ssh "${HOST}" "mkdir -p ${REMOTE_DIR} /opt/renewvan/plugins/kiosk /opt/renewvan/plugins/tailscale /opt/renewvan/plugins/hub /opt/renewvan/venvs"
 rsync -az docker-compose.yml "${HOST}:${REMOTE_DIR}/docker-compose.yml"
+ssh "${HOST}" "mkdir -p ${REMOTE_DIR}/bin"
+rsync -az bin/vedirect-gate.sh "${HOST}:${REMOTE_DIR}/bin/vedirect-gate.sh"
 rsync -az --delete docker/ "${HOST}:${REMOTE_DIR}/docker/"
 rsync -az .env.example "${HOST}:${REMOTE_DIR}/.env.example"
 rsync -az bin/heater-hint.sh "${HOST}:${REMOTE_DIR}/heater-hint.sh"
@@ -57,7 +59,7 @@ ssh "${HOST}" bash -s <<REMOTE
 set -euo pipefail
 cd "${REMOTE_DIR}"
 
-mkdir -p /etc/renewvan/mosquitto /etc/renewvan/tank /etc/renewvan/gps /etc/renewvan/temperature/state /etc/renewvan/tilt/state /etc/renewvan/dashboard /etc/renewvan/wattcycle /etc/renewvan/autoterm
+mkdir -p /etc/renewvan/mosquitto /etc/renewvan/tank /etc/renewvan/gps /etc/renewvan/temperature/state /etc/renewvan/tilt/state /etc/renewvan/dashboard /etc/renewvan/wattcycle /etc/renewvan/autoterm /etc/renewvan/vedirect
 
 # plugin/kiosk: create venv (Bookworm externally-managed Python) and install deps
 python3 -m venv /opt/renewvan/venvs/kiosk
@@ -88,6 +90,7 @@ if [[ ! -f .env ]]; then
   sed -i 's|^TILT_STATE_PATH=.*|TILT_STATE_PATH=/etc/renewvan/tilt/state|' .env
   sed -i 's|^WATTCYCLE_CONFIG_PATH=.*|WATTCYCLE_CONFIG_PATH=/etc/renewvan/wattcycle/config.ini|' .env
   sed -i 's|^AUTOTERM_CONFIG_PATH=.*|AUTOTERM_CONFIG_PATH=/etc/renewvan/autoterm/config.ini|' .env
+  sed -i 's|^VEDIRECT_CONFIG_PATH=.*|VEDIRECT_CONFIG_PATH=/etc/renewvan/vedirect/config.ini|' .env
   sed -i 's|^DASHBOARD_BASEMAP_PATH=.*|DASHBOARD_BASEMAP_PATH=/etc/renewvan/dashboard/basemap.pmtiles|' .env
   sed -i 's|^MOSQUITTO_CONFIG_PATH=.*|MOSQUITTO_CONFIG_PATH=/etc/renewvan/mosquitto|' .env
   echo
@@ -141,6 +144,8 @@ grep -q '^TILT_STATE_PATH=' .env || echo 'TILT_STATE_PATH=/etc/renewvan/tilt/sta
 grep -q '^WATTCYCLE_CONFIG_PATH=' .env || echo 'WATTCYCLE_CONFIG_PATH=/etc/renewvan/wattcycle/config.ini' >> .env
 # Same for driver-autoterm's key.
 grep -q '^AUTOTERM_CONFIG_PATH=' .env || echo 'AUTOTERM_CONFIG_PATH=/etc/renewvan/autoterm/config.ini' >> .env
+# Same for driver-vedirect's key.
+grep -q '^VEDIRECT_CONFIG_PATH=' .env || echo 'VEDIRECT_CONFIG_PATH=/etc/renewvan/vedirect/config.ini' >> .env
 # Same for the dashboard's Basemap path.
 grep -q '^DASHBOARD_BASEMAP_PATH=' .env || echo 'DASHBOARD_BASEMAP_PATH=/etc/renewvan/dashboard/basemap.pmtiles' >> .env
 
@@ -182,6 +187,11 @@ fi
 if [[ ! -f /etc/renewvan/autoterm/config.ini ]]; then
   echo "Seeding /etc/renewvan/autoterm/config.ini from the repo default (sets [mqtt] host = mosquitto; commands_enabled stays false until you set it)."
   cp docker/autoterm/config.ini.default /etc/renewvan/autoterm/config.ini
+fi
+
+if [[ ! -f /etc/renewvan/vedirect/config.ini ]]; then
+  echo "Seeding /etc/renewvan/vedirect/config.ini from the repo default (sets [mqtt] host = mosquitto; set [serial] port_globs to narrow which USB adapters it reads)."
+  cp docker/vedirect/config.ini.default /etc/renewvan/vedirect/config.ini
 fi
 
 if [[ ! -f /etc/renewvan/temperature/config.ini ]]; then
@@ -228,6 +238,18 @@ else
   # Skipping is fine (many vans have no heater): explain it, install no rules, keep going.
   bash ${REMOTE_DIR}/heater-hint.sh "${HOST}" || true
   docker compose rm -sf driver-autoterm >/dev/null 2>&1 || true
+fi
+
+# driver-vedirect is behind the \`vedirect\` compose profile so a van without a Victron USB cable
+# runs no useless container. bin/vedirect-gate.sh checks /dev/serial/by-id against the driver's
+# port_globs (its defaults, or the override in /etc/renewvan/vedirect/config.ini). Any previously
+# created container is stopped otherwise.
+if bash bin/vedirect-gate.sh /dev/serial/by-id /etc/renewvan/vedirect/config.ini; then
+  export COMPOSE_PROFILES="\${COMPOSE_PROFILES:+\${COMPOSE_PROFILES},}vedirect"
+  echo "==> VE.Direct USB adapter present: enabling the vedirect profile"
+else
+  echo "==> No matching /dev/serial/by-id adapter: skipping driver-vedirect (plug in the VE.Direct cable and re-run deploy to enable it)"
+  docker compose rm -sf driver-vedirect >/dev/null 2>&1 || true
 fi
 
 # driver-venus is behind the \`venus\` compose profile: it needs VENUS_MQTT_HOST and

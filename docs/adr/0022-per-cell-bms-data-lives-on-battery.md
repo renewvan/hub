@@ -39,7 +39,7 @@ The properties (all optional, all retained):
 
 ## Limits this accepts
 
-- **No per-instance staleness signal.** Both Drivers set a retained LWT on `renewvan/<driver>/health`, one per Driver, which covers only process or connection death. A BMS that goes silent while its Driver is alive leaves the last values retained and health `online` (`driver-wattcycle` catches `BleError` and retries without publishing). That is true of every existing `battery` property; a per-instance staleness signal would touch every property and both Drivers and is its own effort (not decided here).
+- **No per-instance staleness signal.** _(Amended: ADR 0008 now has a staleness rule, "silence is an invalid reading", and `driver-vedirect` follows it. `driver-wattcycle` and `driver-venus` do not yet, so the paragraph below still describes them.)_ Both Drivers set a retained LWT on `renewvan/<driver>/health`, one per Driver, which covers only process or connection death. A BMS that goes silent while its Driver is alive leaves the last values retained and health `online` (`driver-wattcycle` catches `BleError` and retries without publishing). That is true of every existing `battery` property; a per-instance staleness signal would touch every property and both Drivers and is its own effort (not decided here).
 - **JBD bit layouts are unverified on hardware.** The DH04 capture (`research/dh04-capture`) read the balance words (`0x0000`), the protection word (`0x0000`) and the FET byte (`0x03`) only at rest. The protection bit order above and the FET bit meanings come from the JBD specification and must be confirmed against a real balancing event or a safely forced protection during implementation.
 - **Venus cell paths are config-dependent.** Every per-cell, per-probe and balancing path is a `dbus-serialbattery` extension whose layout depends on its configuration (`research/venus-cell-paths`); Victron documents only the limits and `Io/AllowTo*`. This van's GX has no `dbus-serialbattery` service, so the Venus mapping is written for other users' vans and tested from the research, not on this hardware.
 
@@ -56,7 +56,7 @@ Hard to reverse: these are new retained topics and schema properties that two Dr
 
 ## See also
 
-- `docs/adr/0008-node-naming-and-entity-neutrality.md`: entity neutrality; one source per id; a shunt and a BMS are two views.
+- `docs/adr/0008-node-naming-and-entity-neutrality.md`: entity neutrality; one source per id; a shunt and a BMS are two views; the staleness rule (silence is an invalid reading).
 - `docs/adr/0009-solar-yield-history-as-one-retained-array.md`: one retained array, `null` for a gap.
 - `docs/adr/0019-entity-instances-name-their-driver-and-shared-primary-battery.md`: `driver`, the Primary battery, selection not fusion.
 - `schema/battery.schema.json`, `schema/demo/battery.wattcycle.demo.json`: the contract and the demo scenario.
