@@ -156,6 +156,7 @@ Copy `.env.example` to `.env`. The installer does this for you. `.env.example` d
 | `VITE_MQTT_USERNAME`, `VITE_MQTT_PASSWORD`              | empty                                | Browser-side broker credentials.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `DASHBOARD_BASEMAP_PATH`                                | `./config/dashboard/basemap.pmtiles` | The offline map file. `bin/deploy.sh` uses `/etc/renewvan/dashboard/basemap.pmtiles`.                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `DASHBOARD_HOST`                                        | empty, **required**                  | The Pi's LAN address or name. Compose requires it for every service; deploy refuses to run while it is empty.                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `MQTT_BIND_ADDR`                                        | empty, **required**                  | The Pi's van-LAN IPv4 address. The broker (1883, 9001) is published on it and on loopback only, never on every interface. `bin/deploy.sh` seeds it from `DASHBOARD_HOST` when that is an IP, and refuses to deploy if it is not an address of the Pi. See [Broker reachability](#broker-reachability).                                                                                                                                                                                                          |
 
 ## Deploying to a Pi step by step
 
@@ -215,6 +216,21 @@ Android may warn "Network may be monitored" after you install a user CA. That is
 ### Certificate lifetime
 
 The root is valid for 10 years. Caddy signs the server certificate directly with it (`sign_with_root`) for 90 days and renews it automatically, so renewals need no reinstall. Never delete the `caddy-data` volume: every device would have to trust a new root.
+
+## Broker reachability
+
+The broker is anonymous, so it must be reachable from the van's own network and from nowhere else. Compose publishes ports 1883 and 9001 on loopback (host plugins: kiosk, tailscale) and on `MQTT_BIND_ADDR`, the Pi's van-LAN address, never on `0.0.0.0`. Containers reach the broker over the compose network, and browsers use the dashboard's `/mqtt` proxy, so neither needs the host ports. This is a hard precondition for enabling heater commands (see [ADR 0021](adr/0021-writable-heater-and-its-command-safety-rules.md)).
+
+If the Pi's IP changes (new router), `bin/deploy.sh` stops with an error naming `MQTT_BIND_ADDR`; set it to the new address and re-run.
+
+### Verify
+
+1. On the Pi, check the listeners: `ss -ltn | grep -E ':(1883|9001)\b'` shows only `127.0.0.1` and the van-LAN address, never `0.0.0.0` or `*`.
+2. From a van-LAN device (laptop on the van Wi-Fi): `mosquitto_sub -h <MQTT_BIND_ADDR> -t 'renewvan/#' -C 1 -W 5` receives a message, and the dashboard shows live data.
+3. From a device on the uplink side (a phone on cellular, not on the van Wi-Fi, with the Pi's uplink address from `ip -4 addr` on the uplink interface): `nc -zv -w 5 <uplink-address> 1883` and the same for `9001` must fail (refused or timed out).
+4. `docker compose ps` shows every driver `Up`, and Settings > Drivers lists them as healthy.
+
+Authentication and ACLs are out of scope here; see [Broker security](#broker-security).
 
 ## Broker security
 

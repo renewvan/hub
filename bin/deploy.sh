@@ -258,6 +258,28 @@ if ! grep -Eq '^DASHBOARD_HOST=.+' .env; then
   exit 1
 fi
 
+# The broker is published on loopback and on MQTT_BIND_ADDR only (docker-compose.yml), so it is
+# unreachable from an uplink interface. Seed it from DASHBOARD_HOST when that is an IPv4 address
+# (an existing .env predates the key), then require it to be an address this Pi has right now:
+# a stale DHCP address would otherwise make mosquitto fail to start.
+if ! grep -Eq '^MQTT_BIND_ADDR=.+' .env; then
+  dash_host="\$(sed -n 's|^DASHBOARD_HOST=||p' .env | tr -d '\\r' | head -n1)"
+  if printf '%s' "\${dash_host}" | grep -Eq '^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\$'; then
+    sed -i '/^MQTT_BIND_ADDR=/d' .env
+    echo "MQTT_BIND_ADDR=\${dash_host}" >> .env
+    echo "==> MQTT_BIND_ADDR not set: using DASHBOARD_HOST (\${dash_host})"
+  else
+    echo "ERROR: MQTT_BIND_ADDR in ${REMOTE_DIR}/.env is empty: set it to the Pi's van-LAN IPv4 address (hostname -I) and re-run." >&2
+    exit 1
+  fi
+fi
+bind_addr="\$(sed -n 's|^MQTT_BIND_ADDR=||p' .env | tr -d '\\r' | head -n1)"
+if ! { hostname -I 2>/dev/null | tr ' ' '\\n'; } | grep -qxF "\${bind_addr}"; then
+  echo "ERROR: MQTT_BIND_ADDR=\${bind_addr} is not an address of this Pi (\$(hostname -I 2>/dev/null | xargs || true))." >&2
+  echo "       The Pi's IP probably changed (new router). Set MQTT_BIND_ADDR in ${REMOTE_DIR}/.env to its current van-LAN address and re-run." >&2
+  exit 1
+fi
+
 echo "==> docker compose pull && up -d"
 docker compose pull
 # --remove-orphans: containers have fixed container_name values, so a renamed service key leaves
