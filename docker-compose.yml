@@ -14,7 +14,7 @@
 # host needing bind mounts keeps its own override outside this repo.
 # Full operator reference: docs/reference.md.
 #
-# MQTT:      <host>:1883 (plain), <host>:9001 (websockets)
+# MQTT:      <LAN IP>:1883 (plain), <LAN IP>:9001 (websockets); van LAN + loopback only
 # InfluxDB:  http://<host>:8086 (org=renewvan, bucket=renewvan)
 # Grafana:   http://<host>:3000 (admin/admin on first run); the InfluxDB datasource and the
 #            "Van overview" dashboard are provisioned from docker/grafana/ (docs/reference.md)
@@ -27,9 +27,15 @@ services:
     image: eclipse-mosquitto:2
     container_name: renewvan-mosquitto
     restart: unless-stopped
+    # Van LAN only: published on loopback (host plugins: kiosk, tailscale) and on the Pi's
+    # LAN address, never on 0.0.0.0, so an uplink interface (cellular/Starlink) cannot reach
+    # an anonymous broker. Containers use the compose network, not these ports. bin/deploy.sh
+    # seeds MQTT_BIND_ADDR from DASHBOARD_HOST. Check: docs/reference.md "Broker reachability".
     ports:
-      - "1883:1883"
-      - "9001:9001"
+      - "127.0.0.1:1883:1883"
+      - "127.0.0.1:9001:9001"
+      - "${MQTT_BIND_ADDR:?set MQTT_BIND_ADDR to the Pi LAN IP}:1883:1883"
+      - "${MQTT_BIND_ADDR:?set MQTT_BIND_ADDR to the Pi LAN IP}:9001:9001"
     volumes:
       - ${MOSQUITTO_CONFIG_PATH:-./docker/mosquitto/config}:/mosquitto/config
       - mosquitto-data:/mosquitto/data
