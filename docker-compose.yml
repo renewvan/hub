@@ -156,7 +156,7 @@ services:
   # adapter, use `docker compose --profile autoterm up -d`.
   driver-autoterm:
     profiles: ["autoterm"]
-    image: ghcr.io/renewvan/driver-autoterm:v0.2.0
+    image: ghcr.io/renewvan/driver-autoterm:v0.2.1
     container_name: renewvan-autoterm
     restart: unless-stopped
     depends_on:
