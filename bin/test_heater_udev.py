@@ -36,8 +36,9 @@ class HeaterUdevTest(unittest.TestCase):
         self.bin = self.root / "bin"
         self.usb = self.root / "usb"
         self.rules = self.root / "rules"
+        self.dev = self.root / "dev"
         self.log = self.root / "log"
-        for d in (self.bin, self.usb, self.rules):
+        for d in (self.bin, self.usb, self.rules, self.dev):
             d.mkdir()
         self.log.touch()
         for name, body in STUBS.items():
@@ -61,11 +62,15 @@ class HeaterUdevTest(unittest.TestCase):
             "FAKE_GROUPS": self.groups,
             "USB_SYSFS": str(self.usb),
             "UDEV_RULES_DIR": str(self.rules),
+            "DEV_DIR": str(self.dev),
             "HEATER_USER": "alice",
         }
         return subprocess.run(
             ["bash", str(SCRIPT)], input=stdin, text=True, env=env, capture_output=True
         )
+
+    def make_symlink(self):
+        (self.dev / "ttyAUTOTERM").touch()
 
     def rule(self):
         return (self.rules / RULE_NAME).read_text()
@@ -103,6 +108,7 @@ class HeaterUdevTest(unittest.TestCase):
     def test_second_run_changes_nothing(self):
         self.add_usb("1-1", "0403", "6001", "A1B2C3")
         self.run_script()
+        self.make_symlink()
         self.groups = "pi adm dialout"
         before = self.rule()
         self.log.write_text("")
@@ -110,6 +116,7 @@ class HeaterUdevTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(self.rule(), before)
         self.assertEqual(self.calls(), [])
+        self.assertIn("-> /dev/ttyAUTOTERM", r.stdout)
 
     def test_no_adapter_asks_to_plug_in_and_writes_nothing(self):
         r = self.run_script()
@@ -156,6 +163,60 @@ class HeaterUdevTest(unittest.TestCase):
     def test_adapter_without_serial_is_not_usable(self):
         self.add_usb("1-1", "0403", "6001", None)
         r = self.run_script()
+        self.assertNotEqual(r.returncode, 0)
+        self.assertFalse((self.rules / RULE_NAME).exists())
+        self.assertIn("no serial", (r.stdout + r.stderr).lower())
+
+    def test_no_serial_adapter_next_to_a_good_one_is_mentioned(self):
+        self.add_usb("1-1", "0403", "6001", None)
+        self.add_usb("1-2", "0403", "6001", "A1B2C3")
+        r = self.run_script()
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("no serial", (r.stdout + r.stderr).lower())
+        self.assertIn("A1B2C3", self.rule())
+
+    def test_duplicate_serials_are_refused(self):
+        self.add_usb("1-1", "0403", "6001", "SAME00")
+        self.add_usb("1-2", "0403", "6001", "SAME00")
+        r = self.run_script(stdin="1\n")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("same serial", (r.stdout + r.stderr).lower())
+        self.assertFalse((self.rules / RULE_NAME).exists())
+        self.assertEqual(self.calls(), [])
+
+    def test_rule_current_but_symlink_missing_still_reloads_udev(self):
+        self.add_usb("1-1", "0403", "6001", "A1B2C3")
+        self.run_script()
+        self.groups = "pi dialout"
+        self.log.write_text("")
+        r = self.run_script()
+        self.assertEqual(r.returncode, 0, r.stderr)
+        calls = self.calls()
+        self.assertTrue(any(c.startswith("sudo udevadm control --reload-rules") for c in calls))
+        self.assertTrue(any(c.startswith("sudo udevadm trigger") for c in calls))
+        self.assertFalse(any("usermod" in c for c in calls))
+
+    def test_success_message_only_when_symlink_exists(self):
+        self.add_usb("1-1", "0403", "6001", "A1B2C3")
+        r = self.run_script()
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertNotIn("-> /dev/ttyAUTOTERM", r.stdout)
+        self.assertIn("WARNING", r.stderr)
+        self.make_symlink()
+        r = self.run_script()
+        self.assertIn("-> /dev/ttyAUTOTERM", r.stdout)
+
+    def test_several_adapters_typo_then_valid_answer_is_accepted(self):
+        self.add_usb("1-1", "0403", "6001", "AAA111")
+        self.add_usb("1-2", "0403", "6001", "BBB222")
+        r = self.run_script(stdin="x\n9\n1\n")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("AAA111", self.rule())
+
+    def test_several_adapters_repeated_invalid_answers_give_up(self):
+        self.add_usb("1-1", "0403", "6001", "AAA111")
+        self.add_usb("1-2", "0403", "6001", "BBB222")
+        r = self.run_script(stdin="x\ny\nz\n1\n")
         self.assertNotEqual(r.returncode, 0)
         self.assertFalse((self.rules / RULE_NAME).exists())
 

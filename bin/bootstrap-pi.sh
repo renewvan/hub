@@ -118,12 +118,17 @@ sudo chown -R "$(whoami)":"$(whoami)" /opt/renewvan /etc/renewvan /var/log/renew
 echo "==> Bootstrap complete"
 EOF
 
+# Copy a local script to the Pi, run it over `ssh -t` (so sudo can prompt), clean up.
+run_remote() {
+  local script="$1" remote="$2"
+  scp -q "${script}" "${HOST}:${remote}"
+  ssh -t "${HOST}" "bash ${remote}; status=\$?; rm -f ${remote}; exit \$status"
+}
+
 echo "==> Bootstrapping ${HOST}"
-scp -q "${REMOTE_SCRIPT}" "${HOST}:/tmp/renewvan-bootstrap.sh"
-ssh -t "${HOST}" "bash /tmp/renewvan-bootstrap.sh; status=\$?; rm -f /tmp/renewvan-bootstrap.sh; exit \$status"
+run_remote "${REMOTE_SCRIPT}" /tmp/renewvan-bootstrap.sh
 
 if [[ "${WITH_HEATER}" == "1" ]]; then
   echo "==> Installing heater udev rule on ${HOST}"
-  scp -q "$(dirname "$0")/install-heater-udev.sh" "${HOST}:/tmp/renewvan-heater-udev.sh"
-  ssh -t "${HOST}" "bash /tmp/renewvan-heater-udev.sh; status=\$?; rm -f /tmp/renewvan-heater-udev.sh; exit \$status"
+  run_remote "$(dirname "$0")/install-heater-udev.sh" /tmp/renewvan-heater-udev.sh
 fi
