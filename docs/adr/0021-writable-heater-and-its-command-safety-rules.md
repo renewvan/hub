@@ -13,7 +13,7 @@ The **Heater** entity is a fuel-fired space heater that reports its own phase an
 - **Topics.** `renewvan/heater/<id>/<field>`, retained for fields. The Driver key is `heater`; the manifest declares `publishes: [heater]`.
 - **Unknown is absent.** A value the heater cannot supply is an empty retained payload (ADR 0008 "no value"), never `null`, never `0`.
 - **Commands** (unretained, strict JSON, documented in the schema description, no separate schema files, per ADR 0013): `set` (`true`/`false`, never a toggle), `mode/set`, `setpoint_c/set` (1-30), `power_level/set` (0-9), `ventilating/set` (`true`/`false`), `clear_error/set` (`true` only).
-- **Per phase.** `set` true starts only from `off` with `error_code` 0, using the settings the heater reported. `ventilating/set` true starts fan-only (using the read `power_level`) only from `off`. Settings writes are refused during `shutting_down` and while ventilating. `stop` is always accepted.
+- **Per phase.** `set` true starts only from `off` with `error_code` 0, using the settings the heater reported. `ventilating/set` true starts fan-only (using the read `power_level`) only from `off`. Settings writes are refused during `shutting_down` and while ventilating. `stop` is always accepted, whatever the phase or run time. `ventilating/set` and `clear_error/set` are refused by the Driver (WARNING) until verified on hardware, and the `0x0D` unblock is never exposed.
 
 ## Command-safety rules
 
@@ -21,27 +21,45 @@ The **Heater** entity is a fuel-fired space heater that reports its own phase an
 - **No rejection topic.** A rejected command is logged at WARNING. A command is confirmed only when the retained field changes; a consumer shows "pending" and times out honestly.
 - **`commands_enabled`.** Published as a retained boolean and `false` by default. Installing the Driver never gives the LAN a way to start a heater.
 - **The Driver never acts by itself.** It never stops, starts or re-commands the heater on its own. After a reconnect it resyncs from telemetry and does not re-send anything. If the Pi dies the heater keeps its own cycle.
-- **Retries.** `stop` is retried until it takes. Every other command is sent once, with one retry after three polls; there is no blind double-send.
+- **Retries.** `stop` is retried at most 3 attempts, spaced 3 polls apart, then one ERROR is logged and nothing more is sent until a new stop arrives. A settings write (`mode`, `setpoint_c`, `power_level`) is confirmed by the next `0x02` settings read; a mismatch is "unconfirmed": one WARNING naming the command and phase, nothing published. Every other command is sent once, with one retry after three polls and the same WARNING on failure. A single start or stop frame is sufficient (2026-11-02 capture); there is no blind double-send, and upstream's double send stays rejected.
 - **Hardware safety stays in hardware.** Thermal cutoffs and a manual off are in the heater and never in software.
 
 ## Phase mapping (Low-Medium confidence)
 
-`0.x` is `off`; `1.x` and `2.1`-`2.3` are `starting`; `2.4` is `warming_up`; `3.0` and `3.35` are `running`; `3.4` and `4.x` are `shutting_down`; any other code is `off`, with the raw `status_code` still published. `ventilating` is `true` only for `3.35`. **Verified on real hardware: only `0.1` and `3.35`.**
+The Driver maps the status code through a table. The state names are ours, not the heater's.
+
+| Status code                                     | `phase`                                            |
+| ----------------------------------------------- | -------------------------------------------------- |
+| `0.x` (seen: `0.1`)                             | `off`                                              |
+| `1.0`, `1.1`, `2.0`, `2.1`, `2.2`, `2.6`, `2.3` | `starting`                                         |
+| `2.4`                                           | `warming_up`                                       |
+| `3.0`                                           | `running`                                          |
+| `3.35`                                          | `running`, `ventilating` true (unverified default) |
+| `3.4`                                           | `shutting_down` (unverified default)               |
+| `4.0`                                           | `shutting_down`                                    |
+
+`1.0` means "start accepted", not upstream's "cooling flame sensor". There is no `fault` phase: `error_code` is independent of `phase`.
+
+**An unknown code is not `off`.** The Driver publishes an empty retained `phase` and the raw `status_code`, logs one WARNING per new code, and accepts only `stop` until the code is mapped. The schema therefore makes `phase` optional, absent only while the code is unmapped.
+
+**Verified on real hardware (2026-11-02, one start-run-stop cycle, error 0 throughout):** `0.1`, `1.0`, `1.1`, `2.0`, `2.1`, `2.2`, `2.6`, `2.3`, `2.4`, `3.0`, `4.0`. **Still unverified:** `3.35` and `3.4`.
 
 ## Unverified on an AIR 2D
 
-Every item below is a research default, not a fact, and is to be revisited after a hardware pass:
+Verified and no longer listed here: the `0x0F` status poll, the `0x02` settings read, and that the init sequence is not needed (`send_init` defaults off). Every item below is a research default, not a fact, and is to be revisited after a human-present bench check:
 
-- the `0x0D` unblock and the init sequence;
-- live settings changes (`mode`, `setpoint_c`, `power_level`) and the `setpoint_c` bounds;
-- the `clear_error` frame;
-- every status code except `0.1` and `3.35`, and so the phase mapping above.
+- the `0x0D` unblock (never exposed);
+- live settings changes (`mode`, `setpoint_c`, `power_level`), the `setpoint_c` bounds, and their confirmation by the next `0x02` read;
+- the `clear_error` frame (refused);
+- status codes `3.35` and `3.4`, and so `ventilating/set` (refused);
+- stop during `1.x`/`2.x` (early stop).
 
 ## Rejected alternatives
 
 - **A toggle command.** Rejected, as for the relay: not idempotent.
 - **The Driver re-asserting a desired state after a restart.** Rejected: a stale "on" would light a flame the user no longer wants.
 - **A software thermal cutoff or watchdog stop.** Rejected: the heater's own protection is the authority, and a Driver that stops it on a stale link would act on a guess.
+- **A Driver-side `0x11` temperature feed.** Rejected: the Driver never sends `0x11`; a future thermostat would be a hub plugin using the normal commands.
 - **A per-command rejection topic.** Rejected: the retained field changing is the single confirmation path.
 - **Commands enabled by default.** Rejected: the broker is anonymous.
 - **Modelling the heater as a Relay.** Rejected: a relay latches an output and knows nothing about the load; a heater has phases and faults.
