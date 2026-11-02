@@ -97,6 +97,42 @@ bin/bootstrap-pi.sh --with-heater
 
 It finds the adapter's serial (and asks which one if several are plugged in), writes `/etc/udev/rules.d/99-renewvan-autoterm.rules`, reloads udev (also on a re-run if `/dev/ttyAUTOTERM` is missing) and adds the login user to `dialout` (so that user can open the device for debugging; the driver container gets it through its compose `devices:` entry). It refuses adapters with no serial or duplicate serials, and warns if the symlink does not appear. It is safe to re-run; run it again to point the symlink at a replacement adapter. Log in again for the `dialout` membership to apply, then re-run `bin/deploy.sh` to enable the `autoterm` profile.
 
+**Swapping the adapter.** A replacement adapter has a different serial, so the old rule no longer matches. Plug the new one in (unplug the old one first, so only one FTDI adapter is present) and re-run `bin/bootstrap-pi.sh --with-heater`; it rewrites the rule. If `bin/deploy.sh` finds no `/dev/ttyAUTOTERM`, it skips the `autoterm` profile, still exits 0, prints this command and, when exactly one FTDI adapter is not yet named by the rule, shows its serial. Deploy never installs rules itself.
+
+**Manual rule, without the script.** Find the adapter's serial with `udevadm info -a -n /dev/ttyUSB0 | grep 'ATTRS{serial}' | head -1`, then write `/etc/udev/rules.d/99-renewvan-autoterm.rules` as one line, with your serial:
+
+```text
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", ATTRS{serial}=="<serial>", SYMLINK+="ttyAUTOTERM", GROUP="dialout", MODE="0660"
+```
+
+Reload with `sudo udevadm control --reload-rules && sudo udevadm trigger --subsystem-match=tty --action=add`, check that `/dev/ttyAUTOTERM` exists, and re-run `bin/deploy.sh`.
+
+### Enabling heater commands
+
+Commands (start, stop, setpoint) are off until `commands_enabled = true`, because the broker is anonymous and a start command can run a diesel heater. Work through this list in order, with someone at the van.
+
+Preconditions:
+
+- [ ] The broker is on the van LAN only, and you ran the checks in [Broker reachability](#broker-reachability): both ports unreachable from the uplink side.
+- [ ] The Driver is deployed and `/dev/ttyAUTOTERM` exists.
+
+Verify on the real heater:
+
+- [ ] Early stop (`1.x` and `2.x` status codes) behaves safely: a human is present and the exhaust is clear.
+- [ ] A live setpoint or power-level change is confirmed by the next `0x02` read, checked by a human at the van.
+- [ ] The Driver's status-to-phase mapping, unknown-code rule and staleness clearing have run against the real heater.
+
+Flip the switch:
+
+- [ ] Set `commands_enabled = true` in `/etc/renewvan/autoterm/config.ini`, then `docker compose restart driver-autoterm`, with someone at the van.
+- [ ] Send the first command by hand with `mosquitto_pub`, not the dashboard: start, watch `phase` follow, then stop.
+
+To turn commands off, set `commands_enabled = false` and restart. Removing the container never starts or stops the heater: its own manual off is the authority.
+
+The Driver refuses `ventilating/set` (the `3.35` status needs a bench check) and `clear_error/set` until they are verified, and never exposes `0x0D`.
+
+The Heater page must ask for confirmation before a start, make stop a single tap, and show a pending state that times out honestly rather than assuming the command worked.
+
 The ESP32 relay driver is firmware, not a container. It is flashed once from `renewvan/driver-esp32`.
 
 ### Volumes
