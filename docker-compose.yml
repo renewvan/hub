@@ -273,7 +273,7 @@ services:
   # `docker compose --profile vedirect up -d`.
   driver-vedirect:
     profiles: ["vedirect"]
-    image: ghcr.io/renewvan/driver-vedirect:0.1.0
+    image: ghcr.io/renewvan/driver-vedirect:v0.1.0-beta.1
     container_name: renewvan-vedirect
     restart: unless-stopped
     depends_on:
