@@ -23,7 +23,7 @@ Contents:
 
 - A Raspberry Pi 4 or 5 running Raspberry Pi OS (Debian 13, 64-bit), reachable over `ssh` with a key.
 - Your own machine (macOS or Linux) to run the installer from.
-- Optional hardware, each enabling one driver: an ADS1115 tank sender board, a GY-521 tilt sensor, DS18B20 temperature probes, a u-blox USB GNSS receiver, a WattCycle BLE battery, an Autoterm AIR 2D heater, a Teltonika RUT router, a Venus OS device (Cerbo GX), an ESP32 16-channel relay board.
+- Optional hardware, each enabling one driver: an ADS1115 tank sender board, a GY-521 tilt sensor, DS18B20 temperature probes, a u-blox USB GNSS receiver, a WattCycle BLE battery, an Autoterm AIR 2D heater, a Teltonika RUT router, a Venus OS device (Cerbo GX) or Victron devices on VE.Direct USB cables, an ESP32 16-channel relay board.
 
 ## Install
 
@@ -85,11 +85,25 @@ Drivers marked with a profile do not start by default, because without their har
 | `driver-gps`         | `gps`       | A u-blox USB receiver at `/dev/ttyACM0`.                                                     |
 | `driver-autoterm`    | `autoterm`  | USB-serial adapter at `/dev/ttyAUTOTERM`. Commands stay off until `commands_enabled = true`. |
 | `driver-venus`       | `venus`     | `VENUS_MQTT_HOST` and `VENUS_PORTAL_ID` in `.env`.                                           |
+| `driver-vedirect`    | `vedirect`  | A Victron VE.Direct USB cable (a `/dev/serial/by-id` entry matching `port_globs`).           |
 | `driver-wattcycle`   | `wattcycle` | A `mac` in its `config.ini`, and the battery in BLE range of the Pi.                         |
 
 Example: `docker compose --profile gps --profile venus up -d`.
 
 The ESP32 relay driver is firmware, not a container. It is flashed once from `renewvan/driver-esp32`.
+
+### Migrating from Venus OS to driver-vedirect
+
+`driver-vedirect` reads the SmartShunt, SmartSolar MPPT, Orion XS and Blue Smart AC charger directly over VE.Direct USB, so the Venus OS Pi can be retired. It publishes the same `battery`, `solar` and `charger` entities as `driver-venus`, but under different ids, so the swap is not invisible. A device's VE.Direct port can be read by only one thing at a time: unplug the cables from the Venus OS Pi and plug them into the hub's Pi, then leave the `venus` profile off (clear `VENUS_MQTT_HOST` in `.env`).
+
+What changes:
+
+- **Ids.** `driver-venus` ids are Venus device instances (for example `290`). `driver-vedirect` ids are the lowercased `SER#` the device reports. The SmartShunt sends no serial number, so its id is the tail of its `/dev/serial/by-id` path (for example `if02`).
+- **Primary battery.** `renewvan/hub/primary-battery` still holds the old Venus instance id, which no longer exists. Clients fall back to `auto` (first complete battery by sorted id) and say so. Pick the shunt again in Settings once it appears, so the headline battery is the one you mean (ADR 0019).
+- **Logger history.** The logger writes InfluxDB points tagged by `id`. The new ids start new series: the old history stays under the Venus ids and is not renamed or merged. The Grafana **Battery** dropdown and the per-id panels list both, so choose the new id for current data and the old one for history. The loads figure needs the new battery and solar ids chosen together.
+- **Shunt port stability.** The SmartShunt's id comes from its adapter port, so it stays the same only while its cable stays in the same port of the same adapter (the van uses one Duppa quad-port adapter). Moving it to another port, or changing the adapter, gives it a new id, a new history series and a new primary-battery pick. Devices with a serial number are found by what they report and can be replugged anywhere.
+- **Topics not published.** `battery` `charge_state`, `capacity_ah`, `remaining_ah` and `solar` `yield_history_wh` are absent; history comes from the database. Charger `power_w` is derived as voltage times current when the device sends none.
+- **Silence.** After 10 s without a valid frame from a device its live values are cleared (empty retained payloads). Its identity and the Driver's health stay, so an unplugged device shows as missing, not frozen (ADR 0008).
 
 ### Volumes
 
