@@ -14,7 +14,7 @@ Concretely, this change:
 - Added the shared switch: `renewvan/demo/enabled/set` (command, not retained) and `renewvan/demo/enabled` (state, retained), the same `<topic>` / `<topic>/set` convention as the kiosk settings.
 - Added `node-demo`, a node that replays scenarios from this repo's `schema/demo/` (`<entity>[.<name>].demo.json`, envelope `schema/demo.schema.json`) on one shared clock: `initial` published at loop start, `timeline` steps overlaying `set`, reset to `initial` at `loop_s`.
 - Added `schema/validate-demo.py`, which validates the envelope, each scenario's `initial` and every cumulative `initial ⊕ set` against the entity schema, and fails when an entity has no scenario.
-- Made a demo scenario part of the definition of done for a new entity (or a new required property on an existing one). A new node for an existing entity ships none (`docs/porting-dbus-to-mqtt-node.md`, "Adding a node for an existing entity").
+- Made a demo scenario part of the definition of done for a new entity (or a new required property on an existing one). A new node for an existing entity ships none (`docs/authoring-a-driver.md`, "Adding a driver for an existing entity").
 
 The full contract is `docs/demo-mode.md`.
 
