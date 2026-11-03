@@ -94,6 +94,23 @@ Add your Driver to the fleet in the same change as its first release if you want
 
 A new `schema/<entity>.schema.json` must also be added to the `publishes` enum in **both** `driver-manifest.schema.json` and `driver-info.schema.json`. `schema/validate-examples.sh` fails when an entity schema exists that the enum does not list, and when the enum lists one that has no schema. A new entity also needs a demo scenario ([demo-mode.md](demo-mode.md)).
 
+## 7. What a driver publishes and how it runs
+
+- **MQTT client.** Connect with retry and backoff, set a Last Will on the health topic so consumers can detect a dead Driver, and keep one persistent connection. A Driver is the source of its data and publishes continuously.
+- **Publish loop.** Map the Driver's readings onto its entity's `renewvan/<domain>/<id>/<property>` topics, per the entity schema. `id` is the topic path segment, not a payload field. Publish the retained `driver` property (your Driver key) with each instance's other identity fields, so an instance names its owner.
+- **Retained topics.** All topics are retained. What differs is how often a topic is republished: identity fields once at startup or on config reload, live fields on every read or change.
+- **Layered config.** `config.default.ini` (shipped defaults) overridden by `config.ini` (local, gitignored).
+- **Where it runs.** On the host nearest the hardware it talks to; the pattern does not assume one central box.
+- **How it starts.** A plain `systemd` unit (`Restart=on-failure`, `WantedBy=multi-user.target`), one unit per Driver process, or a container in the hub's compose file.
+
+## Adding a driver for an existing entity
+
+An external developer adding a driver for an entity that already has a schema (for example a Renogy solar charger publishing `solar`) does **not** ship a demo and does not touch `schema/demo/`. The driver only complies with the entity schema: required properties only, optionals may be absent, a stable id derived from the source, retained JSON values, and an LWT health topic. If the source exposes something the entity cannot represent, the path is a hub schema PR (with its demo update), never ad-hoc topics.
+
+## Definition of done
+
+A demo scenario is required only when adding a **new** entity schema or a **new required property**, in the hub PR: `schema/demo/<entity>.demo.json` must pass `python3 schema/validate-demo.py` (format and requirements in [demo-mode.md](demo-mode.md)).
+
 ## Checklist
 
 - [ ] `manifest.json` at the repo root validates against `driver-manifest.schema.json`, with no `version` or `board_serial`.

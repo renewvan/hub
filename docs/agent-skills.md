@@ -39,33 +39,18 @@ Type the skill's name as a slash command, for example `/create-driver`, or descr
 
 ## The skills
 
-| Skill              | Version | Use it to                                                            | Manual equivalent                                                |
-| ------------------ | ------- | -------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `create-driver`    | 2.0.0   | Bootstrap a new `driver-<entity>` repo and run its design round      | [Authoring a driver](authoring-a-driver.md)                      |
-| `port-dbus-driver` | 1.0.0   | Port a Venus OS D-Bus package to a native MQTT driver                | [Porting a D-Bus driver](porting-dbus-to-mqtt-driver.md)         |
-| `flash-esp32`      | 1.0.0   | Build and flash an ESP32 firmware variant, then verify it on the bus | the `renewvan/driver-esp32` README                               |
-| `build-basemap`    | 1.1.0   | Build the dashboard's offline PMTiles basemap                        | [Offline map](reference.md#offline-map)                          |
-| `deploy`           | 1.0.0   | Deploy the hub to the Pi                                             | [Deploying to a Pi](reference.md#deploying-to-a-pi-step-by-step) |
+| Skill           | Version | Use it to                                                            | Manual equivalent                                                |
+| --------------- | ------- | -------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `create-driver` | 2.0.0   | Bootstrap a new `driver-<entity>` repo and run its design round      | [Authoring a driver](authoring-a-driver.md)                      |
+| `flash-esp32`   | 1.0.0   | Build and flash an ESP32 firmware variant, then verify it on the bus | the `renewvan/driver-esp32` README                               |
+| `build-basemap` | 1.1.0   | Build the dashboard's offline PMTiles basemap                        | [Offline map](reference.md#offline-map)                          |
+| `deploy`        | 1.0.0   | Deploy the hub to the Pi                                             | [Deploying to a Pi](reference.md#deploying-to-a-pi-step-by-step) |
 
 The hub repo carries its own copy of `deploy`, so inside a hub checkout you do not need to install it. Versions above were current when this page was written; the skills repo is authoritative.
 
 ### `create-driver`
 
 Scaffolds a new `renewvan/driver-<entity>` repo in the shape `driver-tank` documents: MQTT publisher skeleton, layered `config.default.ini` and `config.ini`, `manifest.json` with retained Driver info, systemd unit, Dockerfile, and CI (tests, manifest gate, release). It does not write the device's sensing logic. It ends with a fixed design round on sensing versus remapping, published fields, hub schema, hardware config, and hub integration, so the new driver gets designed rather than left half built.
-
-### `port-dbus-driver`
-
-Turns `dbus-ads1115`, `dbus_wattcycle_ble`, `dbus-autoterm`, or `dbus-giandel-bridge` into a native MQTT driver by following [porting-dbus-to-mqtt-driver.md](porting-dbus-to-mqtt-driver.md). It does not scaffold or implement on its own. It inventories the package into strip, keep, and add, asks for your go-ahead, then sequences the work:
-
-1. Settle the entity and topics.
-2. Run `create-driver` for the skeleton.
-3. Port the sensing logic test-first.
-4. Write the manifest and Driver info.
-5. If the entity is new: add the hub schema and a demo scenario, then run both validators ([Validating schemas](reference.md#validating-schemas)).
-6. Diagnose failures, then review.
-7. Pin the image in the hub's `docker-compose.yml` and hand off to `deploy`.
-
-Genuine Victron gear is out of scope: that is the remap shape of `driver-venus`.
 
 ### `flash-esp32`
 
@@ -81,13 +66,7 @@ Runs `bin/deploy.sh` from the hub checkout. It checks the Pi is reachable (`ssh 
 
 ## Chaining skills
 
-A new driver for hardware that already has a D-Bus package:
-
-```text
-/port-dbus-driver   →  /create-driver  →  (test-first port)  →  /deploy
-```
-
-A new driver for hardware with no existing package: `/create-driver`, implement, then `/deploy`. A new ESP32 variant: build it in `renewvan/driver-esp32`, then `/flash-esp32`.
+A new driver: `/create-driver`, implement, then `/deploy`. A new ESP32 variant: build it in `renewvan/driver-esp32`, then `/flash-esp32`.
 
 ## Other useful skills
 

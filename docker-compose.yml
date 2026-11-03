@@ -189,7 +189,7 @@ services:
       ROUTER_ID: ${ROUTER_ID:-main}
 
   # Native MQTT tank driver (fresh + grey ADS1115 senders) — see
-  # docs/porting-dbus-to-mqtt-driver.md and
+  # docs/authoring-a-driver.md and
   # .scratch/renewvan-hub-v0-build/issues/02-native-mqtt-tank-driver.md.
   # Needs I2C device passthrough for the ADS1115; layered config.ini
   # override lives on the bind-mounted host path below.
@@ -265,7 +265,7 @@ services:
       - ${TILT_STATE_PATH:-./config/tilt/state}:/app/state
 
   # Native MQTT Victron driver: SmartShunt, SmartSolar MPPT, Orion XS and Blue Smart
-  # chargers read over VE.Direct text mode on USB serial (read-only) -- see
+  # chargers read over VE.Direct on USB serial -- see
   # driver-vedirect's own README's "Topics published" section. It publishes the same
   # battery/solar/charger entities as driver-venus; run one or the other on the same devices.
   #

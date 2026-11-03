@@ -355,7 +355,7 @@ Run these after any schema change:
 - `./schema/validate-examples.sh` checks the fixtures in `schema/examples/` against each schema: `*.valid.json` must pass and `*.invalid.json` must fail. It also fails when an entity schema is missing from the `publishes` enum in `driver-manifest.schema.json` and `driver-info.schema.json`, so adding an entity means adding it to both.
 - `python3 schema/validate-demo.py` (needs `pip install jsonschema`) checks every demo scenario in `schema/demo/` and the simulated fleet. Every entity needs a scenario.
 
-To add a driver, see [authoring-a-driver.md](authoring-a-driver.md). To port a Venus OS dbus driver, see [porting-dbus-to-mqtt-driver.md](porting-dbus-to-mqtt-driver.md).
+To add a driver, see [authoring-a-driver.md](authoring-a-driver.md).
 
 ## Plain Docker Compose
 
