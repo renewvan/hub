@@ -12,8 +12,20 @@ ENV_FILE="/etc/renewvan/tailscale.env"
 # 1. Install tailscale if missing
 # ---------------------------------------------------------------------------
 if ! command -v tailscale >/dev/null 2>&1; then
-  echo "==> Installing Tailscale"
-  curl -fsSL https://tailscale.com/install.sh | sh
+  echo "==> Installing Tailscale from its signed apt repo"
+  # No `curl | sh`: the vendor key is stored in /etc/apt/keyrings and the source is bound to it with
+  # signed-by=, so apt only trusts that key for this repo. Both files come over TLS from
+  # pkgs.tailscale.com; compare the key's fingerprint with https://tailscale.com/kb/1031/install-linux
+  # (`gpg --show-keys /etc/apt/keyrings/tailscale.gpg`) when auditing a van.
+  . /etc/os-release
+  install -m 0755 -d /etc/apt/keyrings
+  curl -fsSL "https://pkgs.tailscale.com/stable/debian/${VERSION_CODENAME}.noarmor.gpg" \
+    -o /etc/apt/keyrings/tailscale.gpg
+  chmod a+r /etc/apt/keyrings/tailscale.gpg
+  echo "deb [signed-by=/etc/apt/keyrings/tailscale.gpg] https://pkgs.tailscale.com/stable/debian ${VERSION_CODENAME} main" \
+    >/etc/apt/sources.list.d/tailscale.list
+  apt-get update -qq
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tailscale
 else
   echo "==> Tailscale already installed ($(tailscale version | head -1))"
 fi

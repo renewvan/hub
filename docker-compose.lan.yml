@@ -2,6 +2,12 @@
 # interface (cellular/Starlink) cannot reach it. Selected on the Pi by
 # COMPOSE_FILE=docker-compose.yml:docker-compose.lan.yml in its .env (bin/deploy.sh seeds it).
 # Local dev does not use this file. docs/reference.md "Broker reachability".
+#
+# Grafana stays on loopback by default (SSH tunnel or Tailscale). To opt it onto the LAN, add:
+#   grafana:
+#     ports:
+#       - "${MQTT_BIND_ADDR:?set MQTT_BIND_ADDR to the Pi LAN IP}:3000:3000"
+# and re-run the exposure check (bin/check-exposure.sh) knowing 3000 is then intentionally open.
 services:
   mosquitto:
     ports:

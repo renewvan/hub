@@ -65,9 +65,9 @@ Restart the service after changes: `sudo systemctl restart renewvan-tailscale`
 
 Once connected, all Pi services are reachable at the Tailscale IP:
 
-| Service   | URL                            |
-| --------- | ------------------------------ |
-| Dashboard | `http://<tailscale-ip>`        |
-| SSH       | `ssh <pi-user>@<tailscale-ip>` |
-| Grafana   | `http://<tailscale-ip>:3000`   |
-| MQTT      | `<tailscale-ip>:1883`          |
+| Service   | URL                                                                             |
+| --------- | ------------------------------------------------------------------------------- |
+| Dashboard | `http://<tailscale-ip>`                                                         |
+| SSH       | `ssh <pi-user>@<tailscale-ip>`                                                  |
+| Grafana   | `ssh -L 3000:localhost:3000 <pi-user>@<tailscale-ip>` (loopback-only on the Pi) |
+| MQTT      | `<tailscale-ip>:1883`                                                           |

@@ -4,28 +4,32 @@
 # independently-published image, per
 # docs/adr/0001-compose-services-via-pinned-images-not-git-submodules.md;
 # none of them are built from local/submodule source here. Bumping a
-# service is a single-line `image:` tag edit below (git-tracked, no
-# env var indirection); see `.env.example` for every other config
-# value an installer needs to set.
+# service is a single-line `image:` edit below (git-tracked, no env var
+# indirection; third-party infra images are `tag@sha256:digest`, Renovate
+# proposes the bumps); see `.env.example` for every other config value an
+# installer needs to set.
 #
-# `docker compose pull && docker compose up -d` from a copy of
-# `.env.example` (as `.env`) is the whole install. Data persists in
-# named Docker volumes. This file is the plain-Compose-host path; a
+# Secrets (InfluxDB admin password/token, the three scoped tokens, the Grafana
+# admin password) have no defaults: `bin/deploy.sh` generates them into `.env`
+# (bin/ensure-secrets.sh). A plain `docker compose up` without them fails on
+# purpose. Data persists in named Docker volumes. This file is the plain-Compose-host path; a
 # host needing bind mounts keeps its own override outside this repo.
 # Full operator reference: docs/reference.md.
 #
 # MQTT:      127.0.0.1:1883 (plain), 127.0.0.1:9001 (websockets); the Pi adds its van-LAN
 #            address via docker-compose.lan.yml
-# InfluxDB:  http://<host>:8086 (org=renewvan, bucket=renewvan)
-# Grafana:   http://<host>:3000 (admin/admin on first run); the InfluxDB datasource and the
-#            "Van overview" dashboard are provisioned from docker/grafana/ (docs/reference.md)
+# InfluxDB:  127.0.0.1:8086 on the host only (org=renewvan, bucket=renewvan); browsers reach it
+#            through Caddy's /influx (docs/adr/0024-history-reaches-browsers-through-a-caddy-influx-proxy.md)
+# Grafana:   http://127.0.0.1:3000 on the host only (SSH tunnel or Tailscale for off-box access);
+#            the InfluxDB datasource and the "Van overview" dashboard are provisioned from
+#            docker/grafana/ (docs/reference.md)
 # Dashboard: https://<host> (Caddy, 443); http://localhost:80 on the Pi only (kiosk)
 
 services:
   # --- infra -----------------------------------------------------------
 
   mosquitto:
-    image: eclipse-mosquitto:2
+    image: eclipse-mosquitto:2.1.2-alpine@sha256:860aeb5d63ce509508f6dcfb2bc8a1c1dd2bc60555b562b45ce90e52d8dabb0f
     container_name: renewvan-mosquitto
     restart: unless-stopped
     # Loopback only here (local dev, host plugins: kiosk, tailscale). The Pi also publishes
@@ -45,15 +49,17 @@ services:
   # (docs/architecture.md "Application services" row). Written by
   # renewvan/logger, one point per renewvan/# message.
   influxdb:
-    image: influxdb:2
+    image: influxdb:2.9.1@sha256:e4572d094ac3272f06528ea904ce6b4cb3bb19be2db3b3b1acbd27ba5c3a73e2
     container_name: renewvan-influxdb
     restart: unless-stopped
+    # Loopback only (like the broker): the history path for browsers is Caddy's /influx; operators
+    # use an SSH tunnel or Tailscale. Check: docs/reference.md "Verifying security hardening".
     ports:
-      - "8086:8086"
+      - "127.0.0.1:8086:8086"
     environment:
       DOCKER_INFLUXDB_INIT_MODE: setup
       DOCKER_INFLUXDB_INIT_USERNAME: admin
-      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_ADMIN_PASSWORD:-renewvan-dev-only}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_ADMIN_PASSWORD:?run bin/deploy.sh, which generates the InfluxDB secrets}
       DOCKER_INFLUXDB_INIT_ORG: renewvan
       DOCKER_INFLUXDB_INIT_BUCKET: renewvan
       # Bucket retention; InfluxDB duration ("8760h" = 1 year) or 0 = forever.
@@ -65,7 +71,9 @@ services:
       #   docker exec renewvan-influxdb influx bucket update --id "$BID" \
       #     --retention <duration> --token "$INFLUXDB_ADMIN_TOKEN"
       DOCKER_INFLUXDB_INIT_BUCKET_RETENTION: ${INFLUXDB_RETENTION:-0}
-      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_ADMIN_TOKEN:-renewvan-dev-token}
+      # Operator-only: no other container receives the admin token. The logger, Grafana and the
+      # dashboard proxy use the scoped tokens below.
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_ADMIN_TOKEN:?run bin/deploy.sh, which generates the InfluxDB secrets}
     volumes:
       - influxdb-data:/var/lib/influxdb2
 
@@ -73,17 +81,21 @@ services:
   # v0 read-only mobile/web/kiosk dashboard (React app). The datasource and
   # dashboards are code: docker/grafana/provisioning (datasource + dashboard
   # provider) and docker/grafana/dashboards (JSON). The datasource reads its
-  # token from INFLUXDB_ADMIN_TOKEN below, so nothing secret is in git.
+  # read-only token from INFLUXDB_GRAFANA_TOKEN below, so nothing secret is in git.
   grafana:
-    image: grafana/grafana:11.2.0
+    image: grafana/grafana:12.4.14@sha256:ae509d9ae8c1021ca32ec370a9ca975d40165eda9fccd1e1102d317ff8787cd7
     container_name: renewvan-grafana
     restart: unless-stopped
+    # Loopback only. Off-box access is an SSH tunnel or Tailscale; opting it onto the LAN is an
+    # explicit override in docker-compose.lan.yml.
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     depends_on:
       - influxdb
     environment:
-      INFLUXDB_ADMIN_TOKEN: ${INFLUXDB_ADMIN_TOKEN:-renewvan-dev-token}
+      INFLUXDB_GRAFANA_TOKEN: ${INFLUXDB_GRAFANA_TOKEN:?run bin/deploy.sh, which generates the InfluxDB secrets}
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:?run bin/deploy.sh, which generates the Grafana password}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/dashboards/van-overview.json
     volumes:
       - grafana-data:/var/lib/grafana
@@ -284,6 +296,16 @@ services:
     restart: unless-stopped
     depends_on:
       - mosquitto
+    # Not root, no capabilities, read-only /dev: it can open the serial nodes (group dialout, gid
+    # 20) but cannot create device nodes. Opening a tty and setting its termios works on a
+    # read-only mount.
+    user: "10002"
+    group_add:
+      - "20"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     device_cgroup_rules:
       - "c 188:* rmw"
       - "c 166:* rmw"
@@ -293,7 +315,7 @@ services:
       MQTT_USERNAME: ${RENEWVAN_USERNAME:-}
       MQTT_PASSWORD: ${RENEWVAN_PASSWORD:-}
     volumes:
-      - /dev:/dev
+      - /dev:/dev:ro
       - ${VEDIRECT_CONFIG_PATH:-./config/vedirect/config.ini}:/app/config.ini:ro
 
   # Venus OS MQTT -> renewvan bus remap (battery, solar, charger). Only for
@@ -343,6 +365,15 @@ services:
     restart: unless-stopped
     depends_on:
       - mosquitto
+    # Not root: least privilege. The driver only needs BlueZ on the host's
+    # system D-Bus. The uid is fixed so the host D-Bus policy installed by bin/bootstrap-pi.sh
+    # (written inline by bin/bootstrap-pi.sh) can name it and allow only org.bluez. Keep the two in
+    # step (bin/test_compose_hardening.py checks it).
+    user: "10001"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     volumes:
       - /var/run/dbus:/var/run/dbus
       - ${WATTCYCLE_CONFIG_PATH:-./config/wattcycle/config.ini}:/app/config.ini:ro
@@ -364,7 +395,8 @@ services:
       MQTT_USERNAME: ${RENEWVAN_USERNAME:-}
       MQTT_PASSWORD: ${RENEWVAN_PASSWORD:-}
       INFLUXDB_URL: http://influxdb:8086
-      INFLUXDB_TOKEN: ${INFLUXDB_ADMIN_TOKEN:-renewvan-dev-token}
+      # Write-only, scoped to the renewvan bucket.
+      INFLUXDB_TOKEN: ${INFLUXDB_LOGGER_TOKEN:?run bin/deploy.sh, which generates the InfluxDB secrets}
       INFLUXDB_ORG: renewvan
       INFLUXDB_BUCKET: renewvan
 
@@ -373,7 +405,7 @@ services:
   # not a polling backend. See
   # .scratch/renewvan-hub-v0-build/issues/06-dashboard-web-app.md.
   dashboard:
-    image: ghcr.io/renewvan/dashboard:v0.24.0
+    image: ghcr.io/renewvan/dashboard:v0.27.0
     container_name: renewvan-dashboard
     restart: unless-stopped
     # Loopback only: the kiosk browser (renewvan-kiosk-browser.sh, KIOSK_URL=http://localhost) reads
@@ -396,15 +428,19 @@ services:
   # `tls internal`). Clients must trust the root once to install the PWA over https; see
   # dashboard/docker/Caddyfile. Set DASHBOARD_HOST to the Pi's LAN IP or name.
   caddy:
-    image: caddy:2
+    image: caddy:2.11.8@sha256:4fcafa98afd1c2e642e353e3c5cf9ddbe892fcee14bc990e7ba2c5b78e51f9cf
     container_name: renewvan-caddy
     restart: unless-stopped
     depends_on:
       - dashboard
+      - influxdb
     ports:
       - "443:443"
     environment:
       DASHBOARD_HOST: ${DASHBOARD_HOST:?set DASHBOARD_HOST to the Pi LAN IP or name}
+      # Read-only, bucket-scoped. Injected by the Caddyfile's /influx proxy, never sent to browsers
+      # (docs/adr/0024-history-reaches-browsers-through-a-caddy-influx-proxy.md).
+      INFLUXDB_DASHBOARD_TOKEN: ${INFLUXDB_DASHBOARD_TOKEN:?run bin/deploy.sh, which generates the InfluxDB secrets}
     volumes:
       - ../dashboard/docker/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
