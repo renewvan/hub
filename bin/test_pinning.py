@@ -73,6 +73,21 @@ class WorkflowPinningTest(unittest.TestCase):
                 self.assertRegex(m.group(1), r"@\d+\.\d+\.\d+$", f"{wf.name}: {m.group(1)}")
 
 
+class WorkflowInjectionTest(unittest.TestCase):
+    def test_no_expression_inside_run_bodies(self):
+        for wf in WORKFLOWS:
+            doc = yaml.safe_load(wf.read_text())
+            for job_name, job in doc["jobs"].items():
+                for step in job.get("steps", []):
+                    self.assertNotIn("${{", step.get("run", ""), f"{wf.name}:{job_name}")
+
+    def test_test_job_has_no_write_permissions(self):
+        doc = yaml.safe_load((ROOT / ".github/workflows/release.yml").read_text())
+        self.assertEqual(doc["jobs"]["test"]["permissions"], {"contents": "read"})
+        for step in doc["jobs"]["publish-image"]["steps"]:
+            self.assertNotIn("TEST_COMMAND", str(step.get("env", "")))
+
+
 class InstallerPinningTest(unittest.TestCase):
     def test_no_curl_piped_into_a_shell(self):
         for script in shell_scripts():
