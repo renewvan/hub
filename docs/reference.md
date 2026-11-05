@@ -297,7 +297,7 @@ Authentication and ACLs are out of scope here; see [Broker security](#broker-sec
 
 `bin/deploy.sh` runs `bin/ensure-secrets.sh` on every deploy. It is idempotent and never wipes a volume:
 
-- It fills in anything empty or still a public example value (`renewvan-dev-token`, `renewvan-dev-only`, `admin`), and creates the missing `INFLUXDB_LOGGER_TOKEN` (write-only), `INFLUXDB_GRAFANA_TOKEN` and `INFLUXDB_DASHBOARD_TOKEN` (read-only) on the `renewvan` bucket.
+- It fills in anything empty or still a placeholder or legacy default (`renewvan-dev-token`, `renewvan-dev-only`, `admin`), and creates the missing `INFLUXDB_LOGGER_TOKEN` (write-only), `INFLUXDB_GRAFANA_TOKEN` and `INFLUXDB_DASHBOARD_TOKEN` (read-only) on the `renewvan` bucket.
 - **Existing vans.** InfluxDB and Grafana only read their initial credentials on a volume's first run, so for a van that already has data volumes the script rotates in place: it creates a new admin token through the old one, deletes the old one, changes the admin password with `influx user password`, and runs `grafana cli admin reset-admin-password`. A van whose admin values were already non-default only gets the three tokens and the Grafana password. It prints the variable names it changed, never the values.
 - **Manual rotation of one value.** Delete its line from `.env` and run `bin/deploy.sh`. A scoped token is revoked in InfluxDB with `docker exec -e INFLUX_TOKEN=<admin token> renewvan-influxdb influx auth list` then `influx auth delete --id <id>`.
 
@@ -317,9 +317,9 @@ Manual spot checks: on the Pi, `ss -ltn | grep -E ':(8086|3000)\b'` shows only `
 
 ## Kiosk user and plugin ownership
 
-The kiosk browser (`renewvan-cage.service`) and the display bridge (`renewvan-kiosk.service`) run as `renewvan-kiosk`: a system user with a locked password and no login shell, in the `video`, `input` and `render` groups only. It has no `sudo` and is not in `docker`. A browser or dashboard bug therefore lands in an account that can neither become root nor reach the Docker socket. `bin/ensure-kiosk-user.sh` creates it (called by `bin/bootstrap-pi.sh` and `bin/bootstrap-kiosk-pi.sh`).
+The kiosk browser (`renewvan-cage.service`) and the display bridge (`renewvan-kiosk.service`) run as `renewvan-kiosk`: a system user with a locked password and no login shell, in the `video`, `input` and `render` groups only. It has no `sudo` and is not in `docker`. The browser therefore runs with only the access it needs. `bin/ensure-kiosk-user.sh` creates it (called by `bin/bootstrap-pi.sh` and `bin/bootstrap-kiosk-pi.sh`).
 
-`/opt/renewvan/plugins` and `/opt/renewvan/venvs` are `root:root` 755: they hold code systemd runs, some of it as root. `bin/deploy.sh` writes them with `sudo rsync --chown=root:root`. `/opt/renewvan/hub` (compose, `.env`) and `/etc/renewvan` stay owned by the admin user, which is in the `docker` group and so root-equivalent there anyway. The `hub` and `tailscale` plugins keep running as the admin user (`$SUDO_USER`), now reading root-owned code.
+`/opt/renewvan/plugins` and `/opt/renewvan/venvs` are `root:root` 755: they hold code systemd runs, some of it as root. `bin/deploy.sh` writes them with `sudo rsync` and re-owns them to root. `/opt/renewvan/hub` (compose, `.env`) and `/etc/renewvan` stay owned by the admin user, which is in the `docker` group. The `hub` and `tailscale` plugins keep running as the admin user (`$SUDO_USER`), now reading root-owned code.
 
 **Migrating a Pi that ran the kiosk as the admin user.** Re-running the bootstrap is the migration; `bin/deploy.sh` never migrates, it stops with "run bin/bootstrap-kiosk-pi.sh" while `renewvan-kiosk` is missing:
 

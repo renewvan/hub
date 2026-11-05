@@ -137,7 +137,7 @@ if [[ -d /opt/renewvan/plugins ]]; then sudo chown -R root:root /opt/renewvan/pl
 if [[ -d /opt/renewvan/venvs ]]; then sudo chown -R root:root /opt/renewvan/venvs; sudo chmod -R go-w /opt/renewvan/venvs; fi
 
 # driver-wattcycle runs as a fixed non-root uid and talks to BlueZ over the host's system D-Bus.
-# This policy lets that uid reach only org.bluez, so a compromise of the driver cannot drive
+# This policy lets that uid reach only org.bluez, so the driver only has the bus access it needs and nothing more
 # systemd (or anything else) on the bus. Keep the uid in step with docker-compose.yml.
 echo "==> Installing the driver-wattcycle D-Bus policy"
 sudo tee /etc/dbus-1/system.d/renewvan-wattcycle.conf >/dev/null <<'DBUS'

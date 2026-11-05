@@ -10,7 +10,7 @@
 #
 # Idempotent: safe to re-run. An existing .env is never overwritten; bin/ensure-secrets.sh
 # fills in only what is missing, and rotates the InfluxDB/Grafana credentials in place when
-# they are still the old public example values (it never wipes a volume).
+# they are still the legacy default values (it never wipes a volume).
 #
 # Usage: bin/install.sh --host <ssh-alias-or-user@host> [options]
 #

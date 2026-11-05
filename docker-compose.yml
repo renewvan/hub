@@ -365,7 +365,7 @@ services:
     restart: unless-stopped
     depends_on:
       - mosquitto
-    # Not root: a driver compromise (it parses BLE data) must not reach systemd over the host's
+    # Not root: least privilege. The driver only needs BlueZ on the host's
     # system D-Bus. The uid is fixed so the host D-Bus policy installed by bin/bootstrap-pi.sh
     # (written inline by bin/bootstrap-pi.sh) can name it and allow only org.bluez. Keep the two in
     # step (bin/test_compose_hardening.py checks it).

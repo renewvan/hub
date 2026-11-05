@@ -21,7 +21,7 @@ GRAFANA_CONTAINER="renewvan-grafana"
 INFLUX_ORG="renewvan"
 INFLUX_BUCKET="renewvan"
 
-# Values that shipped in the repo or in older docs: public, so never acceptable.
+# Placeholders and legacy defaults: never acceptable as real values.
 is_example_value() {
   case "$1" in
     "" | renewvan-dev-token | renewvan-dev-only | admin | changeme | CHANGEME | pending) return 0 ;;
@@ -106,7 +106,7 @@ if [[ "${influx_existed}" == "1" ]] && { [[ "${new_token}" != "${old_token}" ]] 
 fi
 
 if [[ "${rotating}" == "1" ]]; then
-  # The live instance still accepts the OLD admin credentials (the repo's public example values,
+  # The live instance still accepts the OLD admin credentials (the legacy default values,
   # or whatever .env held). Rotate through them. The volume exists, so INIT_* are ignored here.
   influx_running || start_influx "${old_pw:-x}" "${old_token:-x}"
   if [[ "${new_token}" != "${old_token}" ]]; then
@@ -162,7 +162,7 @@ if is_example_value "$(get GF_SECURITY_ADMIN_PASSWORD)"; then
   fi
 fi
 
-# --- 4. Refuse to continue on a public value --------------------------------
+# --- 4. Refuse to continue on a placeholder or legacy default --------------------------------
 for name in INFLUXDB_ADMIN_PASSWORD INFLUXDB_ADMIN_TOKEN INFLUXDB_LOGGER_TOKEN \
   INFLUXDB_GRAFANA_TOKEN INFLUXDB_DASHBOARD_TOKEN GF_SECURITY_ADMIN_PASSWORD; do
   if is_example_value "$(get "${name}")"; then

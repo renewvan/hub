@@ -331,7 +331,7 @@ if ! { hostname -I 2>/dev/null | tr ' ' '\\n'; } | grep -qxF "\${bind_addr}"; th
 fi
 
 # Generate any missing or example-valued secret, create the scoped InfluxDB tokens, and rotate a van
-# that still runs on the old public values. Idempotent; never wipes a volume. Values are never printed.
+# that still runs on legacy default values. Idempotent; never wipes a volume. Values are never printed.
 echo "==> Ensuring secrets"
 bash bin/ensure-secrets.sh .env
 
