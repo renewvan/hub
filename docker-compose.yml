@@ -367,7 +367,7 @@ services:
       - mosquitto
     # Not root: a driver compromise (it parses BLE data) must not reach systemd over the host's
     # system D-Bus. The uid is fixed so the host D-Bus policy installed by bin/bootstrap-pi.sh
-    # (bin/dbus/renewvan-wattcycle.conf) can name it and allow only org.bluez. Keep the two in
+    # (written inline by bin/bootstrap-pi.sh) can name it and allow only org.bluez. Keep the two in
     # step (bin/test_compose_hardening.py checks it).
     user: "10001"
     cap_drop:

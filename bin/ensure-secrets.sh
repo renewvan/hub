@@ -156,7 +156,8 @@ if is_example_value "$(get GF_SECURITY_ADMIN_PASSWORD)"; then
   if [[ "${grafana_existed}" == "1" ]]; then
     # The variable only seeds a fresh grafana-data volume; this one already has a password.
     docker compose up -d grafana
-    wait_for "Grafana to start" 30 docker exec "${GRAFANA_CONTAINER}" grafana cli --help
+    # /api/health answers only after the DB migration (11 -> 12 rewrites tables) has finished.
+    wait_for "Grafana to finish starting" 60 curl -sf http://127.0.0.1:3000/api/health
     docker exec "${GRAFANA_CONTAINER}" grafana cli admin reset-admin-password "${gf_pw}" >/dev/null
   fi
 fi

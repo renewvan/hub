@@ -8,6 +8,7 @@
 #
 # Usage: bin/check-exposure.sh <pi-lan-ip-or-name>
 # Needs: nc, curl. Exit 0 = every check passed, 1 = at least one failed, 2 = usage error.
+# No -e on purpose: every check runs and failures accumulate into the exit code.
 set -uo pipefail
 
 HOST="${1:-}"

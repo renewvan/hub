@@ -56,6 +56,9 @@ class EnsureSecretsTest(unittest.TestCase):
         docker = bindir / "docker"
         docker.write_text(FAKE_DOCKER)
         docker.chmod(docker.stat().st_mode | stat.S_IXUSR)
+        curl = bindir / "curl"  # stands in for Grafana's /api/health
+        curl.write_text("#!/bin/sh\nexit 0\n")
+        curl.chmod(curl.stat().st_mode | stat.S_IXUSR)
         self.env = {
             **os.environ,
             "PATH": f"{bindir}:{os.environ['PATH']}",

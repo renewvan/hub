@@ -54,12 +54,13 @@ ssh "${HOST}" "mkdir -p /opt/renewvan/dashboard/docker"
 rsync -az "${CADDYFILE}" "${HOST}:/opt/renewvan/dashboard/docker/Caddyfile"
 # Plugin code is run by systemd (some of it as root), so the trees are root-owned and not writable by the
 # admin login or the kiosk user: rsync runs under sudo and chowns what it writes.
-PLUGIN_RSYNC=(rsync -az --delete --rsync-path="sudo rsync" --chown=root:root --chmod=D755,F644)
+PLUGIN_RSYNC=(rsync -az --delete --rsync-path="sudo rsync")
 "${PLUGIN_RSYNC[@]}" --exclude='.venv' plugins/kiosk/ "${HOST}:/opt/renewvan/plugins/kiosk/"
 "${PLUGIN_RSYNC[@]}" plugins/tailscale/ "${HOST}:/opt/renewvan/plugins/tailscale/"
 "${PLUGIN_RSYNC[@]}" plugins/hub/ "${HOST}:/opt/renewvan/plugins/hub/"
-# Scripts the units and installers execute keep their execute bit (rsync's --chmod above cleared it).
-ssh "${HOST}" "sudo chmod 755 /opt/renewvan/plugins/kiosk/renewvan-kiosk-browser.sh /opt/renewvan/plugins/tailscale/install.sh /opt/renewvan/plugins/hub/install.sh"
+# (--chown is not portable to macOS rsync, so ownership is fixed on the Pi.) The plugin and venv roots
+# themselves are re-owned too: a Pi that predates the kiosk split still has them admin-owned.
+ssh "${HOST}" "sudo chown -R root:root /opt/renewvan/plugins /opt/renewvan/venvs && sudo chmod -R go-w /opt/renewvan/plugins /opt/renewvan/venvs"
 # The hub's version is a property of this checkout, not of the files rsynced: the Pi has no .git.
 # Stamp it after the rsync above (which would otherwise --delete it) so renewvan-hub publishes it
 # on renewvan/hub/status and Settings > General > Firmware can show it. Same string the ESP32

@@ -10,6 +10,7 @@
 #
 # The static compose checks run in CI (bin/test_compose_hardening.py); this is the runtime half.
 # Exit 0 = all passed (skips are not failures), 1 = at least one check failed.
+# No -e on purpose: every check runs and failures accumulate into the exit code.
 set -uo pipefail
 
 KIOSK_USER="renewvan-kiosk"
@@ -32,7 +33,9 @@ else
       pass "${KIOSK_USER} is not in group ${g}"
     fi
   done
-  if sudo -n -u "${KIOSK_USER}" sudo -n true >/dev/null 2>&1; then
+  if ! sudo -n true >/dev/null 2>&1; then
+    skip "cannot run the sudo -n check as ${KIOSK_USER}: this account has no passwordless sudo"
+  elif sudo -n -u "${KIOSK_USER}" sudo -n true >/dev/null 2>&1; then
     fail "${KIOSK_USER} can run sudo without a password"
   else
     pass "sudo -n true fails for ${KIOSK_USER}"

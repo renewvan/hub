@@ -143,6 +143,8 @@ sudo udevadm settle
 
 echo "==> Installing cage kiosk session unit"
 # The plugin tree is root-owned (bin/deploy.sh); the launcher must stay executable.
+sudo chown -R root:root /opt/renewvan/plugins
+sudo chmod -R go-w /opt/renewvan/plugins
 sudo chmod 755 "${PLUGIN_DIR}/renewvan-kiosk-browser.sh"
 sed "s|@KIOSK_USER@|${KIOSK_USER}|" "${PLUGIN_DIR}/renewvan-cage.service" \
   | sudo tee /etc/systemd/system/renewvan-cage.service >/dev/null
