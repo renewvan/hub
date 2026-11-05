@@ -224,7 +224,7 @@ PY
     rm -f "${tmp}"
     return 3 # already current
   fi
-  if [[ -w "${file}" ]]; then cat "${tmp}" >"${file}"; else sudo -n tee "${file}" <"${tmp}" >/dev/null; fi
+  if [[ -w "${file}" ]]; then cat "${tmp}" >"${file}"; else sudo -n tee "${file}" <"${tmp}" >/dev/null || { rm -f "${tmp}"; return 4; }; fi
   rm -f "${tmp}"
 }
 
@@ -232,13 +232,21 @@ PY
 # (the client then needs a restart). A missing file (the profile is off, the plugin is not installed) is
 # fine: .env stays the source of truth and the next run fills it in.
 apply_client_credential() { # <key>
-  local key="$1" spec kind target pass
+  local key="$1" spec kind target pass file ftype
   spec="$(client_spec "${key}")"
   IFS=: read -r _ kind target _ <<<"${spec}"
   pass="$(get "$(client_var "${key}")")"
   case "${kind}" in
-    config.ini) set_in_file ini "${RENEWVAN_ETC}/${key}/config.ini" "${key}" "${pass}" && echo "${key}" ;;
-    envfile) set_in_file env "${RENEWVAN_ETC}/${target}" "${key}" "${pass}" && echo "${key}" ;;
+    config.ini) file="${RENEWVAN_ETC}/${key}/config.ini"; ftype=ini ;;
+    envfile) file="${RENEWVAN_ETC}/${target}"; ftype=env ;;
+    *) return 0 ;;
+  esac
+  local rc=0
+  set_in_file "${ftype}" "${file}" "${key}" "${pass}" || rc=$?
+  case "${rc}" in
+    0) echo "${key}" ;;
+    1 | 3) ;; # file absent (profile off) or already current
+    *) echo "ERROR: could not write ${key}'s credential to ${file} (rc=${rc})" >&2; return 1 ;;
   esac
   return 0
 }
@@ -249,7 +257,8 @@ restart_client() { # <key>
   spec="$(client_spec "${key}")"
   IFS=: read -r _ kind target unit <<<"${spec}"
   case "${kind}" in
-    config.ini | compose) docker compose restart "${target}" ;;
+    config.ini) docker compose restart "${target}" ;;
+    compose) docker compose up -d --force-recreate --no-deps "${target}" ;; # a restart keeps the old environment
     envfile) sudo -n systemctl restart "${unit}" ;;
     esp32) echo "esp32 is rotated by OTA only (skill renewvan-flash-esp32)" >&2 ;;
   esac

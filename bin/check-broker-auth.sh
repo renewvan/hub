@@ -59,6 +59,12 @@ expect_denied() { # <user> <topic> <payload>
 
 PROBE_RELAY="renewvan/relay/zz-check-probe"
 
+# A failed probe must not read as a denial: the broker has to answer first.
+if ! docker exec "${BROKER_CONTAINER}" mosquitto_sub -h localhost -t '$SYS/broker/uptime' -W 3 -C 1 >/dev/null 2>&1; then
+  echo "ERROR: cannot reach the broker in ${BROKER_CONTAINER}; no denial can be proven" >&2
+  exit 1
+fi
+
 # --- 1. Connected accounts ------------------------------------------------------------------------
 # The log has one "New client connected ... (p2, c1, k60, u'name')" per connection; the last event per
 # client id decides whether it is still connected.

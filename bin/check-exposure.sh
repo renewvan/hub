@@ -95,25 +95,29 @@ else
   echo "skip  the with-login query (set CHECK_EXPOSURE_PASSWORD to the Caddy login password)"
 fi
 
-# Past the gate (with the login) a write and other paths must still be refused by the proxy itself. Without
-# the login these two only prove the gate answers 401, which is weaker but still a refusal.
-AUTH=(-H 'Authorization: Token not-a-real-token')
-if [[ -n "${CHECK_EXPOSURE_PASSWORD:-}" ]]; then AUTH=(-u "renewvan:${CHECK_EXPOSURE_PASSWORD}"); fi
+if [[ -n "${CHECK_EXPOSURE_PASSWORD:-}" ]]; then
+  # Past the gate (with the login) a write and other paths must still be refused by the proxy itself. Without
+  # the login these two only prove the gate answers 401, which is weaker but still a refusal.
+  AUTH=(-H 'Authorization: Token not-a-real-token')
+  if [[ -n "${CHECK_EXPOSURE_PASSWORD:-}" ]]; then AUTH=(-u "renewvan:${CHECK_EXPOSURE_PASSWORD}"); fi
 
-code="$(curl -sk -m 15 -o /dev/null -w '%{http_code}' -X POST \
-  "${BASE}/api/v2/write?org=renewvan&bucket=renewvan" \
-  "${AUTH[@]}" \
-  --data-binary 'exposure_check value=1' || true)"
-case "${code}" in
-  204 | 200 | "" | 000) fail "a write through /influx was not rejected (${code:-no response})" ;;
-  *) pass "write through /influx is rejected (${code})" ;;
-esac
+  code="$(curl -sk -m 15 -o /dev/null -w '%{http_code}' -X POST \
+    "${BASE}/api/v2/write?org=renewvan&bucket=renewvan" \
+    "${AUTH[@]}" \
+    --data-binary 'exposure_check value=1' || true)"
+  case "${code}" in
+    204 | 200 | "" | 000) fail "a write through /influx was not rejected (${code:-no response})" ;;
+    *) pass "write through /influx is rejected (${code})" ;;
+  esac
 
-code="$(curl -sk -m 15 -o /dev/null -w '%{http_code}' "${AUTH[@]}" "${BASE}/api/v2/buckets" || true)"
-case "${code}" in
-  200 | "" | 000) fail "GET /influx/api/v2/buckets was not rejected (${code:-no response})" ;;
-  *) pass "other InfluxDB paths are rejected (${code})" ;;
-esac
+  code="$(curl -sk -m 15 -o /dev/null -w '%{http_code}' "${AUTH[@]}" "${BASE}/api/v2/buckets" || true)"
+  case "${code}" in
+    200 | "" | 000) fail "GET /influx/api/v2/buckets was not rejected (${code:-no response})" ;;
+    *) pass "other InfluxDB paths are rejected (${code})" ;;
+  esac
+else
+  echo "skip  the write and other-path refusals (without the login they only meet the 401 gate; set CHECK_EXPOSURE_PASSWORD)"
+fi
 
 if [[ "${FAILED}" == "0" ]]; then
   echo "Also run 'bin/check-exposure.sh --published' on the Pi (Caddy 443 must not bind every interface)."

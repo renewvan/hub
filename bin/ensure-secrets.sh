@@ -204,10 +204,11 @@ if [[ ${#new_clients[@]} -gt 0 || "${want_users}" != "${have_users}" ]]; then
   note "mosquitto/passwd"
 fi
 
-: >"${ENV_FILE}.changed-clients"
+# Entries stay until deploy has restarted the client (it clears the file), so a failed deploy loses none.
+touch "${ENV_FILE}.changed-clients"
 for key in $(client_keys); do
   changed="$(apply_client_credential "${key}")"
-  if [[ -n "${changed}" ]]; then echo "${key}" >>"${ENV_FILE}.changed-clients"; fi
+  if [[ -n "${changed}" ]] && ! grep -qx "${key}" "${ENV_FILE}.changed-clients"; then echo "${key}" >>"${ENV_FILE}.changed-clients"; fi
 done
 
 # --- 4. Refuse to continue on a placeholder or legacy default --------------------------------

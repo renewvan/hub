@@ -32,14 +32,21 @@ fi
 if [[ "${KEY}" == "caddy" ]]; then
   pw="$(gen 12)"
   set_var CADDY_BASIC_AUTH_HASH "'$(caddy_hash "${pw}")'"
-  docker compose restart caddy
+  docker compose up -d --force-recreate --no-deps caddy # a restart would keep the old hash
   echo "==> Caddy login rotated (shown once, only its hash is stored): user ${CADDY_LOGIN_USER} password ${pw}"
   exit 0
 fi
 
 client_spec "${KEY}" >/dev/null || usage
-set_var "$(client_var "${KEY}")" "$(gen 16)"
-write_passwd_file
+# Keep .env and the password file in step: put the old password back if the new file cannot be written.
+var="$(client_var "${KEY}")"
+old_pw="$(get "${var}")"
+set_var "${var}" "$(gen 16)"
+if ! write_passwd_file; then
+  set_var "${var}" "${old_pw}"
+  echo "ERROR: could not write the password file; ${var} restored, nothing rotated" >&2
+  exit 1
+fi
 apply_client_credential "${KEY}" >/dev/null
 # SIGHUP reloads the password file; only a client whose credential stopped validating is dropped.
 docker kill -s HUP "${BROKER_CONTAINER}" >/dev/null

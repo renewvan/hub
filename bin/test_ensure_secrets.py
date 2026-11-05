@@ -328,7 +328,9 @@ class BrokerAccountsTest(Harness):
         r = self.run_script()
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(self.snapshot(), before)
-        self.assertEqual((self.dir / ".env.changed-clients").read_text(), "")
+        # pending restarts are kept until deploy clears them, but nothing new is added
+        pending = (self.dir / ".env.changed-clients").read_text().split()
+        self.assertEqual(len(pending), len(set(pending)))
         self.assertIn("nothing to change", r.stdout)
 
     def test_rotation_changes_exactly_one_client(self):
@@ -351,7 +353,9 @@ class BrokerAccountsTest(Harness):
         self.assertNotEqual(lines["gps"], old["gps"])
         self.assertIn(after[client_var("gps")][::-1], lines["gps"])
         self.assertIn("kill -s HUP renewvan-mosquitto", self.calls())
-        self.assertIn("compose restart driver-gps", self.calls())
+        self.assertIn(
+            "compose restart driver-gps", self.calls()
+        )  # config.ini is re-read on restart
         self.assertNotIn(after[client_var("gps")], r.stdout + r.stderr)
 
     def test_rotation_refuses_unknown_clients_and_esp32(self):
@@ -371,7 +375,7 @@ class BrokerAccountsTest(Harness):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertNotEqual(self.values()["CADDY_BASIC_AUTH_HASH"], before)
         self.assertIn("password ", r.stdout)
-        self.assertIn("compose restart caddy", self.calls())
+        self.assertIn("compose up -d --force-recreate --no-deps caddy", self.calls())
 
 
 if __name__ == "__main__":
