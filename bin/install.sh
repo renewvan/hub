@@ -97,7 +97,7 @@ IFS='|' read -r PI_OS PI_ARCH PI_UID PI_SUDO PI_IP <<<"${PI_INFO}"
 [[ "${PI_OS}" == "13" ]] || die "the Pi runs Debian ${PI_OS}; this install is written for Raspberry Pi OS (Debian 13, trixie)"
 [[ "${PI_UID}" != "0" ]] || die "ssh as a normal user, not root: the kiosk session runs as that user"
 if [[ "${PI_SUDO}" != "yes" ]]; then
-  [[ "${ASSUME_YES}" == "0" ]] || die "passwordless sudo is required with --yes (see docs/pi-agent-sudo-setup.md)"
+  [[ "${ASSUME_YES}" == "0" ]] || die "passwordless sudo is required with --yes (add a NOPASSWD sudoers rule for the ssh user, or drop --yes to be prompted)"
   echo "note: sudo will prompt for a password during the install"
 fi
 echo "ok: ${HOST} is Debian ${PI_OS} ${PI_ARCH}, ip ${PI_IP:-unknown}"
