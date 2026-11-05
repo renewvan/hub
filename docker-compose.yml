@@ -44,6 +44,11 @@ services:
       - ${MOSQUITTO_CONFIG_PATH:-./docker/mosquitto/config}:/mosquitto/config
       - mosquitto-data:/mosquitto/data
       - mosquitto-log:/mosquitto/log
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # History for tank/relay/battery/solar/charger/router/temperature topics
   # (docs/architecture.md "Application services" row). Written by

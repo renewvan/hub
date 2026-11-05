@@ -16,6 +16,7 @@ _Avoid_: Message bus, broker (when the campervan-specific bus is meant, not MQTT
 
 **Renewvan hub**:
 The Docker Compose stack running on the Pi that forms the connective core of the platform: the Mosquitto broker (renewvan bus), pinned driver containers, and plugins. From a user's perspective, "Renewvan hub connected" means the dashboard has an active MQTT-over-WebSocket connection to this stack. From an operator's perspective, "the hub" refers to the Pi-side compose deployment managed by this repo.
+Besides the broker, the stack holds the history path: InfluxDB and Grafana publish on loopback only, the dashboard reads history through Caddy's same-origin `/influx` proxy (read-only token held server-side, `docs/adr/0024-history-reaches-browsers-through-a-caddy-influx-proxy.md`), and the logger and Grafana each use their own bucket-scoped token. The kiosk browser and display bridge run as the unprivileged `renewvan-kiosk` user (`docs/reference.md` "Kiosk user and plugin ownership").
 _Avoid_: "Bus connected" (ambiguous — sounds like a vehicle CAN/RV-C bus or the MQTT protocol itself, not the Pi service); "hub service" (the hub is the whole stack, not one service inside it).
 
 **Tank**:

@@ -272,7 +272,7 @@ Android may warn "Network may be monitored" after you install a user CA. That is
 
 ### Certificate lifetime
 
-The root is valid for 10 years. Caddy signs the server certificate directly with it (`sign_with_root`) for 90 days and renews it automatically, so renewals need no reinstall. Never delete the `caddy-data` volume: every device would have to trust a new root.
+The root is valid for 10 years. Caddy signs the server certificate directly with it (`sign_with_root`) for 90 days and renews it automatically, so renewals need no reinstall. Never delete the `caddy-data` volume: every device would have to trust a new root. The volume also holds the root's private key, so treat it (and any backup of it) as a secret: anyone with it can issue certificates your phones trust.
 
 ## Broker reachability
 
@@ -343,6 +343,8 @@ The repo's Mosquitto config runs `allow_anonymous true`. That is fine on a priva
 | Host plugins (kiosk, tailscale)                                                      | `/etc/renewvan/kiosk.env`, `/etc/renewvan/tailscale.env` |
 | ESP32 relay                                                                          | its `secrets.yaml`                                       |
 | Browsers                                                                             | `VITE_MQTT_USERNAME`/`VITE_MQTT_PASSWORD`                |
+
+The repo config also sets `max_connections 100`, `message_size_limit 1048576` and logs to stdout only (Docker rotates it). `bin/deploy.sh` seeds `/etc/renewvan/mosquitto/mosquitto.conf` only when it is missing, so an existing van keeps its old file: copy the new lines in by hand and restart `mosquitto`.
 
 Give every client its credential first, then require authentication, and keep the old `mosquitto.conf` to roll back to. Locking the broker with only the environment pair set takes the five config-driven drivers offline (`MQTT connect failed with rc=5`). The open design is tracked in hub issue 49.
 
