@@ -359,6 +359,17 @@ The repo config also sets `max_connections 100`, `message_size_limit 1048576` an
 
 Give every client its credential first, then require authentication, and keep the old `mosquitto.conf` to roll back to. Locking the broker with only the environment pair set takes the five config-driven drivers offline (`MQTT connect failed with rc=5`). The design is [ADR 0025](adr/0025-broker-has-per-client-accounts-and-anonymous-read-only.md).
 
+### Migrating to per-client accounts
+
+The order matters ([ADR 0025](adr/0025-broker-has-per-client-accounts-and-anonymous-read-only.md)); every step has a rollback and none needs a reflash while the old firmware still works.
+
+1. **Bind 443** to the LAN and Tailscale addresses (`bin/deploy.sh` does it; check with `bin/check-exposure.sh --published` on the Pi).
+2. **Deploy.** `bin/deploy.sh` generates the passwords, writes the password file and an ACL that still contains the temporary `topic readwrite renewvan/#` line (`BROKER_ACL_OPEN=1`), validates them in a throwaway broker, and reloads. Drivers, plugins and the dashboard restart on their own accounts; anonymous clients still work.
+3. **Flash the ESP32** while its old anonymous firmware still works, so the 15-minute authentication-failure reboot never fires. On the Pi: `grep MQTT_ESP32_PASSWORD /opt/renewvan/hub/.env`. In `driver-esp32/secrets.yaml` set `mqtt_username: "esp32"` and `mqtt_password` to that value, then build and OTA it (skill `renewvan-flash-esp32`). Its account may write only its own `renewvan/esp32/#`, `renewvan/relay/+/state`, `name` and `driver`, and read everything, so a leaked ESP32 password cannot switch a relay. Rotate it only by OTA, on suspected compromise.
+4. **Check, then cut over.** On the Pi, `bin/check-broker-auth.sh --stage3` must report no anonymous client (a client refused with `rc=5` needs a restart; exclude harmless readers with `CHECK_ALLOW_ANON=<regex on client id>`). Then `bin/cutover-broker-acl.sh` removes the temporary line, validates, reloads and re-checks; a failed check puts the line back. Roll back by hand with `bin/cutover-broker-acl.sh --rollback`.
+
+`bin/check-broker-auth.sh` proves each rule by effect, because a denied publish is silent on MQTT 3.1.1: it publishes as one account and watches an anonymous subscriber. It uses an unknown relay id and unretained payloads, so nothing real is switched.
+
 ## Host plugins
 
 Plugins under `plugins/` are Pi-level systemd services that run outside Docker.
