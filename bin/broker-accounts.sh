@@ -154,6 +154,8 @@ install_for_broker() { # <content file> <destination>
   else
     sudo -n chown "${owner}:${BROKER_GID}" "${src}"
   fi
+  # Keep the last file so bin/validate-broker-config.sh can roll back a bad one.
+  if [[ -f "${dst}" ]]; then cp -p "${dst}" "${dst}.prev"; fi
   mv "${src}" "${dst}"
 }
 

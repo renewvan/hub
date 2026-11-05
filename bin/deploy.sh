@@ -38,7 +38,7 @@ echo "==> Syncing compose artifacts to ${HOST}:${REMOTE_DIR}"
 ssh "${HOST}" "mkdir -p ${REMOTE_DIR} && sudo mkdir -p /opt/renewvan/plugins/kiosk /opt/renewvan/plugins/tailscale /opt/renewvan/plugins/hub /opt/renewvan/venvs"
 rsync -az docker-compose.yml docker-compose.lan.yml "${HOST}:${REMOTE_DIR}/"
 ssh "${HOST}" "mkdir -p ${REMOTE_DIR}/bin"
-rsync -az bin/vedirect-gate.sh bin/ensure-secrets.sh bin/broker-accounts.sh bin/rotate-secret.sh "${HOST}:${REMOTE_DIR}/bin/"
+rsync -az bin/vedirect-gate.sh bin/ensure-secrets.sh bin/broker-accounts.sh bin/rotate-secret.sh bin/validate-broker-config.sh "${HOST}:${REMOTE_DIR}/bin/"
 rsync -az --delete docker/ "${HOST}:${REMOTE_DIR}/docker/"
 rsync -az .env.example "${HOST}:${REMOTE_DIR}/.env.example"
 rsync -az bin/heater-hint.sh "${HOST}:${REMOTE_DIR}/heater-hint.sh"
@@ -356,11 +356,24 @@ fi
 echo "==> Ensuring secrets"
 bash bin/ensure-secrets.sh .env
 
+# The broker's password file and ACL (ADR 0025) are checked in a throwaway container before the running
+# broker is touched; a bad ACL line would make it exit on reload. Stops the deploy on failure.
+echo "==> Validating the broker config and ACL"
+bash bin/validate-broker-config.sh
+
 echo "==> docker compose pull && up -d"
 docker compose pull
 # --remove-orphans: containers have fixed container_name values, so a renamed service key leaves
 # the old container holding the name and a plain up -d aborts half-way (ADR 0014's rename did).
 docker compose up -d --remove-orphans
+# New password file / ACL: a changed mosquitto.conf needs a restart (listeners and auth settings), the files
+# alone a SIGHUP. Neither runs when the validation above failed (the deploy stopped there).
+if [[ -f /etc/renewvan/mosquitto/mosquitto.conf.changed ]]; then
+  rm -f /etc/renewvan/mosquitto/mosquitto.conf.changed
+  docker compose restart mosquitto
+else
+  docker kill -s HUP renewvan-mosquitto >/dev/null
+fi
 # caddy bind-mounts the Caddyfile as a single file: each deploy replaces it with a new inode, which the
 # running container keeps reading until it restarts. Restart it here (brief TLS blip; the root CA lives in
 # the caddy-data volume, so devices keep trusting it).

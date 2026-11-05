@@ -351,9 +351,9 @@ The repo's Mosquitto config runs `allow_anonymous true`. That is fine on a priva
 | ESP32 relay                                                                          | its `secrets.yaml`                                       |
 | Browsers                                                                             | `VITE_MQTT_USERNAME`/`VITE_MQTT_PASSWORD`                |
 
-The repo config also sets `max_connections 100`, `message_size_limit 1048576` and logs to stdout only (Docker rotates it). `bin/deploy.sh` seeds `/etc/renewvan/mosquitto/mosquitto.conf` only when it is missing, so an existing van keeps its old file: copy the new lines in by hand and restart `mosquitto`.
+The repo config also sets `max_connections 100`, `message_size_limit 1048576` and logs to stdout only (Docker rotates it). On the Pi, `bin/validate-broker-config.sh` (run by `bin/deploy.sh`) rebuilds `/etc/renewvan/mosquitto/mosquitto.conf` on every deploy from the repo file plus `docker/mosquitto/auth.conf` (`password_file` and `acl_file`, global, so both listeners load them): hand edits to the installed copy are replaced. Before the running broker is touched it starts a throwaway broker (no network) on the candidate config and the generated `passwd`/`acl`, because `mosquitto --test-config` does not read the ACL and a bad ACL line makes the broker exit on reload. If that broker does not stay up, the deploy stops, the previous `passwd`/`acl` are restored and the running broker is untouched. When the config changed deploy restarts `mosquitto`, otherwise it sends SIGHUP.
 
-Give every client its credential first, then require authentication, and keep the old `mosquitto.conf` to roll back to. Locking the broker with only the environment pair set takes the five config-driven drivers offline (`MQTT connect failed with rc=5`). The open design is tracked in hub issue 49.
+Give every client its credential first, then require authentication, and keep the old `mosquitto.conf` to roll back to. Locking the broker with only the environment pair set takes the five config-driven drivers offline (`MQTT connect failed with rc=5`). The design is [ADR 0025](adr/0025-broker-has-per-client-accounts-and-anonymous-read-only.md).
 
 ## Host plugins
 
