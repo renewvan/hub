@@ -10,7 +10,13 @@
 #   - On a van that already has data volumes, rotates in place: the DOCKER_INFLUXDB_INIT_* and
 #     GF_SECURITY_ADMIN_PASSWORD variables only apply on a volume's first run, so it changes the
 #     live admin token/password through the influx and grafana CLIs. It never wipes a volume.
-#   - Prints the names of the variables it changed, never their values.
+#   - Broker accounts (docs/adr/0025): one MQTT_<CLIENT>_PASSWORD per client, the Mosquitto password
+#     file and ACL in /etc/renewvan/mosquitto/, each driver's/plugin's own credential file, and the
+#     Caddy login (CADDY_BASIC_AUTH_USER/HASH; its password is shown once, never stored). Clients
+#     whose credential file changed are listed in <env file>.changed-clients for deploy to restart.
+#     BROKER_ACL_OPEN=1 keeps the temporary `topic readwrite renewvan/#` migration line.
+#   - Prints the names of the variables it changed, never their values (the one-time Caddy password
+#     is the exception).
 #
 # Usage: bin/ensure-secrets.sh [path-to-.env]      (default ./.env)
 set -euo pipefail
@@ -32,19 +38,8 @@ is_example_value() {
 [[ -f "${ENV_FILE}" ]] || { echo "ERROR: ${ENV_FILE} not found" >&2; exit 1; }
 chmod 600 "${ENV_FILE}"
 
-get() { sed -n "s|^$1=||p" "${ENV_FILE}" | tr -d '\r' | tail -n1; }
-
-# Rewrite the file through a 0600 temp file so a secret is never briefly world-readable.
-set_var() {
-  local tmp
-  tmp="$(mktemp "${ENV_FILE}.XXXXXX")"
-  chmod 600 "${tmp}"
-  { grep -v "^$1=" "${ENV_FILE}" || true; printf '%s=%s\n' "$1" "$2"; } >"${tmp}"
-  mv "${tmp}" "${ENV_FILE}"
-}
-
-# Hex only: safe in sed, YAML, shell and URLs.
-gen() { openssl rand -hex "$1"; }
+# shellcheck source=bin/broker-accounts.sh
+source "$(dirname "${BASH_SOURCE[0]}")/broker-accounts.sh"
 
 CHANGED=()
 note() { CHANGED+=("$1"); }
@@ -162,9 +157,65 @@ if is_example_value "$(get GF_SECURITY_ADMIN_PASSWORD)"; then
   fi
 fi
 
+# --- 3b. Broker accounts (ADR 0025) -----------------------------------------------------------
+new_clients=()
+for key in $(client_keys); do
+  var="$(client_var "${key}")"
+  if is_example_value "$(get "${var}")"; then
+    set_var "${var}" "$(gen 16)"
+    note "${var}"
+    new_clients+=("${key}")
+  fi
+done
+
+caddy_password=""
+if is_example_value "$(get CADDY_BASIC_AUTH_HASH)"; then
+  caddy_password="$(gen 12)"
+  # Single-quoted: compose would otherwise expand the $ signs of the bcrypt hash.
+  set_var CADDY_BASIC_AUTH_HASH "'$(caddy_hash "${caddy_password}")'"
+  set_var CADDY_BASIC_AUTH_USER "${CADDY_LOGIN_USER}"
+  note CADDY_BASIC_AUTH_HASH
+fi
+
+mosq_dir="${RENEWVAN_ETC}/mosquitto"
+mkdir -p "${mosq_dir}"
+# A van with no ACL yet starts in the migration state (every client may still write); the cutover sets 0.
+if [[ -z "$(get BROKER_ACL_OPEN)" ]]; then
+  if [[ -f "${mosq_dir}/acl" ]]; then set_var BROKER_ACL_OPEN 0; else set_var BROKER_ACL_OPEN 1; fi
+  note BROKER_ACL_OPEN
+fi
+
+acl_tmp="$(mktemp "${mosq_dir}/acl.XXXXXX")"
+render_acl "$(get BROKER_ACL_OPEN)" >"${acl_tmp}"
+if cmp -s "${acl_tmp}" "${mosq_dir}/acl"; then
+  rm -f "${acl_tmp}"
+else
+  install_for_broker "${acl_tmp}" "${mosq_dir}/acl"
+  note "mosquitto/acl"
+fi
+
+# Users in the password file must be exactly the client list; hashes are salted, so passwords are only
+# rewritten when a client is new or the user set differs.
+want_users="$(client_keys | sort | tr '\n' ' ')"
+have_users=""
+[[ -f "${mosq_dir}/passwd" ]] && have_users="$(cut -d: -f1 "${mosq_dir}/passwd" | sort | tr '\n' ' ')"
+if [[ ${#new_clients[@]} -gt 0 || "${want_users}" != "${have_users}" ]]; then
+  write_passwd_file
+  note "mosquitto/passwd"
+fi
+
+: >"${ENV_FILE}.changed-clients"
+for key in $(client_keys); do
+  changed="$(apply_client_credential "${key}")"
+  if [[ -n "${changed}" ]]; then echo "${key}" >>"${ENV_FILE}.changed-clients"; fi
+done
+
 # --- 4. Refuse to continue on a placeholder or legacy default --------------------------------
+broker_vars=()
+for key in $(client_keys); do broker_vars+=("$(client_var "${key}")"); done
 for name in INFLUXDB_ADMIN_PASSWORD INFLUXDB_ADMIN_TOKEN INFLUXDB_LOGGER_TOKEN \
-  INFLUXDB_GRAFANA_TOKEN INFLUXDB_DASHBOARD_TOKEN GF_SECURITY_ADMIN_PASSWORD; do
+  INFLUXDB_GRAFANA_TOKEN INFLUXDB_DASHBOARD_TOKEN GF_SECURITY_ADMIN_PASSWORD CADDY_BASIC_AUTH_HASH \
+  "${broker_vars[@]}"; do
   if is_example_value "$(get "${name}")"; then
     echo "ERROR: ${name} in ${ENV_FILE} is empty or an example value after the secrets step" >&2
     exit 1
@@ -175,4 +226,8 @@ if [[ ${#CHANGED[@]} -gt 0 ]]; then
   echo "==> Generated or rotated in ${ENV_FILE} (values not shown): ${CHANGED[*]}"
 else
   echo "==> Secrets already set; nothing to change"
+fi
+
+if [[ -n "${caddy_password}" ]]; then
+  echo "==> Caddy login for the dashboard (shown once, only its hash is stored): user ${CADDY_LOGIN_USER} password ${caddy_password}"
 fi
