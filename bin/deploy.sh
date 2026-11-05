@@ -374,6 +374,16 @@ if [[ -f /etc/renewvan/mosquitto/mosquitto.conf.changed ]]; then
 else
   docker kill -s HUP renewvan-mosquitto >/dev/null
 fi
+# A node refused with rc=5 does not retry, and a driver reads its config.ini only at start: restart every
+# client whose credential file ensure-secrets just changed (compose clients are recreated by up -d above,
+# their environment changed). The list is rewritten on each ensure-secrets run.
+if [[ -s .env.changed-clients ]]; then
+  while read -r client; do
+    echo "==> Restarting \${client} (new broker credential)"
+    ( ENV_FILE=.env; source bin/broker-accounts.sh; restart_client "\${client}" ) || echo "WARN: could not restart \${client}" >&2
+  done < .env.changed-clients
+  : > .env.changed-clients
+fi
 # caddy bind-mounts the Caddyfile as a single file: each deploy replaces it with a new inode, which the
 # running container keeps reading until it restarts. Restart it here (brief TLS blip; the root CA lives in
 # the caddy-data volume, so devices keep trusting it).
