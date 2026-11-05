@@ -38,11 +38,26 @@ class ExposureTest(unittest.TestCase):
             self.assertTrue(hosts, f"{service} publishes nothing")
             self.assertEqual(set(hosts), {"127.0.0.1"}, service)
 
-    def test_no_service_publishes_on_all_interfaces_except_caddy(self):
+    def test_no_service_publishes_on_all_interfaces(self):
         for name in SERVICES:
-            if name == "caddy":
-                continue
             self.assertNotIn("", published_hosts(name), f"{name} binds 0.0.0.0")
+
+    def test_caddy_443_is_loopback_here_and_lan_plus_tailnet_in_the_pi_override(self):
+        self.assertEqual(published_hosts("caddy"), ["127.0.0.1"])
+        lan = yaml.safe_load((ROOT / "docker-compose.lan.yml").read_text())
+        ports = [str(p) for p in lan["services"]["caddy"]["ports"]]
+        self.assertEqual(len(ports), 2)
+        hosts = {p.rsplit(":443:443", 1)[0] for p in ports}
+        self.assertTrue(all(p.endswith(":443:443") for p in ports))
+        self.assertEqual(
+            {h.split(":?")[0] for h in hosts}, {"${MQTT_BIND_ADDR", "${TAILSCALE_BIND_ADDR"}
+        )
+        self.assertRegex(ENV_EXAMPLE, r"(?m)^TAILSCALE_BIND_ADDR=$")
+
+    def test_check_exposure_covers_the_caddy_publish(self):
+        script = (ROOT / "bin" / "check-exposure.sh").read_text()
+        self.assertIn("--published", script)
+        self.assertIn("renewvan-caddy", script)
 
 
 class CredentialsTest(unittest.TestCase):

@@ -330,6 +330,27 @@ if ! { hostname -I 2>/dev/null | tr ' ' '\\n'; } | grep -qxF "\${bind_addr}"; th
   exit 1
 fi
 
+# Caddy's 443 is published on MQTT_BIND_ADDR and the Pi's Tailscale address only (docker-compose.lan.yml),
+# never every interface: /mqtt behind it can switch relays. Seed the tailnet address from tailscale, then
+# require it to be an address this Pi has right now (tailscale must be logged in: sudo tailscale up).
+if ! grep -Eq '^TAILSCALE_BIND_ADDR=.+' .env; then
+  ts_ip="\$(tailscale ip -4 2>/dev/null | head -n1 || true)"
+  if printf '%s' "\${ts_ip}" | grep -Eq '^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\$'; then
+    sed -i '/^TAILSCALE_BIND_ADDR=/d' .env
+    echo "TAILSCALE_BIND_ADDR=\${ts_ip}" >> .env
+    echo "==> TAILSCALE_BIND_ADDR not set: using tailscale ip (\${ts_ip})"
+  else
+    echo "ERROR: TAILSCALE_BIND_ADDR in ${REMOTE_DIR}/.env is empty and tailscale has no IPv4 address: run sudo tailscale up, or set it, and re-run." >&2
+    exit 1
+  fi
+fi
+ts_addr="\$(sed -n 's|^TAILSCALE_BIND_ADDR=||p' .env | tr -d '\\r' | head -n1)"
+if ! { hostname -I 2>/dev/null | tr ' ' '\\n'; } | grep -qxF "\${ts_addr}"; then
+  echo "ERROR: TAILSCALE_BIND_ADDR=\${ts_addr} is not an address of this Pi (\$(hostname -I 2>/dev/null | xargs || true))." >&2
+  echo "       Set it to the output of 'tailscale ip -4' in ${REMOTE_DIR}/.env and re-run." >&2
+  exit 1
+fi
+
 # Generate any missing or example-valued secret, create the scoped InfluxDB tokens, and rotate a van
 # that still runs on legacy default values. Idempotent; never wipes a volume. Values are never printed.
 echo "==> Ensuring secrets"

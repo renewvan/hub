@@ -1,4 +1,4 @@
-# Pi override: also publish the broker on the van-LAN address, never on 0.0.0.0, so an uplink
+# Pi override: also publish the broker, and Caddy 443, on the van-LAN address, never on 0.0.0.0, so an uplink
 # interface (cellular/Starlink) cannot reach it. Selected on the Pi by
 # COMPOSE_FILE=docker-compose.yml:docker-compose.lan.yml in its .env (bin/deploy.sh seeds it).
 # Local dev does not use this file. docs/reference.md "Broker reachability".
@@ -13,3 +13,9 @@ services:
     ports:
       - "${MQTT_BIND_ADDR:?set MQTT_BIND_ADDR to the Pi LAN IP}:1883:1883"
       - "${MQTT_BIND_ADDR:?set MQTT_BIND_ADDR to the Pi LAN IP}:9001:9001"
+
+  # Caddy 443 (dashboard, /mqtt, /influx): van-LAN and tailnet addresses only, never every interface.
+  caddy:
+    ports:
+      - "${MQTT_BIND_ADDR:?set MQTT_BIND_ADDR to the Pi LAN IP}:443:443"
+      - "${TAILSCALE_BIND_ADDR:?set TAILSCALE_BIND_ADDR to the Pi Tailscale IPv4 (tailscale ip -4)}:443:443"

@@ -6,10 +6,41 @@
 #   2. Caddy's /influx answers a query with no credentials (it injects the read-only token).
 #   3. A write through /influx is rejected (only POST /api/v2/query is forwarded).
 #
+#   4. (--published, run ON the Pi) Caddy's 443 is published on specific addresses only, never
+#      0.0.0.0 / [::] (docs/adr/0025-broker-has-per-client-accounts-and-anonymous-read-only.md).
+#      From a second host a wildcard publish is indistinguishable from the LAN bind, so this one
+#      reads the container's port mappings (CONTAINER_CLI, default docker).
+#
 # Usage: bin/check-exposure.sh <pi-lan-ip-or-name>
+#        bin/check-exposure.sh --published      (on the Pi; only check 4)
 # Needs: nc, curl. Exit 0 = every check passed, 1 = at least one failed, 2 = usage error.
 # No -e on purpose: every check runs and failures accumulate into the exit code.
 set -uo pipefail
+
+FAILED=0
+pass() { printf 'ok    %s\n' "$*"; }
+fail() { printf 'FAIL  %s\n' "$*" >&2; FAILED=1; }
+
+# Fails on any all-interface publish of 443; reads `docker port` lines like `443/tcp -> 10.0.0.5:443`.
+check_published() {
+  local cli="${CONTAINER_CLI:-docker}" out
+  if ! out="$("${cli}" port renewvan-caddy 443/tcp 2>&1)"; then
+    fail "cannot read renewvan-caddy's published ports (${cli} port: ${out})"
+    return
+  fi
+  if [[ -z "${out}" ]]; then
+    fail "renewvan-caddy publishes nothing on 443"
+  elif printf '%s\n' "${out}" | grep -Eq '(^|-> )(0\.0\.0\.0|\[::\]|::):'; then
+    fail "Caddy 443 is published on every interface: ${out//$'\n'/, }"
+  else
+    pass "Caddy 443 is published on specific addresses only: ${out//$'\n'/, }"
+  fi
+}
+
+if [[ "${1:-}" == "--published" ]]; then
+  check_published
+  exit "${FAILED}"
+fi
 
 HOST="${1:-}"
 if [[ -z "${HOST}" || "${HOST}" == -* ]]; then
@@ -19,10 +50,6 @@ fi
 for tool in nc curl; do
   command -v "${tool}" >/dev/null 2>&1 || { echo "ERROR: ${tool} is required" >&2; exit 2; }
 done
-
-FAILED=0
-pass() { printf 'ok    %s\n' "$*"; }
-fail() { printf 'FAIL  %s\n' "$*" >&2; FAILED=1; }
 
 for port in 8086 3000; do
   if nc -z -w 3 "${HOST}" "${port}" >/dev/null 2>&1; then
@@ -60,6 +87,7 @@ case "${code}" in
 esac
 
 if [[ "${FAILED}" == "0" ]]; then
+  echo "Also run 'bin/check-exposure.sh --published' on the Pi (Caddy 443 must not bind every interface)."
   echo "All exposure checks passed."
 else
   echo "Exposure checks FAILED." >&2

@@ -439,8 +439,11 @@ services:
     depends_on:
       - dashboard
       - influxdb
+    # Loopback only here. The Pi adds its van-LAN and Tailscale addresses through
+    # docker-compose.lan.yml. Never 443:443 (every interface): /mqtt behind it can switch relays, and an
+    # uplink interface must not reach it (docs/adr/0025-broker-has-per-client-accounts-and-anonymous-read-only.md).
     ports:
-      - "443:443"
+      - "127.0.0.1:443:443"
     environment:
       DASHBOARD_HOST: ${DASHBOARD_HOST:?set DASHBOARD_HOST to the Pi LAN IP or name}
       # Read-only, bucket-scoped. Injected by the Caddyfile's /influx proxy, never sent to browsers
