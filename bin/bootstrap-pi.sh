@@ -139,6 +139,11 @@ if [[ -d /opt/renewvan/venvs ]]; then sudo chown -R root:root /opt/renewvan/venv
 # driver-wattcycle runs as a fixed non-root uid and talks to BlueZ over the host's system D-Bus.
 # This policy lets that uid reach only org.bluez, so the driver only has the bus access it needs and nothing more
 # systemd (or anything else) on the bus. Keep the uid in step with docker-compose.yml.
+# dbus-daemon resets the connection of a uid it cannot resolve in the host's user database, so the
+# container's fixed uid needs a matching host account (no login, no home).
+if ! id -u renewvan-wattcycle >/dev/null 2>&1; then
+  sudo useradd --system --uid 10001 --no-create-home --shell /usr/sbin/nologin --user-group renewvan-wattcycle
+fi
 echo "==> Installing the driver-wattcycle D-Bus policy"
 sudo tee /etc/dbus-1/system.d/renewvan-wattcycle.conf >/dev/null <<'DBUS'
 <!DOCTYPE busconfig PUBLIC "-//freedesktop//DTD D-BUS Bus Configuration 1.0//EN"

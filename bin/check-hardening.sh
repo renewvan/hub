@@ -48,7 +48,7 @@ else
   else
     fail "Chromium runs as: ${chromium_user}"
   fi
-  bridge_user="$(ps -eo user=,args= | awk '/kiosk\.py/ && !/awk/ {print $1; exit}')"
+  bridge_user="$(ps -eo user:32=,args= | awk '/kiosk\.py/ && !/awk/ {print $1; exit}')"
   if [[ -z "${bridge_user}" ]]; then
     fail "kiosk.py (display bridge) is not running"
   elif [[ "${bridge_user}" == "${KIOSK_USER}" ]]; then
@@ -92,6 +92,12 @@ for c in renewvan-wattcycle renewvan-vedirect; do
     fail "${c} lacks no-new-privileges"
   fi
 done
+
+if id -u renewvan-wattcycle >/dev/null 2>&1; then
+  pass "host account renewvan-wattcycle exists (dbus-daemon needs it for the container uid)"
+else
+  fail "host account renewvan-wattcycle is missing (run bin/bootstrap-pi.sh)"
+fi
 
 if [[ -f /etc/dbus-1/system.d/renewvan-wattcycle.conf ]]; then
   pass "D-Bus policy /etc/dbus-1/system.d/renewvan-wattcycle.conf is installed"

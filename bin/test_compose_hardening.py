@@ -106,6 +106,7 @@ class DriverHardeningTest(unittest.TestCase):
         uid = str(SERVICES["driver-wattcycle"]["user"])
         policy = (ROOT / "bin" / "bootstrap-pi.sh").read_text()
         self.assertIn(f'<policy user="{uid}">', policy)
+        self.assertIn(f"--uid {uid} ", policy, "the host needs an account for the uid")
         self.assertIn('send_destination="org.bluez"', policy)
         self.assertIn('<deny send_destination="org.freedesktop.systemd1"/>', policy)
 
