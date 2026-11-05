@@ -3,7 +3,8 @@
 # Verifies docs/adr/0024-history-reaches-browsers-through-a-caddy-influx-proxy.md:
 #
 #   1. InfluxDB (8086) and Grafana (3000) refuse connections on the Pi's LAN address.
-#   2. Caddy's /influx answers a query with no credentials (it injects the read-only token).
+#   2. Caddy's basic_auth gate (ADR 0025): /influx and /mqtt answer 401 with no login. With the login
+#      (CHECK_EXPOSURE_PASSWORD, user renewvan) /influx answers a query (Caddy injects the read-only token).
 #   3. A write through /influx is rejected (only POST /api/v2/query is forwarded).
 #
 #   4. (--published, run ON the Pi) Caddy's 443 is published on specific addresses only, never
@@ -11,7 +12,7 @@
 #      From a second host a wildcard publish is indistinguishable from the LAN bind, so this one
 #      reads the container's port mappings (CONTAINER_CLI, default docker).
 #
-# Usage: bin/check-exposure.sh <pi-lan-ip-or-name>
+# Usage: [CHECK_EXPOSURE_PASSWORD=<caddy login>] bin/check-exposure.sh <pi-lan-ip-or-name>
 #        bin/check-exposure.sh --published      (on the Pi; only check 4)
 # Needs: nc, curl. Exit 0 = every check passed, 1 = at least one failed, 2 = usage error.
 # No -e on purpose: every check runs and failures accumulate into the exit code.
@@ -62,25 +63,53 @@ done
 # Caddy uses a local CA (`tls internal`), so this host may not trust it: -k only skips that check.
 BASE="https://${HOST}/influx"
 
+QUERY_BODY='{"query":"buckets()","type":"flux"}'
+
 code="$(curl -sk -m 15 -o /dev/null -w '%{http_code}' -X POST "${BASE}/api/v2/query?org=renewvan" \
-  -H 'Content-Type: application/json' \
-  -d '{"query":"buckets()","type":"flux"}' || true)"
-if [[ "${code}" == "200" ]]; then
-  pass "POST /influx/api/v2/query answers without credentials (200)"
+  -H 'Content-Type: application/json' -d "${QUERY_BODY}" || true)"
+if [[ "${code}" == "401" ]]; then
+  pass "POST /influx/api/v2/query without the Caddy login is refused (401)"
 else
-  fail "POST /influx/api/v2/query returned ${code:-no response}, expected 200"
+  fail "POST /influx/api/v2/query without a login returned ${code:-no response}, expected 401"
 fi
+
+# A WebSocket upgrade to /mqtt without the login must be refused before the upgrade.
+code="$(curl -sk -m 15 -o /dev/null -w '%{http_code}' "https://${HOST}/mqtt" \
+  -H 'Connection: Upgrade' -H 'Upgrade: websocket' -H 'Sec-WebSocket-Version: 13' \
+  -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' -H 'Sec-WebSocket-Protocol: mqtt' || true)"
+if [[ "${code}" == "401" ]]; then
+  pass "/mqtt without the Caddy login is refused (401)"
+else
+  fail "/mqtt without a login returned ${code:-no response}, expected 401"
+fi
+
+if [[ -n "${CHECK_EXPOSURE_PASSWORD:-}" ]]; then
+  code="$(curl -sk -m 15 -o /dev/null -w '%{http_code}' -X POST "${BASE}/api/v2/query?org=renewvan" \
+    -u "renewvan:${CHECK_EXPOSURE_PASSWORD}" -H 'Content-Type: application/json' -d "${QUERY_BODY}" || true)"
+  if [[ "${code}" == "200" ]]; then
+    pass "POST /influx/api/v2/query with the Caddy login answers (200)"
+  else
+    fail "POST /influx/api/v2/query with the login returned ${code:-no response}, expected 200"
+  fi
+else
+  echo "skip  the with-login query (set CHECK_EXPOSURE_PASSWORD to the Caddy login password)"
+fi
+
+# Past the gate (with the login) a write and other paths must still be refused by the proxy itself. Without
+# the login these two only prove the gate answers 401, which is weaker but still a refusal.
+AUTH=(-H 'Authorization: Token not-a-real-token')
+if [[ -n "${CHECK_EXPOSURE_PASSWORD:-}" ]]; then AUTH=(-u "renewvan:${CHECK_EXPOSURE_PASSWORD}"); fi
 
 code="$(curl -sk -m 15 -o /dev/null -w '%{http_code}' -X POST \
   "${BASE}/api/v2/write?org=renewvan&bucket=renewvan" \
-  -H 'Authorization: Token not-a-real-token' \
+  "${AUTH[@]}" \
   --data-binary 'exposure_check value=1' || true)"
 case "${code}" in
   204 | 200 | "" | 000) fail "a write through /influx was not rejected (${code:-no response})" ;;
   *) pass "write through /influx is rejected (${code})" ;;
 esac
 
-code="$(curl -sk -m 15 -o /dev/null -w '%{http_code}' "${BASE}/api/v2/buckets" || true)"
+code="$(curl -sk -m 15 -o /dev/null -w '%{http_code}' "${AUTH[@]}" "${BASE}/api/v2/buckets" || true)"
 case "${code}" in
   200 | "" | 000) fail "GET /influx/api/v2/buckets was not rejected (${code:-no response})" ;;
   *) pass "other InfluxDB paths are rejected (${code})" ;;

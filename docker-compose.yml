@@ -451,6 +451,10 @@ services:
       # Read-only, bucket-scoped. Injected by the Caddyfile's /influx proxy, never sent to browsers
       # (docs/adr/0024-history-reaches-browsers-through-a-caddy-influx-proxy.md).
       INFLUXDB_DASHBOARD_TOKEN: ${INFLUXDB_DASHBOARD_TOKEN:?run bin/deploy.sh, which generates the InfluxDB secrets}
+      # The shared login in front of the whole site, /mqtt and /influx included (ADR 0025). bcrypt hash only;
+      # the password is shown once by bin/ensure-secrets.sh. The kiosk uses 127.0.0.1:80, not this site.
+      CADDY_BASIC_AUTH_USER: ${CADDY_BASIC_AUTH_USER:?run bin/deploy.sh, which generates the Caddy login}
+      CADDY_BASIC_AUTH_HASH: ${CADDY_BASIC_AUTH_HASH:?run bin/deploy.sh, which generates the Caddy login}
     volumes:
       - ../dashboard/docker/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

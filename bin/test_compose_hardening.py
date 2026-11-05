@@ -143,6 +143,25 @@ class BrokerAccountsTest(unittest.TestCase):
         for service, key in self.COMPOSE_CLIENTS.items():
             self.assertIn(f'"{key}:', accounts)
 
+    def test_caddy_gets_the_login_and_the_kiosk_bypasses_it(self):
+        env = env_of("caddy")
+        for name in ("CADDY_BASIC_AUTH_USER", "CADDY_BASIC_AUTH_HASH"):
+            self.assertTrue(env[name].startswith(f"${{{name}:?"), name)
+        # the kiosk loads http://localhost:80, the dashboard container itself, not Caddy
+        self.assertEqual(published_hosts("dashboard"), ["127.0.0.1"])
+        self.assertTrue(any(str(p).endswith(":80:80") for p in SERVICES["dashboard"]["ports"]))
+        self.assertRegex(ENV_EXAMPLE, r"(?m)^CADDY_BASIC_AUTH_HASH=$")
+
+    def test_caddyfile_gates_the_whole_site_when_the_dashboard_checkout_is_present(self):
+        caddyfile = ROOT.parent / "dashboard" / "docker" / "Caddyfile"
+        if not caddyfile.exists():
+            self.skipTest("no ../dashboard checkout")
+        text = caddyfile.read_text()
+        self.assertIn("basic_auth {", text)
+        self.assertIn("{$CADDY_BASIC_AUTH_USER} {$CADDY_BASIC_AUTH_HASH}", text)
+        # the gate comes before any handler, so /mqtt and /influx are both behind it
+        self.assertLess(text.index("basic_auth {"), text.index("handle_path /influx/*"))
+
     def test_deploy_restarts_clients_whose_credential_file_changed(self):
         deploy = (ROOT / "bin" / "deploy.sh").read_text()
         self.assertIn(".env.changed-clients", deploy)

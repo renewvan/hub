@@ -242,7 +242,7 @@ The dashboard is served over HTTPS on the LAN so a phone can install it as a PWA
 
 Published ports:
 
-- `caddy`: host port 443 (LAN).
+- `caddy`: host port 443 on the van-LAN and Tailscale addresses only (see [Broker reachability](#broker-reachability)).
 - `dashboard`: `127.0.0.1:80` only, for the kiosk browser (`http://localhost`).
 
 ### Setup
@@ -250,6 +250,10 @@ Published ports:
 1. Keep a `renewvan/dashboard` checkout next to this repo (`../dashboard`). `bin/deploy.sh` ships its `docker/Caddyfile` to the Pi, and compose mounts it from there.
 2. On the Pi, set `DASHBOARD_HOST` in `/opt/renewvan/hub/.env` to its LAN address (`hostname -I | awk '{print $1}'`).
 3. Run `bin/deploy.sh`. It restarts Caddy, because the Caddyfile is a single-file bind mount that a redeploy does not reload.
+
+### The login
+
+Caddy puts one shared `basic_auth` login in front of the whole site, so `/mqtt` (which can switch relays) and `/influx` are never open to whoever reaches 443 ([ADR 0025](adr/0025-broker-has-per-client-accounts-and-anonymous-read-only.md)). The username is `renewvan`. `bin/ensure-secrets.sh` generates the password on the first deploy and prints it once; only its bcrypt hash is kept (`CADDY_BASIC_AUTH_HASH` in `.env`). Lost it? `bin/rotate-secret.sh caddy` prints a new one. The browser asks once per device and remembers it. The kiosk is not behind the login: it loads `http://localhost` (the dashboard container on the Pi's loopback), never this site. Check from a laptop with `CHECK_EXPOSURE_PASSWORD=<password> bin/check-exposure.sh <pi-lan-ip>`.
 
 ### Trust the root on each phone (once)
 
@@ -316,7 +320,7 @@ Everything here is also covered by CI where it can be (`bin/test_compose_hardeni
 
 | Check                                                  | Where it runs                | What it proves                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | ------------------------------------------------------ | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bin/check-exposure.sh <pi-lan-ip>`                    | A second host on the van LAN | 8086 and 3000 refuse connections on the LAN address; `https://<pi>/influx/api/v2/query` answers with no credentials; a write through `/influx` and other InfluxDB paths are rejected. Needs `nc` and `curl`. Exit 0 = pass.                                                                                                                                                                                                                       |
+| `bin/check-exposure.sh <pi-lan-ip>`                    | A second host on the van LAN | 8086 and 3000 refuse connections on the LAN address; `/influx` and `/mqtt` answer 401 without the Caddy login; with `CHECK_EXPOSURE_PASSWORD` set, a query through `/influx` answers and a write and other InfluxDB paths are rejected. `--published` (on the Pi) fails if Caddy's 443 is published on every interface. Needs `nc` and `curl`. Exit 0 = pass.                                                                                     |
 | `bin/check-hardening.sh`                               | On the Pi, by hand           | `renewvan-kiosk` is not in `sudo` or `docker` and `sudo -n true` fails for it; Chromium and `kiosk.py` run as it; `/opt/renewvan/plugins` and `/opt/renewvan/venvs` are root-owned and not group or world writable; the wattcycle and vedirect containers run with a non-zero uid, `cap_drop: ALL` and `no-new-privileges`; the D-Bus policy file is installed; vedirect's `/dev` is read-only; each driver still reaches D-Bus or a serial port. |
 | `bin/test_compose_hardening.py`, `bin/test_pinning.py` | CI (`pytest bin/`)           | Static: loopback publishes, no secret defaults, scoped tokens per consumer, non-root drivers, `/dev:ro`, D-Bus policy uid matches compose; `tag@sha256` for infra images, exact tags for `renewvan/*`, SHA-pinned Actions, exact `npx` versions, no `curl \| sh`.                                                                                                                                                                                 |
 
