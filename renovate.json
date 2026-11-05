@@ -1,0 +1,35 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "description": "One PR per bump, reviewed and merged by a human (no automerge). Keeps the tag@sha256 pins in docker-compose.yml and the commit-SHA pins of GitHub Actions fresh; bin/test_pinning.py stops regressions.",
+  "automerge": false,
+  "separateMajorMinor": true,
+  "prConcurrentLimit": 5,
+  "docker-compose": {
+    "pinDigests": true
+  },
+  "github-actions": {
+    "pinDigests": true
+  },
+  "packageRules": [
+    {
+      "description": "Only the third-party infra images are digest-pinned (docs/adr/0001); renewvan/* images keep exact version tags.",
+      "matchPackageNames": ["/^ghcr\\.io\\/renewvan\\//"],
+      "pinDigests": false
+    },
+    {
+      "description": "Grafana stays on the supported 12.4 line until the 13.x move (due before 2027-05-24).",
+      "matchPackageNames": ["grafana/grafana"],
+      "allowedVersions": "<13.0.0"
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "npx pins in workflows, e.g. npx --yes ajv-cli@5.0.0",
+      "matchStrings": ["npx --yes (?<depName>[a-z0-9@/._-]+)@(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
+      "datasourceTemplate": "npm",
+      "managerFilePatterns": ["/^\\.github/workflows/.+\\.ya?ml$/"]
+    }
+  ]
+}

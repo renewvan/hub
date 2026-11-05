@@ -72,7 +72,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       sha: ${{ steps.commit.outputs.sha }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
 
@@ -169,19 +169,19 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           ref: ${{ needs.cut.outputs.tag }}
 
       # Stable releases are cut from `main`, where the push-to-main CI already ran the tests on
       # the merge commit. A pre-release comes from a branch that may never have been through
       # CI, so it keeps the gate.
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         if: ${{ inputs.prerelease && inputs.test-command != '' && inputs.python-version != '' }}
         with:
           python-version: ${{ inputs.python-version }}
 
-      - uses: voidzero-dev/setup-vp@v1.21.2
+      - uses: voidzero-dev/setup-vp@68f39c78aaf39be468cabd2afb09c162574c84af # v1.21.2
         if: ${{ inputs.prerelease && inputs.test-command != '' && inputs.node-version-file != '' }}
         with:
           node-version-file: ${{ inputs.node-version-file }}
@@ -194,17 +194,17 @@ jobs:
         run: bash -c "$TEST_COMMAND"
 
       - name: Log in to registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       - name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
           push: true
@@ -227,7 +227,7 @@ jobs:
     outputs:
       variants: ${{ steps.list.outputs.variants }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           ref: ${{ needs.cut.outputs.tag }}
 
@@ -245,7 +245,7 @@ jobs:
       matrix:
         variant: ${{ fromJSON(needs.firmware-variants.outputs.variants) }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           ref: ${{ needs.cut.outputs.tag }}
 

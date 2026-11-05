@@ -50,16 +50,32 @@ set -euo pipefail
 #                              wheel for CPython 3.13, so pip compiles it and
 #                              needs Python.h
 #   build-essential            the compiler for that build
-#   curl                       Docker's and Tailscale's installers
+#   curl, gnupg, ca-certificates   fetch and verify Docker's and Tailscale's apt signing keys
 #   rsync                      deploy.sh rsyncs into /opt/renewvan
 echo "==> Installing host packages"
 sudo apt-get update -qq
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-  curl rsync python3-venv python3-dev build-essential i2c-tools
+  curl gnupg ca-certificates rsync python3-venv python3-dev build-essential i2c-tools
 
 if ! command -v docker >/dev/null 2>&1; then
-  echo "==> Installing Docker Engine + Compose plugin"
-  curl -fsSL https://get.docker.com | sh
+  echo "==> Installing Docker Engine + Compose plugin from Docker's signed apt repo"
+  # No `curl | sh`: the vendor key lands in /etc/apt/keyrings and the source is bound to it with
+  # signed-by=. Fingerprint from https://docs.docker.com/engine/install/debian/ (9DC8 5822 ...).
+  DOCKER_KEY_FPR="9DC858229FC7DD38854AE2D88D81803C0EBFCD88"
+  sudo install -m 0755 -d /etc/apt/keyrings
+  sudo curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+  actual_fpr="$(gpg --show-keys --with-colons /etc/apt/keyrings/docker.asc | awk -F: '/^fpr:/ {print $10; exit}')"
+  if [[ "${actual_fpr}" != "${DOCKER_KEY_FPR}" ]]; then
+    sudo rm -f /etc/apt/keyrings/docker.asc
+    echo "ERROR: Docker apt key fingerprint is ${actual_fpr}, expected ${DOCKER_KEY_FPR}" >&2
+    exit 1
+  fi
+  sudo chmod a+r /etc/apt/keyrings/docker.asc
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian $(. /etc/os-release && echo "${VERSION_CODENAME}") stable" \
+    | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
+  sudo apt-get update -qq
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
   sudo usermod -aG docker "$(whoami)"
   echo "==> Docker installed. Log out/in (or start a new SSH session) for the docker group to take effect."
 else
@@ -113,22 +129,50 @@ fi
 
 echo "==> Creating directory layout"
 sudo mkdir -p /opt/renewvan/hub /etc/renewvan /var/log/renewvan
-sudo chown -R "$(whoami)":"$(whoami)" /opt/renewvan /etc/renewvan /var/log/renewvan
+# /opt/renewvan/plugins and /opt/renewvan/venvs hold code systemd runs, some as root: they are
+# root-owned (bin/deploy.sh writes them with sudo), so only hub/ is chowned recursively here.
+sudo chown "$(whoami)":"$(whoami)" /opt/renewvan
+sudo chown -R "$(whoami)":"$(whoami)" /opt/renewvan/hub /etc/renewvan /var/log/renewvan
+if [[ -d /opt/renewvan/plugins ]]; then sudo chown -R root:root /opt/renewvan/plugins; sudo chmod -R go-w /opt/renewvan/plugins; fi
+if [[ -d /opt/renewvan/venvs ]]; then sudo chown -R root:root /opt/renewvan/venvs; sudo chmod -R go-w /opt/renewvan/venvs; fi
+
+# driver-wattcycle runs as a fixed non-root uid and talks to BlueZ over the host's system D-Bus.
+# This policy lets that uid reach only org.bluez, so a compromise of the driver cannot drive
+# systemd (or anything else) on the bus. Keep the uid in step with docker-compose.yml.
+echo "==> Installing the driver-wattcycle D-Bus policy"
+sudo tee /etc/dbus-1/system.d/renewvan-wattcycle.conf >/dev/null <<'DBUS'
+<!DOCTYPE busconfig PUBLIC "-//freedesktop//DTD D-BUS Bus Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
+<busconfig>
+  <policy user="10001">
+    <allow send_destination="org.bluez"/>
+    <allow send_destination="org.freedesktop.DBus"/>
+    <deny send_destination="org.freedesktop.systemd1"/>
+  </policy>
+</busconfig>
+DBUS
+sudo systemctl reload dbus 2>/dev/null || true
 
 echo "==> Bootstrap complete"
 EOF
 
 # Copy a local script to the Pi, run it over `ssh -t` (so sudo can prompt), clean up.
+# The remote path is a fresh mktemp -d, not a fixed /tmp name another local user could pre-create.
 run_remote() {
-  local script="$1" remote="$2"
-  scp -q "${script}" "${HOST}:${remote}"
-  ssh -t "${HOST}" "bash ${remote}; status=\$?; rm -f ${remote}; exit \$status"
+  local script="$1" dir
+  dir="$(ssh "${HOST}" 'mktemp -d')"
+  scp -q "${script}" "${HOST}:${dir}/script.sh"
+  ssh -t "${HOST}" "bash ${dir}/script.sh; status=\$?; rm -rf ${dir}; exit \$status"
 }
 
 echo "==> Bootstrapping ${HOST}"
-run_remote "${REMOTE_SCRIPT}" /tmp/renewvan-bootstrap.sh
+run_remote "${REMOTE_SCRIPT}"
+
+# The unprivileged user the kiosk browser and display bridge run as; bin/deploy.sh refuses to run
+# without it. Created here so a headless hub (no kiosk session) deploys too.
+run_remote "$(dirname "$0")/ensure-kiosk-user.sh"
 
 if [[ "${WITH_HEATER}" == "1" ]]; then
   echo "==> Installing heater udev rule on ${HOST}"
-  run_remote "$(dirname "$0")/install-heater-udev.sh" /tmp/renewvan-heater-udev.sh
+  run_remote "$(dirname "$0")/install-heater-udev.sh"
 fi

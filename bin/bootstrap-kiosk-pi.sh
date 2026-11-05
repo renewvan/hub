@@ -17,7 +17,9 @@
 #   hardware   /boot/firmware/config.txt: KMS driver + DSI panel overlay
 #              /boot/firmware/cmdline.txt: panel_orientation=upside_down
 #              udev: touch calibration matrix + bl_power write access
-#   groups     kiosk user in video, input, render
+#   user       renewvan-kiosk (system user: no sudo, no docker; groups video, input, render),
+#              created by bin/ensure-kiosk-user.sh. Re-running this script is the migration for a
+#              Pi whose kiosk used to run as the admin login user.
 #
 # I2C and 1-wire are hub prerequisites (the tank, tilt and temperature nodes need
 # them with or without a screen) and are set up by bin/bootstrap-pi.sh.
@@ -57,7 +59,7 @@ trap 'rm -f "${REMOTE_SCRIPT}"' EXIT
 cat > "${REMOTE_SCRIPT}" <<'EOF'
 set -euo pipefail
 
-KIOSK_USER="$(whoami)"
+KIOSK_USER="renewvan-kiosk"
 PLUGIN_DIR="/opt/renewvan/plugins/kiosk"
 BOOT_DIR="/boot/firmware"
 
@@ -71,12 +73,10 @@ sudo apt-get update -qq
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
   cage chromium curl
 
-echo "==> Adding ${KIOSK_USER} to hardware groups"
-for g in video input render; do
-  if getent group "${g}" >/dev/null; then
-    sudo usermod -aG "${g}" "${KIOSK_USER}"
-  fi
-done
+if ! id "${KIOSK_USER}" >/dev/null 2>&1; then
+  echo "${KIOSK_USER} is missing" >&2
+  exit 1
+fi
 
 echo "==> Boot config (${BOOT_DIR}/config.txt)"
 # Append a line only if no active (uncommented) line already matches it.
@@ -142,7 +142,8 @@ sudo udevadm trigger --action=add --subsystem-match=input
 sudo udevadm settle
 
 echo "==> Installing cage kiosk session unit"
-sudo chmod +x "${PLUGIN_DIR}/renewvan-kiosk-browser.sh"
+# The plugin tree is root-owned (bin/deploy.sh); the launcher must stay executable.
+sudo chmod 755 "${PLUGIN_DIR}/renewvan-kiosk-browser.sh"
 sed "s|@KIOSK_USER@|${KIOSK_USER}|" "${PLUGIN_DIR}/renewvan-cage.service" \
   | sudo tee /etc/systemd/system/renewvan-cage.service >/dev/null
 sudo systemctl daemon-reload
@@ -159,6 +160,13 @@ sudo systemctl enable renewvan-cage.service
 echo "==> Kiosk session installed. Reboot to start it: sudo reboot"
 EOF
 
+echo "==> Ensuring the renewvan-kiosk user on ${HOST}"
+USER_SCRIPT="$(dirname "$0")/ensure-kiosk-user.sh"
+REMOTE_TMP="$(ssh "${HOST}" 'mktemp -d')"
+trap 'rm -f "${REMOTE_SCRIPT}"; ssh "${HOST}" "rm -rf ${REMOTE_TMP}" || true' EXIT
+scp -q "${USER_SCRIPT}" "${HOST}:${REMOTE_TMP}/ensure-kiosk-user.sh"
+ssh -t "${HOST}" "bash ${REMOTE_TMP}/ensure-kiosk-user.sh"
+
 echo "==> Bootstrapping kiosk session on ${HOST}"
-scp -q "${REMOTE_SCRIPT}" "${HOST}:/tmp/renewvan-bootstrap-kiosk.sh"
-ssh -t "${HOST}" "ROTATE=${ROTATE} bash /tmp/renewvan-bootstrap-kiosk.sh; status=\$?; rm -f /tmp/renewvan-bootstrap-kiosk.sh; exit \$status"
+scp -q "${REMOTE_SCRIPT}" "${HOST}:${REMOTE_TMP}/bootstrap-kiosk.sh"
+ssh -t "${HOST}" "ROTATE=${ROTATE} bash ${REMOTE_TMP}/bootstrap-kiosk.sh"

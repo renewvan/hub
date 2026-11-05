@@ -25,11 +25,20 @@ done
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${REPO_ROOT}"
 
+# The kiosk browser runs as the unprivileged renewvan-kiosk user (created by bin/bootstrap-kiosk-pi.sh).
+# deploy.sh only deploys: it never creates or migrates that user, it refuses to continue without it.
+# .scratch/security-audit/issues/04-kiosk-privilege-split.md
+echo "==> Checking the kiosk user on ${HOST}"
+if ! ssh "${HOST}" "id renewvan-kiosk >/dev/null 2>&1"; then
+  echo "ERROR: user renewvan-kiosk does not exist on ${HOST}: run bin/bootstrap-kiosk-pi.sh first." >&2
+  exit 1
+fi
+
 echo "==> Syncing compose artifacts to ${HOST}:${REMOTE_DIR}"
-ssh "${HOST}" "mkdir -p ${REMOTE_DIR} /opt/renewvan/plugins/kiosk /opt/renewvan/plugins/tailscale /opt/renewvan/plugins/hub /opt/renewvan/venvs"
+ssh "${HOST}" "mkdir -p ${REMOTE_DIR} && sudo mkdir -p /opt/renewvan/plugins/kiosk /opt/renewvan/plugins/tailscale /opt/renewvan/plugins/hub /opt/renewvan/venvs"
 rsync -az docker-compose.yml docker-compose.lan.yml "${HOST}:${REMOTE_DIR}/"
 ssh "${HOST}" "mkdir -p ${REMOTE_DIR}/bin"
-rsync -az bin/vedirect-gate.sh "${HOST}:${REMOTE_DIR}/bin/vedirect-gate.sh"
+rsync -az bin/vedirect-gate.sh bin/ensure-secrets.sh "${HOST}:${REMOTE_DIR}/bin/"
 rsync -az --delete docker/ "${HOST}:${REMOTE_DIR}/docker/"
 rsync -az .env.example "${HOST}:${REMOTE_DIR}/.env.example"
 rsync -az bin/heater-hint.sh "${HOST}:${REMOTE_DIR}/heater-hint.sh"
@@ -43,16 +52,21 @@ if [[ ! -f "${CADDYFILE}" ]]; then
 fi
 ssh "${HOST}" "mkdir -p /opt/renewvan/dashboard/docker"
 rsync -az "${CADDYFILE}" "${HOST}:/opt/renewvan/dashboard/docker/Caddyfile"
-rsync -az --delete --exclude='.venv' plugins/kiosk/ "${HOST}:/opt/renewvan/plugins/kiosk/"
-rsync -az --delete plugins/tailscale/ "${HOST}:/opt/renewvan/plugins/tailscale/"
-rsync -az --delete plugins/hub/ "${HOST}:/opt/renewvan/plugins/hub/"
+# Plugin code is run by systemd (some of it as root), so the trees are root-owned and not writable by the
+# admin login or the kiosk user: rsync runs under sudo and chowns what it writes.
+PLUGIN_RSYNC=(rsync -az --delete --rsync-path="sudo rsync" --chown=root:root --chmod=D755,F644)
+"${PLUGIN_RSYNC[@]}" --exclude='.venv' plugins/kiosk/ "${HOST}:/opt/renewvan/plugins/kiosk/"
+"${PLUGIN_RSYNC[@]}" plugins/tailscale/ "${HOST}:/opt/renewvan/plugins/tailscale/"
+"${PLUGIN_RSYNC[@]}" plugins/hub/ "${HOST}:/opt/renewvan/plugins/hub/"
+# Scripts the units and installers execute keep their execute bit (rsync's --chmod above cleared it).
+ssh "${HOST}" "sudo chmod 755 /opt/renewvan/plugins/kiosk/renewvan-kiosk-browser.sh /opt/renewvan/plugins/tailscale/install.sh /opt/renewvan/plugins/hub/install.sh"
 # The hub's version is a property of this checkout, not of the files rsynced: the Pi has no .git.
 # Stamp it after the rsync above (which would otherwise --delete it) so renewvan-hub publishes it
 # on renewvan/hub/status and Settings > General > Firmware can show it. Same string the ESP32
 # flash script derives; an untagged tree gives a commit hash, never a refusal.
 HUB_VERSION="$(git describe --tags --always --dirty 2>/dev/null || echo dev)"
 echo "==> Stamping hub version ${HUB_VERSION}"
-ssh "${HOST}" "printf '%s\n' '${HUB_VERSION}' > /opt/renewvan/plugins/hub/VERSION"
+ssh "${HOST}" "printf '%s\n' '${HUB_VERSION}' | sudo tee /opt/renewvan/plugins/hub/VERSION >/dev/null"
 
 echo "==> Ensuring remote config"
 ssh "${HOST}" bash -s <<REMOTE
@@ -62,11 +76,14 @@ cd "${REMOTE_DIR}"
 mkdir -p /etc/renewvan/mosquitto /etc/renewvan/tank /etc/renewvan/gps /etc/renewvan/temperature/state /etc/renewvan/tilt/state /etc/renewvan/dashboard /etc/renewvan/wattcycle /etc/renewvan/autoterm /etc/renewvan/vedirect
 
 # plugin/kiosk: create venv (Bookworm externally-managed Python) and install deps
-python3 -m venv /opt/renewvan/venvs/kiosk
-/opt/renewvan/venvs/kiosk/bin/pip install --quiet -r /opt/renewvan/plugins/kiosk/requirements.txt
-sed "s|@SERVICE_USER@|\$(whoami)|" /opt/renewvan/plugins/kiosk/renewvan-kiosk.service | sudo tee /etc/systemd/system/renewvan-kiosk.service >/dev/null
+# (root-owned, like the plugin code that imports it)
+sudo python3 -m venv /opt/renewvan/venvs/kiosk
+sudo /opt/renewvan/venvs/kiosk/bin/pip install --quiet -r /opt/renewvan/plugins/kiosk/requirements.txt
+sed "s|@SERVICE_USER@|renewvan-kiosk|" /opt/renewvan/plugins/kiosk/renewvan-kiosk.service | sudo tee /etc/systemd/system/renewvan-kiosk.service >/dev/null
 sudo systemctl daemon-reload
-sudo systemctl enable --now renewvan-kiosk.service
+# restart (not just enable --now): an upgraded unit changes user, which a running service would not pick up
+sudo systemctl enable renewvan-kiosk.service
+sudo systemctl restart renewvan-kiosk.service
 # The cage kiosk session unit (renewvan-cage.service) is installed by
 # bin/bootstrap-kiosk-pi.sh, not here: it needs the kiosk user substituted in.
 if [[ ! -f /etc/renewvan/kiosk.env ]]; then
@@ -93,12 +110,11 @@ if [[ ! -f .env ]]; then
   sed -i 's|^VEDIRECT_CONFIG_PATH=.*|VEDIRECT_CONFIG_PATH=/etc/renewvan/vedirect/config.ini|' .env
   sed -i 's|^DASHBOARD_BASEMAP_PATH=.*|DASHBOARD_BASEMAP_PATH=/etc/renewvan/dashboard/basemap.pmtiles|' .env
   sed -i 's|^MOSQUITTO_CONFIG_PATH=.*|MOSQUITTO_CONFIG_PATH=/etc/renewvan/mosquitto|' .env
-  echo
-  echo "==> Edit ${REMOTE_DIR}/.env on the Pi to fill in secrets (INFLUXDB_ADMIN_PASSWORD,"
-  echo "    INFLUXDB_ADMIN_TOKEN, VICTRON_MQTT_HOST/PORTAL_ID, RENEWVAN_WS_URL), then re-run"
-  echo "    bin/deploy.sh."
-  exit 1
+  # Secrets are generated by bin/ensure-secrets.sh below; the rest has working defaults.
+  echo "==> Seeded ${REMOTE_DIR}/.env. Set DASHBOARD_HOST (the Pi's LAN IP) and, with Venus OS,"
+  echo "    VENUS_MQTT_HOST/VENUS_PORTAL_ID there, then re-run bin/deploy.sh."
 fi
+chmod 600 .env
 
 # A full-URL VITE_MQTT_WS_URL is opened by the *browser* (kiosk, phone), so it must
 # name an address this Pi actually has right now. Moving the Pi to another router
@@ -313,6 +329,11 @@ if ! { hostname -I 2>/dev/null | tr ' ' '\\n'; } | grep -qxF "\${bind_addr}"; th
   exit 1
 fi
 
+# Generate any missing or example-valued secret, create the scoped InfluxDB tokens, and rotate a van
+# that still runs on the old public values. Idempotent; never wipes a volume. Values are never printed.
+echo "==> Ensuring secrets"
+bash bin/ensure-secrets.sh .env
+
 echo "==> docker compose pull && up -d"
 docker compose pull
 # --remove-orphans: containers have fixed container_name values, so a renamed service key leaves
@@ -330,12 +351,12 @@ REMOTE
 echo "==> Reloading kiosk browser"
 # Fresh cache: chromium heuristic-caches index.html, which would keep serving
 # the previous dashboard build after an image bump. The cache lives in the
-# kiosk user's home, which is the ssh user's home on a single-user kiosk Pi.
+# renewvan-kiosk user's home (/var/lib/renewvan-kiosk).
 # Restarting renewvan-cage relaunches cage and therefore Chromium; if the
 # unit isn't installed yet (Pi not bootstrapped with bin/bootstrap-kiosk-pi.sh)
 # say so instead of silently leaving the old dashboard on screen.
 ssh "${HOST}" '
-  rm -rf "${HOME}/.cache/chromium" || true
+  sudo rm -rf /var/lib/renewvan-kiosk/.cache/chromium || true
   if systemctl cat renewvan-cage.service >/dev/null 2>&1; then
     sudo systemctl restart renewvan-cage.service
   else

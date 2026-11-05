@@ -20,7 +20,7 @@ jobs:
   validate-manifest:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
       - name: Fetch the hub manifest schema at the pinned ref
         env:
@@ -33,7 +33,7 @@ jobs:
       - name: Validate the manifest
         env:
           MANIFEST: ${{ inputs.manifest }}
-        run: npx --yes ajv-cli@5 validate -s driver-manifest.schema.json -d "$MANIFEST" --strict=false
+        run: npx --yes ajv-cli@5.0.0 validate -s driver-manifest.schema.json -d "$MANIFEST" --strict=false
 
       # version and board_serial are stamped at runtime, never hand-written: the schema forbids them.
       - name: Gate rejects a manifest that contains version
@@ -41,7 +41,7 @@ jobs:
           MANIFEST: ${{ inputs.manifest }}
         run: |
           jq '. + {version: "v0.0.0"}' "$MANIFEST" > manifest-with-version.json
-          if npx --yes ajv-cli@5 validate -s driver-manifest.schema.json -d manifest-with-version.json --strict=false; then
+          if npx --yes ajv-cli@5.0.0 validate -s driver-manifest.schema.json -d manifest-with-version.json --strict=false; then
             echo "gate accepted a manifest containing version" >&2
             exit 1
           fi

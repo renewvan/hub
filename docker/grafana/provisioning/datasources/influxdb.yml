@@ -2,7 +2,7 @@ apiVersion: 1
 
 # The hub's InfluxDB (docker-compose.yml `influxdb`), queried with Flux.
 # The token is read from the grafana container's environment
-# (INFLUXDB_ADMIN_TOKEN, passed through by compose); it is never stored in git.
+# (INFLUXDB_GRAFANA_TOKEN, a read-only token passed through by compose); it is never stored in git.
 datasources:
   - name: InfluxDB
     uid: renewvan-influxdb
@@ -16,4 +16,4 @@ datasources:
       organization: renewvan
       defaultBucket: renewvan
     secureJsonData:
-      token: ${INFLUXDB_ADMIN_TOKEN}
+      token: ${INFLUXDB_GRAFANA_TOKEN}
