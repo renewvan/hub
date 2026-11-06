@@ -158,6 +158,7 @@ if is_example_value "$(get GF_SECURITY_ADMIN_PASSWORD)"; then
 fi
 
 # --- 3b. Broker accounts (ADR 0025) -----------------------------------------------------------
+validate_boards || exit 1
 new_clients=()
 for key in $(client_keys); do
   var="$(client_var "${key}")"

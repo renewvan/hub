@@ -7,7 +7,7 @@
 # Regenerates that client's password in .env, rewrites the password file, updates the client's own
 # credential file (config.ini or env file), SIGHUPs the broker, and restarts the client. Run on the Pi in
 # the hub directory (next to docker-compose.yml and .env). The new Caddy login password is shown once.
-# `esp32` is refused: its password is compiled into the firmware, so it is rotated only by OTA with a new
+# A board account (`esp32-<name>`) is refused: its password is compiled into the firmware, so it is rotated only by OTA with a new
 # secrets.yaml (skill renewvan-flash-esp32), and only on suspected compromise.
 # A client that is refused with rc=5 does not retry by itself, hence the restart.
 set -euo pipefail
@@ -18,14 +18,14 @@ KEY="${1:-}"
 source "$(dirname "${BASH_SOURCE[0]}")/broker-accounts.sh"
 
 usage() {
-  echo "usage: $0 <client|caddy>   clients: $(client_keys | grep -vx esp32 | tr '\n' ' ')" >&2
+  echo "usage: $0 <client|caddy>   clients: $(client_keys | grep -v '^esp32-' | tr '\n' ' ')" >&2
   exit 2
 }
 [[ -n "${KEY}" ]] || usage
 [[ -f "${ENV_FILE}" ]] || { echo "ERROR: ${ENV_FILE} not found" >&2; exit 1; }
 
-if [[ "${KEY}" == "esp32" ]]; then
-  echo "ERROR: esp32 is rotated by OTA only (new secrets.yaml, skill renewvan-flash-esp32)." >&2
+if [[ "${KEY}" == esp32 || "${KEY}" == esp32-* ]]; then
+  echo "ERROR: ${KEY} is rotated by OTA only (new secrets.yaml, skill renewvan-flash-esp32)." >&2
   exit 2
 fi
 

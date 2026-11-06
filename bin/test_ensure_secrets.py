@@ -182,12 +182,12 @@ class EnsureSecretsTest(Harness):
 
 CLIENTS = (
     "tank gps temperature tilt wattcycle autoterm vedirect logger venus router demo "
-    "kiosk tailscale hub esp32 command reader"
+    "kiosk tailscale hub esp32-front esp32-rear command reader"
 ).split()
 
 
 def client_var(key):
-    return f"MQTT_{key.upper()}_PASSWORD"
+    return f"MQTT_{key.upper().replace('-', '_')}_PASSWORD"
 
 
 class BrokerAccountsTest(Harness):
@@ -202,6 +202,11 @@ class BrokerAccountsTest(Harness):
             )
         (self.etc / "kiosk.env").write_text("DISPLAY_ON_CMD=x\nMQTT_USERNAME=\n")
         (self.dir / "docker-compose.yml").write_text("services:\n")
+
+    def write_env(self, **values):
+        super().write_env(**values)
+        with self.envfile.open("a") as f:
+            f.write("BROKER_ESP32_BOARDS=front rear\n")  # ADR 0027: one account per board
 
     def acl(self):
         return (self.etc / "mosquitto" / "acl").read_text()
@@ -289,12 +294,57 @@ class BrokerAccountsTest(Harness):
         demo = self.acl_block("demo")
         self.assertNotIn("demo/enabled/set", demo)
         self.assertNotIn("renewvan/demo/#", demo)
-        for line in self.acl_block("esp32").splitlines():
-            self.assertFalse(line.endswith("/set"), line)
+        for board in ("esp32-front", "esp32-rear"):
+            for line in self.acl_block(board).splitlines():
+                self.assertFalse(line.endswith("/set"), line)
         # the read-only login has no write line at all
         self.assertNotIn("topic", self.acl_block("reader"))
         for k in CLIENTS:
             self.assertIn(f"\nuser {k}\n", acl)
+
+    def test_each_board_writes_only_its_own_driver_namespace(self):
+        # hub#162, ADR 0027: a board's key is esp32-<name>; it may not write another board's topics
+        self.write_env()
+        self.assertEqual(self.run_script().returncode, 0)
+        for mine, other in (("esp32-front", "esp32-rear"), ("esp32-rear", "esp32-front")):
+            block = self.acl_block(mine)
+            self.assertIn(f"topic write renewvan/{mine}/#\n", block + "\n")
+            self.assertNotIn(other, block)
+            self.assertNotIn("renewvan/esp32/#", block, "no family-wide grant")
+            self.assertNotIn("esp32-+", block, "no wildcard over board keys")
+            self.assertNotIn("renewvan/relay/#", block, "relay topics are listed, never wholesale")
+            self.assertIn("topic write renewvan/relay/+/state\n", block + "\n")
+        self.assertNotIn("\nuser esp32\n", self.acl(), "the old family account is gone")
+
+    def test_no_boards_means_no_board_accounts(self):
+        super().write_env()
+        self.assertEqual(self.run_script().returncode, 0)
+        self.assertNotIn("user esp32", self.acl())
+        self.assertNotIn(client_var("esp32"), self.values())
+
+    def test_a_board_added_later_gets_an_account_and_the_others_keep_theirs(self):
+        self.write_env()
+        self.assertEqual(self.run_script().returncode, 0)
+        before = self.values()
+        self.envfile.write_text(self.envfile.read_text().replace("front rear", "front rear garage"))
+        self.assertEqual(self.run_script().returncode, 0)
+        after = self.values()
+        self.assertEqual(len(after[client_var("esp32-garage")]), 32)
+        self.assertEqual(after[client_var("esp32-front")], before[client_var("esp32-front")])
+        users = [
+            ln.split(":")[0] for ln in (self.etc / "mosquitto" / "passwd").read_text().splitlines()
+        ]
+        self.assertIn("esp32-garage", users)
+        self.assertIn(
+            "topic write renewvan/esp32-garage/#\n", self.acl_block("esp32-garage") + "\n"
+        )
+
+    def test_a_malformed_board_name_is_refused(self):
+        self.write_env()
+        self.envfile.write_text(self.envfile.read_text().replace("front rear", "Front rear/#"))
+        r = self.run_script()
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("BROKER_ESP32_BOARDS", r.stderr)
 
     def test_acl_without_the_migration_line_after_cutover(self):
         self.write_env()
@@ -370,7 +420,7 @@ class BrokerAccountsTest(Harness):
         self.write_env()
         self.assertEqual(self.run_script().returncode, 0)
         before = self.values()
-        for bad in ("nope", "esp32", ""):
+        for bad in ("nope", "esp32", "esp32-front", ""):
             r = self.run_rotate(bad) if bad else self.run_rotate()
             self.assertNotEqual(r.returncode, 0, bad)
         self.assertEqual(self.values(), before)
