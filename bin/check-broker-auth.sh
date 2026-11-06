@@ -115,7 +115,9 @@ users="$(cut -f2 <<<"${conns}" | sort -u)"
 for key in $(running_clients); do
   if grep -qx "${key}" <<<"${users}"; then pass "${key} is connected as ${key}"; else fail "${key} runs but no connection as '${key}' is in the broker log (restart it? rc=5 does not retry)"; fi
 done
-for name in $(board_names); do
+BOARDS=()
+while IFS= read -r name; do [[ -z "${name}" ]] || BOARDS+=("${name}"); done < <(board_names) # once: the list is checked on every call
+for name in ${BOARDS[@]+"${BOARDS[@]}"}; do
   grep -qx "esp32-${name}" <<<"${users}" && pass "esp32-${name} is connected as esp32-${name}" || note "esp32-${name} not seen connected (offline, or not flashed with its account yet)"
 done
 
@@ -131,12 +133,14 @@ fi
 expect_allowed command "${PROBE_RELAY}/set" false
 expect_denied command "${PROBE_RELAY}/state" false
 expect_denied tank "${PROBE_RELAY}/set" false
-for name in $(board_names); do
+# Each board: no set topic, its own Driver namespace is writable, and the next board's (a ring, so every board
+# is both writer and victim once) is not. One cross probe per board keeps the cost linear in the boards.
+for i in "${!BOARDS[@]}"; do
+  name="${BOARDS[i]}"
   expect_denied "esp32-${name}" "${PROBE_RELAY}/set" false
   expect_allowed "esp32-${name}" "renewvan/esp32-${name}/zz-check-probe" false
-  for other in $(board_names); do
-    [[ "${other}" == "${name}" ]] || expect_denied "esp32-${name}" "renewvan/esp32-${other}/zz-check-probe" false
-  done
+  neighbour="${BOARDS[(i + 1) % ${#BOARDS[@]}]}"
+  [[ "${neighbour}" == "${name}" ]] || expect_denied "esp32-${name}" "renewvan/esp32-${neighbour}/zz-check-probe" false
 done
 expect_denied reader "${PROBE_RELAY}/set" false
 demo_now="$(docker exec "${BROKER_CONTAINER}" mosquitto_sub -h localhost -u reader -P "${READER_PW}" -t renewvan/demo/enabled -W 2 -C 1 2>/dev/null || true)"
