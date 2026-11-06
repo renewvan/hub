@@ -69,7 +69,7 @@ class ValidateBrokerConfigTest(unittest.TestCase):
         conf = (self.mosq / "mosquitto.conf").read_text()
         self.assertIn("listener 1883", conf)
         self.assertIn("listener 9001", conf)
-        self.assertIn("allow_anonymous true", conf)
+        self.assertIn("allow_anonymous true", conf, "migration state: no BROKER_ACL_OPEN yet")
         self.assertIn("password_file /mosquitto/config/passwd", conf)
         self.assertIn("acl_file /mosquitto/config/acl", conf)
         active = [ln for ln in conf.splitlines() if not ln.lstrip().startswith("#")]
@@ -88,6 +88,22 @@ class ValidateBrokerConfigTest(unittest.TestCase):
         for rc in ("1", "3"):
             with self.subTest(rc=rc):
                 self.assertEqual(self.run_script(FAKE_BROKER_RC=rc).returncode, 1)
+
+    def test_allow_anonymous_follows_broker_acl_open(self):
+        env_file = self.dir / ".env"
+        for value, expected in (("1", "true"), ("0", "false")):
+            with self.subTest(BROKER_ACL_OPEN=value):
+                env_file.write_text(f"BROKER_ACL_OPEN={value}\n")
+                r = self.run_script(ENV_FILE=str(env_file))
+                self.assertEqual(r.returncode, 0, r.stderr)
+                lines = [
+                    ln
+                    for ln in (self.mosq / "mosquitto.conf").read_text().splitlines()
+                    if ln.strip().startswith("allow_anonymous")
+                ]
+                self.assertEqual(
+                    lines, [f"allow_anonymous {expected}"], "exactly one, last word wins"
+                )
 
     def test_unchanged_conf_leaves_no_restart_marker(self):
         self.assertEqual(self.run_script().returncode, 0)

@@ -15,7 +15,10 @@
 # Usage: bin/validate-broker-config.sh        (cwd = the hub dir)  Exit 0 = valid, 1 = invalid.
 set -euo pipefail
 
-RENEWVAN_ETC="${RENEWVAN_ETC:-/etc/renewvan}"
+ENV_FILE="${ENV_FILE:-.env}"
+HERE="$(dirname "${BASH_SOURCE[0]}")"
+# shellcheck source=bin/broker-accounts.sh
+source "${HERE}/broker-accounts.sh"
 DIR="${RENEWVAN_ETC}/mosquitto"
 BASE_CONF="docker/mosquitto/config/mosquitto.conf"
 AUTH_CONF="docker/mosquitto/auth.conf"
@@ -29,8 +32,19 @@ image="$(awk '$0 == "  mosquitto:" {on = 1; next} on && /^  [a-z]/ {exit} on && 
 image="${MOSQUITTO_IMAGE:-${image}}"
 [[ -n "${image}" ]] || { echo "ERROR: cannot find the mosquitto image in docker-compose.yml" >&2; exit 1; }
 
+# allow_anonymous follows BROKER_ACL_OPEN: true while any client may still connect without an account
+# (migration; also when the value is missing, so a half-set-up Pi stays reachable), false after the cutover.
+if [[ -f "${ENV_FILE}" && "$(get BROKER_ACL_OPEN)" == "0" ]]; then anonymous=false; else anonymous=true; fi
+
 candidate="${DIR}/mosquitto.conf.new"
-{ cat "${BASE_CONF}"; echo; cat "${AUTH_CONF}"; } >"${candidate}"
+{
+  grep -v '^[[:space:]]*allow_anonymous' "${BASE_CONF}"
+  echo
+  cat "${AUTH_CONF}"
+  echo
+  echo "# Set by bin/validate-broker-config.sh from BROKER_ACL_OPEN (0 = cut over, no anonymous clients)."
+  echo "allow_anonymous ${anonymous}"
+} >"${candidate}"
 chmod 640 "${candidate}"
 
 rollback() {

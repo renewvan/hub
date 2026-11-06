@@ -6,9 +6,9 @@
 #   1. Every client whose process runs is connected with its OWN account (broker log, `u'<key>'`).
 #   2. `command` can write a set topic; the demo driver cannot write renewvan/demo/enabled/set; a driver
 #      cannot write another client's set or state topics; the ESP32 cannot write a set topic.
-#   3. --stage3: no anonymous client is connected (the cutover gate). Clients you know are harmless readers
-#      can be excluded with CHECK_ALLOW_ANON=<regex on the client id>.
-#   4. When the ACL is closed (BROKER_ACL_OPEN=0), an anonymous client cannot publish.
+#   3. --stage3: no anonymous client is connected (the cutover gate: after it they are refused). Clients
+#      you know are harmless can be excluded with CHECK_ALLOW_ANON=<regex on the client id>.
+#   4. When the broker is closed (BROKER_ACL_OPEN=0), an anonymous client cannot even connect.
 #
 # Probes use unknown ids (renewvan/relay/zz-check-probe/...) that no device listens to, and unretained
 # payloads, so nothing real is switched. The demo toggle is re-published with its CURRENT value.
@@ -31,15 +31,19 @@ note() { printf 'note  %s\n' "$*"; }
 
 [[ -f "${ENV_FILE}" ]] || { echo "ERROR: ${ENV_FILE} not found (run in the hub dir)" >&2; exit 2; }
 
-# probe <user|anonymous> <topic> <payload>: prints the payload when the broker delivered the publish to an
-# anonymous subscriber (so the publisher was allowed to write the topic), nothing otherwise.
+# The subscriber logs in as `reader` (it works before and after anonymous clients are refused) and the
+# publisher is one account at a time.
+READER_PW="$(get "$(client_var reader)")"
+
+# probe <user|anonymous> <topic> <payload>: prints the payload when the broker delivered the publish to the
+# reader's subscription (so the publisher was allowed to write the topic), nothing otherwise.
 probe() {
   local user="$1" topic="$2" payload="$3" pw=""
   [[ "${user}" == "anonymous" ]] || pw="$(get "$(client_var "${user}")")"
-  PROBE_USER="${user}" PROBE_PW="${pw}" PROBE_TOPIC="${topic}" PROBE_MSG="${payload}" \
-    docker exec -e PROBE_USER -e PROBE_PW -e PROBE_TOPIC -e PROBE_MSG "${BROKER_CONTAINER}" sh -c '
+  PROBE_USER="${user}" PROBE_PW="${pw}" PROBE_TOPIC="${topic}" PROBE_MSG="${payload}" PROBE_READER_PW="${READER_PW}" \
+    docker exec -e PROBE_USER -e PROBE_PW -e PROBE_TOPIC -e PROBE_MSG -e PROBE_READER_PW "${BROKER_CONTAINER}" sh -c '
       out=/tmp/probe.$$
-      mosquitto_sub -h localhost -t "$PROBE_TOPIC" -W 4 -C 1 >"$out" 2>/dev/null &
+      mosquitto_sub -h localhost -u reader -P "$PROBE_READER_PW" -t "$PROBE_TOPIC" -W 4 -C 1 >"$out" 2>/dev/null &
       sleep 1
       if [ "$PROBE_USER" = anonymous ]; then
         mosquitto_pub -h localhost -t "$PROBE_TOPIC" -m "$PROBE_MSG" 2>/dev/null
@@ -60,13 +64,13 @@ expect_denied() { # <user> <topic> <payload>
 PROBE_RELAY="renewvan/relay/zz-check-probe"
 
 # A failed probe must not read as a denial: the broker has to answer first.
-# The ACL only lets anonymous clients read renewvan/#, so $SYS is denied: probe that. mosquitto_sub exits 27
-# when it stayed connected until -W ran out (nothing retained), 0 when a message arrived; anything else is
-# a connection failure.
+# Log in as the reader and read renewvan/# ($SYS is not readable). mosquitto_sub exits 27 when it stayed
+# connected until -W ran out (nothing retained), 0 when a message arrived; anything else is a connection
+# failure (5 = refused, so this also proves the reader account itself works).
 reach_rc=0
-docker exec "${BROKER_CONTAINER}" mosquitto_sub -h localhost -t 'renewvan/#' -W 3 -C 1 >/dev/null 2>&1 || reach_rc=$?
+docker exec "${BROKER_CONTAINER}" mosquitto_sub -h localhost -u reader -P "${READER_PW}" -t 'renewvan/#' -W 3 -C 1 >/dev/null 2>&1 || reach_rc=$?
 if [[ "${reach_rc}" != "0" && "${reach_rc}" != "27" ]]; then
-  echo "ERROR: cannot reach the broker in ${BROKER_CONTAINER}; no denial can be proven" >&2
+  echo "ERROR: cannot read from the broker in ${BROKER_CONTAINER} as 'reader' (rc=${reach_rc}); no denial can be proven" >&2
   exit 1
 fi
 
@@ -125,16 +129,18 @@ expect_allowed command "${PROBE_RELAY}/set" false
 expect_denied command "${PROBE_RELAY}/state" false
 expect_denied tank "${PROBE_RELAY}/set" false
 expect_denied esp32 "${PROBE_RELAY}/set" false
-demo_now="$(docker exec "${BROKER_CONTAINER}" mosquitto_sub -h localhost -t renewvan/demo/enabled -W 2 -C 1 2>/dev/null || true)"
+expect_denied reader "${PROBE_RELAY}/set" false
+demo_now="$(docker exec "${BROKER_CONTAINER}" mosquitto_sub -h localhost -u reader -P "${READER_PW}" -t renewvan/demo/enabled -W 2 -C 1 2>/dev/null || true)"
 expect_denied demo renewvan/demo/enabled/set "${demo_now:-false}"
 expect_allowed command renewvan/demo/enabled/set "${demo_now:-false}"
 
-# --- 4. Anonymous write (only once the migration line is gone) ----------------------------------------
+# --- 4. Anonymous clients are refused (only once the cutover is done) ------------------------------------
 if [[ "$(get BROKER_ACL_OPEN)" == "0" ]]; then
-  expect_denied anonymous "${PROBE_RELAY}/set" false
-  expect_denied anonymous renewvan/tank/zz-check-probe/level 1
+  anon_rc=0
+  docker exec "${BROKER_CONTAINER}" mosquitto_pub -h localhost -t "${PROBE_RELAY}/set" -m false >/dev/null 2>&1 || anon_rc=$?
+  if [[ "${anon_rc}" == "0" ]]; then fail "an anonymous client can still connect and publish (allow_anonymous is not false)"; else pass "anonymous cannot connect (mosquitto_pub rc=${anon_rc})"; fi
 else
-  note "BROKER_ACL_OPEN=1: the temporary readwrite line is still in the ACL, so anonymous writes are allowed until the cutover"
+  note "BROKER_ACL_OPEN=1: migration state, anonymous clients may still connect and write until the cutover"
 fi
 
 if [[ "${FAILED}" == "0" ]]; then echo "All broker auth checks passed."; else echo "Broker auth checks FAILED." >&2; fi

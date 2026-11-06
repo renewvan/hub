@@ -182,7 +182,7 @@ class EnsureSecretsTest(Harness):
 
 CLIENTS = (
     "tank gps temperature tilt wattcycle autoterm vedirect logger venus router demo "
-    "kiosk tailscale hub esp32 command"
+    "kiosk tailscale hub esp32 command reader"
 ).split()
 
 
@@ -259,8 +259,11 @@ class BrokerAccountsTest(Harness):
         self.assertEqual(self.run_script().returncode, 0)
         acl = self.acl()
         head = acl.split("\nuser ")[0]
-        self.assertIn("topic read renewvan/#", head)
-        self.assertIn("topic readwrite renewvan/#", head, "temporary migration line on a new van")
+        # `pattern`, not `topic`: a global `topic` line applies to anonymous clients only, so
+        # authenticated drivers would read nothing (checked on eclipse-mosquitto 2.1.2)
+        self.assertIn("pattern read renewvan/#", head)
+        self.assertNotIn("\ntopic read", "\n" + head)
+        self.assertIn("pattern readwrite renewvan/#", head, "temporary migration line on a new van")
         self.assertEqual(self.values()["BROKER_ACL_OPEN"], "1")
         # drivers write only their own namespaces, never a set topic of another client
         self.assertIn("topic write renewvan/tank/#", self.acl_block("tank"))
@@ -286,6 +289,8 @@ class BrokerAccountsTest(Harness):
         self.assertNotIn("renewvan/demo/#", demo)
         for line in self.acl_block("esp32").splitlines():
             self.assertFalse(line.endswith("/set"), line)
+        # the read-only login has no write line at all
+        self.assertNotIn("topic", self.acl_block("reader"))
         for k in CLIENTS:
             self.assertIn(f"\nuser {k}\n", acl)
 
@@ -295,7 +300,8 @@ class BrokerAccountsTest(Harness):
         text = self.envfile.read_text().replace("BROKER_ACL_OPEN=1", "BROKER_ACL_OPEN=0")
         self.envfile.write_text(text)
         self.assertEqual(self.run_script().returncode, 0)
-        self.assertNotIn("readwrite", self.acl(), "anonymous clients end read-only")
+        self.assertNotIn("readwrite", self.acl(), "the migration line is gone")
+        self.assertIn("pattern read renewvan/#", self.acl(), "everyone still reads")
         self.assertEqual(self.values()["BROKER_ACL_OPEN"], "0", "a redeploy does not reopen it")
 
     def test_credentials_land_in_each_clients_own_file_and_keep_the_rest(self):

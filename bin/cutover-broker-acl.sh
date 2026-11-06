@@ -3,12 +3,14 @@
 # has already moved every driver and plugin and flashed the ESP32 (tickets 57 and 58).
 #
 #   bin/cutover-broker-acl.sh              stage 3: bin/check-broker-auth.sh --stage3 must find no anonymous
-#                                          client; stage 4: drop the temporary `topic readwrite renewvan/#`
-#                                          line (BROKER_ACL_OPEN=0), validate the new ACL in a throwaway
-#                                          broker, SIGHUP, and check again. A failed check puts the line back.
-#   bin/cutover-broker-acl.sh --rollback   put the line back (BROKER_ACL_OPEN=1), validate, SIGHUP.
+#                                          client; stage 4: BROKER_ACL_OPEN=0 drops the temporary
+#                                          `pattern readwrite renewvan/#` line and sets `allow_anonymous
+#                                          false`, validates the new files in a throwaway broker, SIGHUPs
+#                                          (which refuses anonymous clients) and checks again. A failed
+#                                          check puts the migration state back.
+#   bin/cutover-broker-acl.sh --rollback   BROKER_ACL_OPEN=1: line back, anonymous allowed again; SIGHUP.
 #
-# Rolling back is always safe: the line only widens write access, and no client depends on it being absent.
+# Rolling back is always safe: it only widens access, and no client depends on it being absent.
 set -euo pipefail
 
 ENV_FILE="${ENV_FILE:-.env}"
@@ -23,11 +25,13 @@ apply_acl() { # <0|1>: regenerate the ACL with the line on/off, validate, reload
   bash "${HERE}/ensure-secrets.sh" "${ENV_FILE}"
   bash "${HERE}/validate-broker-config.sh"
   docker kill -s HUP "${BROKER_CONTAINER}" >/dev/null
+  # The reload applied the new mosquitto.conf, so deploy must not restart the broker for it as well.
+  rm -f "${RENEWVAN_ETC}/mosquitto/mosquitto.conf.changed"
 }
 
 if [[ "${1:-}" == "--rollback" ]]; then
   apply_acl 1
-  echo "==> Rolled back: the temporary readwrite line is in the ACL again"
+  echo "==> Rolled back: the temporary readwrite line is back and anonymous clients are allowed again"
   exit 0
 fi
 
@@ -37,14 +41,14 @@ bash "${HERE}/check-broker-auth.sh" --stage3 || {
   exit 1
 }
 
-echo "==> Stage 4: removing the temporary readwrite line"
+echo "==> Stage 4: removing the temporary readwrite line and refusing anonymous clients"
 if ! apply_acl 0; then
   echo "ERROR: could not apply the closed ACL; restoring the migration line" >&2
   apply_acl 1 || true
   exit 1
 fi
 if bash "${HERE}/check-broker-auth.sh"; then
-  echo "==> Cutover done: anonymous clients are read-only"
+  echo "==> Cutover done: allow_anonymous is false; every client needs an account"
 else
   echo "ERROR: the checks failed with the closed ACL; restoring the migration line" >&2
   apply_acl 1

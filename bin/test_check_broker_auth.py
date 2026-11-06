@@ -12,6 +12,7 @@ BIN = Path(__file__).resolve().parent
 
 # `docker exec -e PROBE_USER ...` is a probe: the publish is "delivered" only for the (user|topic)
 # pairs in FAKE_ALLOWED. A plain `docker exec ... mosquitto_sub` (the demo state read) says `false`.
+# A plain `mosquitto_pub` is the anonymous-connection test: refused (rc 5) when FAKE_ANON_REFUSED=1.
 FAKE_DOCKER = r"""#!/usr/bin/env bash
 case "$1" in
   logs) cat "$FAKE_LOGS" ;;
@@ -19,6 +20,8 @@ case "$1" in
   exec)
     if [[ "$*" == *PROBE_USER* ]]; then
       case " $FAKE_ALLOWED " in *" $PROBE_USER|$PROBE_TOPIC "*) echo "$PROBE_MSG" ;; esac
+    elif [[ "$*" == *mosquitto_pub* ]]; then
+      [[ "${FAKE_ANON_REFUSED:-1}" == 1 ]] && exit 5
     else
       echo false
     fi ;;
@@ -55,7 +58,7 @@ class CheckBrokerAuthTest(unittest.TestCase):
             (fakebin / name).write_text(body)
             make_executable(fakebin / name)
         self.envfile = self.dir / ".env"
-        self.envfile.write_text("BROKER_ACL_OPEN=0\n")
+        self.envfile.write_text("BROKER_ACL_OPEN=0\nMQTT_READER_PASSWORD=readerpw\n")
         self.logs = self.dir / "logs"
         self.allowed = [f"command|{SET_PROBE}", f"command|{DEMO_TOGGLE}"]
         self.services = "driver-tank logger"
@@ -88,7 +91,8 @@ class CheckBrokerAuthTest(unittest.TestCase):
         self.assertIn("ok    tank is connected as tank", r.stdout)
         self.assertIn(f"ok    command can write {SET_PROBE}", r.stdout)
         self.assertIn(f"ok    demo cannot write {DEMO_TOGGLE}", r.stdout)
-        self.assertIn("ok    anonymous cannot write", r.stdout)
+        self.assertIn("ok    anonymous cannot connect", r.stdout)
+        self.assertIn(f"ok    reader cannot write {SET_PROBE}", r.stdout)
 
     def test_a_running_client_without_its_own_connection_fails(self):
         self.logs.write_text(connect("tank-1", "tank") + connect("lg"))  # logger still anonymous
@@ -133,14 +137,23 @@ class CheckBrokerAuthTest(unittest.TestCase):
         self.logs.write_text(self.logs.read_text() + connect("auto-9") + gone)
         self.assertEqual(self.run_check("--stage3").returncode, 0)
 
-    def test_anonymous_write_is_only_checked_after_the_cutover(self):
-        self.envfile.write_text("BROKER_ACL_OPEN=1\n")
-        self.allowed.append(f"anonymous|{SET_PROBE}")
+    def test_the_reader_writing_a_set_topic_fails(self):
+        self.allowed.append(f"reader|{SET_PROBE}")
         r = self.run_check()
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("reader CAN write", r.stderr)
+
+    def test_anonymous_refusal_is_only_checked_after_the_cutover(self):
+        self.envfile.write_text("BROKER_ACL_OPEN=1\n")
+        r = self.run_check(FAKE_ANON_REFUSED="0")  # still migrating: anonymous may connect
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn("BROKER_ACL_OPEN=1", r.stdout)
         self.envfile.write_text("BROKER_ACL_OPEN=0\n")
-        self.assertEqual(self.run_check().returncode, 1, "open ACL after the cutover is a failure")
+        r = self.run_check(FAKE_ANON_REFUSED="0")
+        self.assertEqual(
+            r.returncode, 1, "anonymous still connecting after the cutover is a failure"
+        )
+        self.assertIn("anonymous client can still connect", r.stderr)
 
 
 class CutoverTest(unittest.TestCase):
