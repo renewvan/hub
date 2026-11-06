@@ -186,6 +186,28 @@ if [[ -z "$(get BROKER_ACL_OPEN)" ]]; then
   note BROKER_ACL_OPEN
 fi
 
+# An account that exists now but is not in the client list any more is about to be dropped from the password
+# file and ACL (a board removed from BROKER_ESP32_BOARDS, or the legacy `esp32` account). Say so loudly, but
+# do not block: dropping is how a board is retired. Its password stays in .env until someone removes it.
+current_users="$({
+  [[ -f "${mosq_dir}/passwd" ]] && cut -d: -f1 "${mosq_dir}/passwd"
+  [[ -f "${mosq_dir}/acl" ]] && sed -n 's/^user //p' "${mosq_dir}/acl"
+  true
+} | sort -u)"
+wanted_keys="$(client_keys)" # not piped into grep -q: pipefail would turn its early exit into a miss
+for user in ${current_users}; do
+  if ! grep -Fqx -- "${user}" <<<"${wanted_keys}"; then
+    orphan_var="$(client_var "${user}")"
+    {
+      echo "WARNING: broker account '${user}' is being DROPPED from the password file and ACL: it is no longer a client"
+      echo "         (for a board, it is not in BROKER_ESP32_BOARDS). Anything still using it will be refused with rc=5."
+      if [[ -n "$(get "${orphan_var}")" ]]; then
+        echo "         ${orphan_var} is still in ${ENV_FILE}; delete it once the account is really gone."
+      fi
+    } >&2
+  fi
+done
+
 acl_tmp="$(mktemp "${mosq_dir}/acl.XXXXXX")"
 render_acl "$(get BROKER_ACL_OPEN)" >"${acl_tmp}"
 if cmp -s "${acl_tmp}" "${mosq_dir}/acl"; then

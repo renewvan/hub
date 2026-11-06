@@ -47,40 +47,46 @@ BROKER_CLIENTS=(
 # renewvan/esp32-<name>/# plus the relay topics listed in client_writes.
 BOARD_NAME_RE='^[a-z][a-z0-9]*(-[a-z0-9]+)*$' # the Driver slug (schema/relay.schema.json definitions/id)
 
-board_names() { # the <name>s in BROKER_ESP32_BOARDS; nothing when .env is absent
+# The checked board list, one <name> per line. Fails closed: when any entry is bad (not a slug, repeated) it
+# prints the error on stderr and NO board at all, so no consumer (ACL, password file, check, rotation) can
+# act on a half-valid list. Nothing when .env is absent or the variable is empty. The value is read the way
+# compose's env_file reads it (one pair of surrounding quotes removed) and split without globbing.
+board_names() {
   [[ -n "${ENV_FILE:-}" && -f "${ENV_FILE}" ]] || return 0
-  local name
-  for name in $(get BROKER_ESP32_BOARDS); do printf '%s\n' "${name}"; done
-}
-
-validate_boards() { # fail on a name that is not a slug, or is twice in the list
-  local name seen=" "
-  for name in $(board_names); do
+  local raw names=() name seen=" "
+  raw="$(get BROKER_ESP32_BOARDS)"
+  if [[ "${raw}" =~ ^\"(.*)\"$ || "${raw}" =~ ^\'(.*)\'$ ]]; then raw="${BASH_REMATCH[1]}"; fi
+  read -r -a names <<<"${raw}" # read does not glob
+  for name in ${names[@]+"${names[@]}"}; do
     if [[ ! "${name}" =~ ${BOARD_NAME_RE} || "${seen}" == *" ${name} "* ]]; then
-      echo "ERROR: BROKER_ESP32_BOARDS entry '${name}' is not a unique lowercase slug (a-z, 0-9, single hyphens)" >&2
+      printf "ERROR: BROKER_ESP32_BOARDS entry '%s' is not a unique lowercase slug (a-z, 0-9, single hyphens); no board accounts are created until it is fixed\n" "${name}" >&2
       return 1
     fi
     seen+="${name} "
   done
+  for name in ${names[@]+"${names[@]}"}; do printf '%s\n' "${name}"; done
 }
 
-is_board_key() { [[ "$1" == esp32-* ]]; }
+validate_boards() { board_names >/dev/null; } # for the caller that must stop on a bad list
+
+is_board_key() { [[ "$1" == esp32-?* ]]; }
 
 client_keys() {
   local spec name
-  for spec in "${BROKER_CLIENTS[@]}"; do
-    printf '%s\n' "${spec%%:*}"
-    # boards sit before command and reader, where the old esp32 account was
-    [[ "${spec%%:*}" == hub ]] && for name in $(board_names); do printf 'esp32-%s\n' "${name}"; done
-  done
+  for spec in "${BROKER_CLIENTS[@]}"; do printf '%s\n' "${spec%%:*}"; done
+  for name in $(board_names); do printf 'esp32-%s\n' "${name}"; done
   return 0
 }
 
 client_spec() { # <key> -> the full spec line
-  local spec
-  if is_board_key "$1" && grep -qx "${1#esp32-}" <<<"$(board_names)"; then
-    printf '%s:esp32:' "$1"
-    return 0
+  local spec name
+  if is_board_key "$1"; then
+    for name in $(board_names); do
+      if [[ "esp32-${name}" == "$1" ]]; then
+        printf '%s:esp32:' "$1"
+        return 0
+      fi
+    done
   fi
   for spec in "${BROKER_CLIENTS[@]}"; do
     if [[ "${spec%%:*}" == "$1" ]]; then

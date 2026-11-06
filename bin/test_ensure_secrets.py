@@ -190,6 +190,72 @@ def client_var(key):
     return f"MQTT_{key.upper().replace('-', '_')}_PASSWORD"
 
 
+BROKER_ACCOUNTS = SCRIPT.with_name("broker-accounts.sh")
+
+
+class BoardListTest(unittest.TestCase):
+    """BROKER_ESP32_BOARDS as every consumer of bin/broker-accounts.sh sees it (hub#162)."""
+
+    def shell(self, boards_line, snippet, pre=""):
+        with tempfile.TemporaryDirectory() as tmp:
+            env = Path(tmp) / ".env"
+            env.write_text(boards_line + "\n")
+            return subprocess.run(
+                ["bash", "-c", f"ENV_FILE={env}; source {BROKER_ACCOUNTS}; {pre}\n{snippet}"],
+                capture_output=True,
+                text=True,
+                cwd=tmp,  # a glob would expand against this directory
+            )
+
+    def boards(self, boards_line, **kw):
+        r = self.shell(boards_line, "board_names", **kw)
+        return r.stdout.split(), r.stderr
+
+    def test_quotes_around_the_value_are_stripped_like_compose_env_file(self):
+        self.assertEqual(self.boards('BROKER_ESP32_BOARDS="front rear"')[0], ["front", "rear"])
+        self.assertEqual(self.boards("BROKER_ESP32_BOARDS='front'")[0], ["front"])
+
+    def test_a_glob_is_never_expanded(self):
+        names, err = self.boards("BROKER_ESP32_BOARDS=*")
+        self.assertEqual(names, [])
+        self.assertIn("BROKER_ESP32_BOARDS", err)
+
+    def test_an_invalid_list_yields_no_boards_at_all_and_says_why(self):
+        for bad in ("Front", "front front", "fr.nt", "front-", "front rear/#", "9front", '""x'):
+            names, err = self.boards(f"BROKER_ESP32_BOARDS={bad}")
+            self.assertEqual(names, [], bad)
+            self.assertIn("BROKER_ESP32_BOARDS", err, bad)
+
+    def test_empty_or_quote_only_lists_are_no_boards_and_no_error(self):
+        for empty in ("BROKER_ESP32_BOARDS=", 'BROKER_ESP32_BOARDS=""', "# nothing"):
+            names, err = self.boards(empty)
+            self.assertEqual((names, err), ([], ""), empty)
+
+    def test_client_keys_and_client_spec_carry_only_checked_boards(self):
+        r = self.shell("BROKER_ESP32_BOARDS=front", "client_keys")
+        self.assertIn("esp32-front", r.stdout.split())
+        r = self.shell("BROKER_ESP32_BOARDS=front Front", "client_keys")
+        self.assertFalse([k for k in r.stdout.split() if k.startswith("esp32-")])
+
+    def test_client_spec_matches_board_names_as_fixed_strings(self):
+        spec = "client_spec esp32-front"
+        self.assertEqual(self.shell("BROKER_ESP32_BOARDS=front", spec).stdout, "esp32-front:esp32:")
+        for line in (
+            "BROKER_ESP32_BOARDS=",
+            "BROKER_ESP32_BOARDS=rear",
+            "BROKER_ESP32_BOARDS=f.ont",
+        ):
+            self.assertNotEqual(self.shell(line, spec).returncode, 0, line)
+        # an empty list must not make the bare prefix a client
+        self.assertNotEqual(self.shell("BROKER_ESP32_BOARDS=", "client_spec esp32-").returncode, 0)
+
+    def test_boards_do_not_depend_on_any_particular_static_client(self):
+        r = self.shell(
+            "BROKER_ESP32_BOARDS=front", "client_keys", pre='BROKER_CLIENTS=("tank:config.ini:t")'
+        )
+        self.assertEqual(r.stdout.split(), ["tank", "esp32-front"])
+
+
 class BrokerAccountsTest(Harness):
     """ensure-secrets.sh and rotate-secret.sh for the broker accounts (ADR 0025)."""
 
@@ -338,6 +404,39 @@ class BrokerAccountsTest(Harness):
         self.assertIn(
             "topic write renewvan/esp32-garage/#\n", self.acl_block("esp32-garage") + "\n"
         )
+
+    def test_dropping_a_board_warns_loudly_but_does_not_block(self):
+        self.write_env()
+        self.assertEqual(self.run_script().returncode, 0)
+        self.envfile.write_text(self.envfile.read_text().replace("front rear", "front"))
+        r = self.run_script()
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("WARNING", r.stderr)
+        self.assertIn("esp32-rear", r.stderr)
+        self.assertIn("MQTT_ESP32_REAR_PASSWORD", r.stderr)
+        self.assertNotIn("esp32-front", r.stderr, "a board that stays is not reported")
+        users = [
+            ln.split(":")[0] for ln in (self.etc / "mosquitto" / "passwd").read_text().splitlines()
+        ]
+        self.assertNotIn("esp32-rear", users, "the run still drops it")
+        again = self.run_script()
+        self.assertNotIn("WARNING", again.stderr, "only when something is about to be dropped")
+
+    def test_the_legacy_esp32_account_is_reported_when_it_is_dropped(self):
+        self.write_env()
+        mosq = self.etc / "mosquitto"
+        mosq.mkdir()
+        (mosq / "passwd").write_text("esp32:$7$old$hash\ntank:$7$old$hash\n")
+        (mosq / "acl").write_text(
+            "pattern read renewvan/#\n\nuser esp32\ntopic write renewvan/esp32/#\n"
+        )
+        self.envfile.write_text(self.envfile.read_text() + "MQTT_ESP32_PASSWORD=legacy\n")
+        r = self.run_script()
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("WARNING", r.stderr)
+        self.assertRegex(r.stderr, r"\besp32\b")
+        self.assertIn("MQTT_ESP32_PASSWORD", r.stderr)
+        self.assertNotIn("legacy", r.stderr, "never print the value")
 
     def test_a_malformed_board_name_is_refused(self):
         self.write_env()
