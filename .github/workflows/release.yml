@@ -278,11 +278,15 @@ jobs:
         env:
           VERSION: ${{ needs.cut.outputs.tag }}
           VARIANT: ${{ matrix.variant }}
+          # A board is one physical unit named by its owner when flashing, so a gate build has none:
+          # a fixed valid name stands in (nothing built here is flashed or uploaded).
+          BOARD: ci-board
         run: |
+          python3 scripts/variants.py board "${BOARD}"
           {
             echo "substitutions<<EOF"
             echo "version=${VERSION}"
-            python3 scripts/manifest_substitutions.py "${VARIANT}"
+            python3 scripts/manifest_substitutions.py "${VARIANT}" --board "${BOARD}"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
