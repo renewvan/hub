@@ -6,13 +6,13 @@ status: accepted
 
 Supersedes the anonymous-read part of [ADR 0025](0025-broker-has-per-client-accounts-and-anonymous-read-only.md). The per-client accounts, the `command` account and the Caddy gate stand.
 
-At the end of the migration `allow_anonymous` is `false` on both listeners. Every client needs an account, including people and tools that only read: MQTT Explorer and a development dashboard use the new `reader` account, which may read `renewvan/#` and write nothing. During the migration `allow_anonymous` stays `true` together with the temporary `topic readwrite renewvan/#` line (anonymous clients only, so every account is already scoped), and both go away at the same step: `BROKER_ACL_OPEN=0`, applied by `bin/cutover-broker-acl.sh` with a SIGHUP.
+At the end of the migration `allow_anonymous` is `false` on both listeners. Every client needs an account, including people and tools that only read: MQTT Explorer and a development dashboard use the new `reader` account, which may read `renewvan/#` and write nothing. During the migration `allow_anonymous` stays `true` together with the temporary `topic readwrite renewvan/#` line (anonymous clients only, so every account is already scoped), and both go away at the same step: `BROKER_ACL_OPEN=0`, applied by `bin/cutover-broker-acl.sh`, which restarts the broker.
 
 ## Why
 
 - **Nothing on the van network reads telemetry without a credential.** The goal of the audit was a broker that only accounts can use; leaving reads open kept a hole the owner did not want.
 - **One switch, not two.** `BROKER_ACL_OPEN` already marks "migration versus cut over", so the open ACL line and `allow_anonymous` can never disagree.
-- **Reload is enough.** SIGHUP applies `allow_anonymous false` (checked on eclipse-mosquitto 2.1.2: anonymous connects get `rc=5`, an account keeps working), so the cutover needs no broker restart.
+- **A restart applies it, a reload does not.** On the Pi, SIGHUP reloaded the new ACL and passwords but the broker kept accepting anonymous clients after `allow_anonymous false` was in the file; a restart refused them (`rc=5`) while accounts kept working. The cutover therefore restarts the broker and waits for every client to reconnect before it judges the result. Plugins must handle the reconnect: the tailscale and kiosk plugins had a broken `on_disconnect` (paho v1 signature under callback API v2) that stopped them reconnecting at all, and were fixed.
 
 ## Consequences and rules
 

@@ -193,6 +193,8 @@ class CutoverTest(unittest.TestCase):
             "PATH": f"{fakebin}:{os.environ['PATH']}",
             "ENV_FILE": str(self.envfile),
             "LOG": str(self.log),
+            "CUTOVER_RETRIES": "3",
+            "CUTOVER_WAIT": "0",
         }
 
     def run_cutover(self, *args, **extra):
@@ -213,12 +215,24 @@ class CutoverTest(unittest.TestCase):
         self.assertEqual(self.acl_open(), "0")
         steps = self.log.read_text().splitlines()
         self.assertEqual(steps[0], "check-broker-auth.sh --stage3 acl=1")
-        order = [s.split(" ")[0] for s in steps[1:]]
+        # the waiting `docker exec` probes are noise here; the order of the real steps is the point
+        order = [
+            s.split(" ")[0] + (" restart" if s.startswith("docker restart") else "")
+            for s in steps[1:]
+        ]
+        order = [o for o in order if o != "docker"]
         self.assertEqual(
             order,
-            ["ensure-secrets.sh", "validate-broker-config.sh", "docker", "check-broker-auth.sh"],
+            [
+                "ensure-secrets.sh",
+                "validate-broker-config.sh",
+                "docker restart",
+                "check-broker-auth.sh",
+            ],
         )
-        self.assertIn("docker kill -s HUP renewvan-mosquitto", steps[3])
+        self.assertNotIn(
+            "HUP", self.log.read_text(), "allow_anonymous needs a restart, not a reload"
+        )
 
     def test_a_failed_stage3_leaves_the_acl_alone(self):
         r = self.run_cutover(FAIL_CHECK="stage3")
@@ -231,14 +245,30 @@ class CutoverTest(unittest.TestCase):
         self.assertEqual(r.returncode, 1)
         self.assertEqual(self.acl_open(), "1")
         self.assertIn("restoring the migration line", r.stderr)
-        self.assertIn("HUP", self.log.read_text().splitlines()[-1])
+        restarts = [s for s in self.log.read_text().splitlines() if s.startswith("docker restart")]
+        self.assertEqual(len(restarts), 2, "closed, then back to the migration state")
 
-    def test_rollback_restores_the_line_and_reloads(self):
+    def test_rollback_restores_the_line_and_restarts(self):
         self.envfile.write_text("BROKER_ACL_OPEN=0\n")
         r = self.run_cutover("--rollback")
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(self.acl_open(), "1")
-        self.assertIn("HUP", self.log.read_text())
+        self.assertIn("docker restart renewvan-mosquitto", self.log.read_text())
+
+    def test_the_final_check_waits_for_clients_that_are_still_reconnecting(self):
+        flaky = self.bin / "check-broker-auth.sh"
+        counter = self.dir / "tries"
+        flaky.write_text(
+            "#!/usr/bin/env bash\n"
+            '[[ "${1:-}" == --stage3 ]] && exit 0\n'
+            f'n=$(($(cat "{counter}" 2>/dev/null || echo 0) + 1)); echo $n >"{counter}"\n'
+            "((n >= 3))\n"
+        )
+        make_executable(flaky)
+        r = self.run_cutover()
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(counter.read_text().strip(), "3", "passed on the third try")
+        self.assertEqual(self.acl_open(), "0")
 
 
 if __name__ == "__main__":
