@@ -193,14 +193,16 @@ class BoardAclLiveTest(unittest.TestCase):
 
     def test_autoterm_publishes_heater_state_but_cannot_command_the_heater(self):
         for topic in (
-            "renewvan/heater/info",
-            "renewvan/heater/health",
+            "renewvan/autoterm/info",
+            "renewvan/autoterm/health",
             "renewvan/heater/main/phase",
         ):
             self.assertTrue(self.delivered("autoterm", topic), topic)
         for topic in ("mode", "setpoint_c", "power_level", "ventilating", "clear_error"):
             self.assertFalse(self.delivered("autoterm", f"renewvan/heater/main/{topic}/set"), topic)
-        self.assertFalse(self.delivered("autoterm", "renewvan/autoterm/health"))
+        # not what the pinned driver writes, and not a namespace it owns
+        self.assertFalse(self.delivered("autoterm", "renewvan/heater/health"))
+        self.assertFalse(self.delivered("autoterm", "renewvan/autoterm/other"))
 
     def test_command_can_still_send_a_heater_command(self):
         self.assertTrue(self.delivered("command", "renewvan/heater/main/mode/set", '"heat"'))
