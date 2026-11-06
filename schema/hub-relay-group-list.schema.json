@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://renewvan.dev/schema/hub-relay-group-list.schema.json",
+  "title": "hub-relay-group-list",
+  "description": "The shared list of relay groups a client offers (Lights, Appliances, USB, ...), in the order it lists them. Published retained by the hub plugin to renewvan/hub/relay-group-list, restored from the value it persisted on the Pi and published on every (re)connect; until the first command it is the five stock groups [\"Lights\", \"Appliances\", \"USB\", \"Water\", \"Heating\"]. Changed by a client sending the same payload, unretained, to renewvan/hub/relay-group-list/set, which replaces the whole list; a client never writes the state topic. Up to 16 distinct names of 1 to 32 characters with no leading or trailing whitespace; an empty array is valid. The name 'Unassigned' stands for the relays with no group: where it sits in the list is where a consumer draws them (last when it is absent). The plugin does not change the assignments (hub-relay-groups.schema.json) when a name leaves the list: a consumer reads an assignment to a name that is not in the list as Unassigned.",
+  "type": "array",
+  "maxItems": 16,
+  "uniqueItems": true,
+  "items": {
+    "type": "string",
+    "minLength": 1,
+    "maxLength": 32,
+    "pattern": "^\\S(.*\\S)?$"
+  }
+}

@@ -116,7 +116,9 @@ client_writes() {
     demo) printf '%s\n' "renewvan/demo/enabled" "renewvan/demo/health" "renewvan/demo/+/info" "renewvan/demo/+/+/+" ;;
     # State topics only (four segments); the five-segment .../set topics belong to `command`.
     kiosk) echo "renewvan/kiosk/display/+" ;;
-    hub) printf '%s\n' "renewvan/hub/status" "renewvan/hub/primary-battery" "renewvan/hub/icons" ;;
+    hub) printf '%s\n' "renewvan/hub/status" "renewvan/hub/primary-battery" "renewvan/hub/icons" \
+      "renewvan/hub/relay-groups" "renewvan/hub/relay-group-list" \
+      "renewvan/hub/relay-order" ;;
     # A board: its own Driver namespace (info, health, last will) plus relay state, name and driver, never
     # relay/+/set. Relay ids are opaque (ADR 0027), so those three are not scoped to the board's own ids: see
     # "Relay ownership" in the ADR 0027 addendum.
@@ -125,7 +127,8 @@ client_writes() {
     command)
       printf '%s\n' "renewvan/relay/+/set" "renewvan/relay/+/name/set" "renewvan/kiosk/display/+/set" \
         "renewvan/heater/+/set" "renewvan/heater/+/+/set" "renewvan/demo/enabled/set" \
-        "renewvan/hub/primary-battery/set" "renewvan/hub/icons/set"
+        "renewvan/hub/primary-battery/set" "renewvan/hub/icons/set" "renewvan/hub/relay-groups/set" \
+        "renewvan/hub/relay-group-list/set" "renewvan/hub/relay-order/set"
       ;;
   esac
 }

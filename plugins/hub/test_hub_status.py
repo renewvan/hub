@@ -185,9 +185,15 @@ class PrimaryBatteryTests(unittest.TestCase):
         patcher = mock.patch.object(hub_status, "PRIMARY_BATTERY_PATH", self.path)
         patcher.start()
         self.addCleanup(patcher.stop)
-        icons = mock.patch.object(hub_status, "ICONS_PATH", Path(tmp.name) / "state" / "icons.json")
-        icons.start()
-        self.addCleanup(icons.stop)
+        for name, file in (
+            ("ICONS_PATH", "icons.json"),
+            ("RELAY_GROUPS_PATH", "relay-groups.json"),
+            ("RELAY_GROUP_LIST_PATH", "relay-group-list.json"),
+            ("RELAY_ORDER_PATH", "relay-order.json"),
+        ):
+            other = mock.patch.object(hub_status, name, Path(tmp.name) / "state" / file)
+            other.start()
+            self.addCleanup(other.stop)
         self.client = _FakeClient()
 
     def _connect(self):
@@ -315,6 +321,7 @@ class EntityIconsTests(unittest.TestCase):
         for name, path in (
             ("ICONS_PATH", self.path),
             ("PRIMARY_BATTERY_PATH", Path(tmp.name) / "state" / "primary-battery.json"),
+            ("RELAY_GROUPS_PATH", Path(tmp.name) / "state" / "relay-groups.json"),
         ):
             patcher = mock.patch.object(hub_status, name, path)
             patcher.start()
@@ -436,6 +443,407 @@ class EntityIconsTests(unittest.TestCase):
         self.assertFalse(
             any(p[0] == hub_status.TOPIC_PRIMARY_BATTERY for p in self.client.published)
         )
+
+
+def _group_msg(payload, topic: str = hub_status.TOPIC_RELAY_GROUPS_SET):
+    raw = payload if isinstance(payload, bytes) else json.dumps(payload).encode()
+    return types.SimpleNamespace(topic=topic, payload=raw)
+
+
+class RelayGroupsTests(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        # A directory that does not exist yet: the plugin must create it.
+        self.path = Path(tmp.name) / "state" / "relay-groups.json"
+        for name, path in (
+            ("RELAY_GROUPS_PATH", self.path),
+            ("RELAY_ORDER_PATH", Path(tmp.name) / "state" / "relay-order.json"),
+            ("RELAY_GROUP_LIST_PATH", Path(tmp.name) / "state" / "relay-group-list.json"),
+            ("ICONS_PATH", Path(tmp.name) / "state" / "icons.json"),
+            ("PRIMARY_BATTERY_PATH", Path(tmp.name) / "state" / "primary-battery.json"),
+        ):
+            patcher = mock.patch.object(hub_status, name, path)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.client = _FakeClient()
+
+    def _state_publishes(self):
+        return [p for p in self.client.published if p[0] == hub_status.TOPIC_RELAY_GROUPS]
+
+    def _set(self, relay_id, group):
+        hub_status.on_message(self.client, None, _group_msg({"id": relay_id, "group": group}))
+
+    def test_topics_follow_the_contract(self):
+        self.assertEqual(hub_status.TOPIC_RELAY_GROUPS, "renewvan/hub/relay-groups")
+        self.assertEqual(hub_status.TOPIC_RELAY_GROUPS_SET, "renewvan/hub/relay-groups/set")
+
+    def test_connect_subscribes_and_publishes_an_empty_map_retained(self):
+        hub_status.on_connect(self.client, None, {}, 0)
+        self.assertIn(hub_status.TOPIC_RELAY_GROUPS_SET, self.client.subscribed)
+        self.assertEqual(self._state_publishes(), [(hub_status.TOPIC_RELAY_GROUPS, "{}", True)])
+
+    def test_connect_publishes_the_persisted_map(self):
+        self.path.parent.mkdir(parents=True)
+        self.path.write_text('{"relay-x8-01": "Lights"}')
+        hub_status.on_connect(self.client, None, {}, 0)
+        self.assertEqual(
+            self._state_publishes(),
+            [(hub_status.TOPIC_RELAY_GROUPS, '{"relay-x8-01": "Lights"}', True)],
+        )
+
+    def test_a_command_persists_and_republishes_the_whole_map_retained(self):
+        self._set("relay-x8-01", "Lights")
+        self._set("relay-x8-02", "USB")
+        expected = {"relay-x8-01": "Lights", "relay-x8-02": "USB"}
+        self.assertEqual(json.loads(self.path.read_text()), expected)
+        topic, payload, retained = self._state_publishes()[-1]
+        self.assertTrue(retained)
+        self.assertEqual(json.loads(payload), expected)
+
+    def test_a_later_command_replaces_the_entry(self):
+        self._set("relay-x8-01", "Lights")
+        self._set("relay-x8-01", "Appliances")
+        self.assertEqual(json.loads(self.path.read_text()), {"relay-x8-01": "Appliances"})
+
+    def test_null_clears_the_entry_and_leaves_the_others(self):
+        self._set("relay-x8-01", "Lights")
+        self._set("relay-x8-02", "USB")
+        self._set("relay-x8-01", None)
+        self.assertEqual(json.loads(self.path.read_text()), {"relay-x8-02": "USB"})
+
+    def test_clearing_an_entry_that_is_not_there_is_harmless(self):
+        self._set("relay-x8-01", None)
+        self.assertEqual(json.loads(self.path.read_text()), {})
+
+    def test_the_map_survives_a_restart(self):
+        self._set("relay-x8-01", "Lights")
+        restarted = _FakeClient()
+        hub_status.on_connect(restarted, None, {}, 0)
+        published = [p for p in restarted.published if p[0] == hub_status.TOPIC_RELAY_GROUPS]
+        self.assertEqual(json.loads(published[0][1]), {"relay-x8-01": "Lights"})
+
+    def test_a_name_may_have_spaces_inside_and_be_32_characters_long(self):
+        self._set("relay-x8-01", "Water pump")
+        self._set("relay-x8-02", "x" * 32)
+        self.assertEqual(
+            json.loads(self.path.read_text()),
+            {"relay-x8-01": "Water pump", "relay-x8-02": "x" * 32},
+        )
+
+    def test_save_is_atomic_and_leaves_no_temp_file(self):
+        hub_status.save_relay_groups({"relay-x8-01": "Lights"})
+        hub_status.save_relay_groups({"relay-x8-01": "USB"})
+        self.assertEqual([p.name for p in self.path.parent.iterdir()], [self.path.name])
+
+    def test_invalid_commands_are_ignored_and_change_nothing(self):
+        self._set("relay-x8-01", "Lights")
+        self.client.published.clear()
+        invalid = [
+            b"",
+            b"not json",
+            b"\xff\xfe",
+            b'"relay-x8-01"',
+            b"[]",
+            {"id": "relay-x8-01"},  # no group
+            {"group": "Lights"},  # no id
+            {"id": "relay-x8-01", "group": "Lights", "extra": 1},
+            {"id": "", "group": "Lights"},
+            {"id": "relay/01", "group": "Lights"},  # a topic separator
+            {"id": "relay 01", "group": "Lights"},
+            {"id": "relay+", "group": "Lights"},
+            {"id": 3, "group": "Lights"},
+            {"id": "relay-x8-01", "group": ""},
+            {"id": "relay-x8-01", "group": " Lights"},  # leading space
+            {"id": "relay-x8-01", "group": "Lights "},
+            {"id": "relay-x8-01", "group": "Lights\n"},
+            {"id": "relay-x8-01", "group": "x" * 33},
+            {"id": "relay-x8-01", "group": 3},
+        ]
+        for payload in invalid:
+            with self.subTest(payload=payload):
+                hub_status.on_message(self.client, None, _group_msg(payload))
+        self.assertEqual(self.client.published, [])
+        self.assertEqual(json.loads(self.path.read_text()), {"relay-x8-01": "Lights"})
+
+    def test_unreadable_persisted_map_falls_back_to_empty(self):
+        for bad in (b"", b"not json", b'"x"', b"[]", b"\xff\xfe"):
+            with self.subTest(bad=bad):
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                self.path.write_bytes(bad)
+                self.assertEqual(hub_status.load_relay_groups(), {})
+
+    def test_one_bad_stored_entry_does_not_cost_the_others(self):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(
+            '{"relay-x8-01": "Lights", "bad/id": "USB", "relay-x8-02": "", "relay-x8-03": 3}'
+        )
+        self.assertEqual(hub_status.load_relay_groups(), {"relay-x8-01": "Lights"})
+
+    def test_unwritable_state_is_not_applied_or_published(self):
+        with mock.patch.object(hub_status, "save_relay_groups", side_effect=OSError("ro")):
+            self._set("relay-x8-01", "Lights")
+        self.assertEqual(self.client.published, [])
+
+    def test_the_groups_do_not_touch_the_icons_or_the_primary_battery(self):
+        self._set("relay-x8-01", "Lights")
+        topics = {p[0] for p in self.client.published}
+        self.assertEqual(topics, {hub_status.TOPIC_RELAY_GROUPS})
+
+
+def _list_msg(payload, topic: str = hub_status.TOPIC_RELAY_GROUP_LIST_SET):
+    raw = payload if isinstance(payload, bytes) else json.dumps(payload).encode()
+    return types.SimpleNamespace(topic=topic, payload=raw)
+
+
+class RelayGroupListTests(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        # A directory that does not exist yet: the plugin must create it.
+        self.path = Path(tmp.name) / "state" / "relay-group-list.json"
+        for name, path in (
+            ("RELAY_GROUP_LIST_PATH", self.path),
+            ("RELAY_ORDER_PATH", Path(tmp.name) / "state" / "relay-order.json"),
+            ("RELAY_GROUPS_PATH", Path(tmp.name) / "state" / "relay-groups.json"),
+            ("ICONS_PATH", Path(tmp.name) / "state" / "icons.json"),
+            ("PRIMARY_BATTERY_PATH", Path(tmp.name) / "state" / "primary-battery.json"),
+        ):
+            patcher = mock.patch.object(hub_status, name, path)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.client = _FakeClient()
+
+    def _state_publishes(self):
+        return [p for p in self.client.published if p[0] == hub_status.TOPIC_RELAY_GROUP_LIST]
+
+    def _set(self, payload):
+        hub_status.on_message(self.client, None, _list_msg(payload))
+
+    def test_topics_follow_the_contract(self):
+        self.assertEqual(hub_status.TOPIC_RELAY_GROUP_LIST, "renewvan/hub/relay-group-list")
+        self.assertEqual(hub_status.TOPIC_RELAY_GROUP_LIST_SET, "renewvan/hub/relay-group-list/set")
+
+    def test_connect_subscribes_and_publishes_the_stock_groups_retained(self):
+        hub_status.on_connect(self.client, None, {}, 0)
+        self.assertIn(hub_status.TOPIC_RELAY_GROUP_LIST_SET, self.client.subscribed)
+        topic, payload, retained = self._state_publishes()[0]
+        self.assertTrue(retained)
+        self.assertEqual(json.loads(payload), ["Lights", "Appliances", "USB", "Water", "Heating"])
+        # Publishing the stock list persists nothing: it is a default, not a choice.
+        self.assertFalse(self.path.exists())
+
+    def test_connect_publishes_the_persisted_list(self):
+        self.path.parent.mkdir(parents=True)
+        self.path.write_text('["Fridge", "Lights"]')
+        hub_status.on_connect(self.client, None, {}, 0)
+        self.assertEqual(json.loads(self._state_publishes()[0][1]), ["Fridge", "Lights"])
+
+    def test_a_command_persists_and_republishes_the_list_retained_in_order(self):
+        sent = ["USB", "Lights", "Awning"]
+        self._set(sent)
+        self.assertEqual(json.loads(self.path.read_text()), sent)
+        topic, payload, retained = self._state_publishes()[-1]
+        self.assertTrue(retained)
+        self.assertEqual(json.loads(payload), sent)
+
+    def test_unassigned_may_sit_anywhere_in_the_list(self):
+        sent = ["Unassigned", "Lights"]
+        self._set(sent)
+        self.assertEqual(json.loads(self.path.read_text()), sent)
+
+    def test_an_empty_list_is_a_valid_choice_and_is_not_replaced_by_the_stock_groups(self):
+        self._set([])
+        restarted = _FakeClient()
+        hub_status.on_connect(restarted, None, {}, 0)
+        published = [p for p in restarted.published if p[0] == hub_status.TOPIC_RELAY_GROUP_LIST]
+        self.assertEqual(json.loads(published[0][1]), [])
+
+    def test_the_list_survives_a_restart(self):
+        self._set(["Awning"])
+        restarted = _FakeClient()
+        hub_status.on_connect(restarted, None, {}, 0)
+        published = [p for p in restarted.published if p[0] == hub_status.TOPIC_RELAY_GROUP_LIST]
+        self.assertEqual(json.loads(published[0][1]), ["Awning"])
+
+    def test_save_is_atomic_and_leaves_no_temp_file(self):
+        hub_status.save_relay_group_list(["A"])
+        hub_status.save_relay_group_list(["B"])
+        self.assertEqual([p.name for p in self.path.parent.iterdir()], [self.path.name])
+
+    def test_invalid_commands_are_ignored_and_change_nothing(self):
+        self._set(["Lights"])
+        self.client.published.clear()
+        invalid = [
+            b"",
+            b"not json",
+            b"\xff\xfe",
+            b'"Lights"',
+            b"{}",
+            ["Lights", "Lights"],  # duplicate
+            ["Lights", ""],
+            ["Lights", " USB"],
+            ["Lights", "x" * 33],
+            ["Lights", 3],
+            ["Lights", None],
+            [{"name": "Lights"}],  # an entry, not a name
+            [["Lights"]],
+            [f"Group {i}" for i in range(17)],  # one too many
+        ]
+        for payload in invalid:
+            with self.subTest(payload=payload):
+                hub_status.on_message(self.client, None, _list_msg(payload))
+        self.assertEqual(self.client.published, [])
+        self.assertEqual(json.loads(self.path.read_text()), ["Lights"])
+
+    def test_sixteen_groups_are_allowed(self):
+        names = [f"Group {i}" for i in range(16)]
+        self._set(names)
+        self.assertEqual(json.loads(self.path.read_text()), names)
+
+    def test_unreadable_persisted_list_falls_back_to_the_stock_groups(self):
+        for bad in (
+            b"",
+            b"not json",
+            b'"x"',
+            b"{}",
+            b"\xff\xfe",
+            b'["a", "a"]',
+            b'[{"name": "a"}]',
+            b'[""]',
+        ):
+            with self.subTest(bad=bad):
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                self.path.write_bytes(bad)
+                self.assertEqual(
+                    hub_status.load_relay_group_list(), hub_status.DEFAULT_RELAY_GROUP_LIST
+                )
+
+    def test_unwritable_state_is_not_applied_or_published(self):
+        with mock.patch.object(hub_status, "save_relay_group_list", side_effect=OSError("ro")):
+            self._set(["Lights"])
+        self.assertEqual(self.client.published, [])
+
+    def test_the_list_does_not_touch_the_assignments(self):
+        self._set(["Lights"])
+        topics = {p[0] for p in self.client.published}
+        self.assertEqual(topics, {hub_status.TOPIC_RELAY_GROUP_LIST})
+
+
+def _order_msg(payload, topic: str = hub_status.TOPIC_RELAY_ORDER_SET):
+    raw = payload if isinstance(payload, bytes) else json.dumps(payload).encode()
+    return types.SimpleNamespace(topic=topic, payload=raw)
+
+
+class RelayOrderTests(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        # A directory that does not exist yet: the plugin must create it.
+        self.path = Path(tmp.name) / "state" / "relay-order.json"
+        for name, path in (
+            ("RELAY_ORDER_PATH", self.path),
+            ("RELAY_GROUP_LIST_PATH", Path(tmp.name) / "state" / "relay-group-list.json"),
+            ("RELAY_GROUPS_PATH", Path(tmp.name) / "state" / "relay-groups.json"),
+            ("ICONS_PATH", Path(tmp.name) / "state" / "icons.json"),
+            ("PRIMARY_BATTERY_PATH", Path(tmp.name) / "state" / "primary-battery.json"),
+        ):
+            patcher = mock.patch.object(hub_status, name, path)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.client = _FakeClient()
+
+    def _state_publishes(self):
+        return [p for p in self.client.published if p[0] == hub_status.TOPIC_RELAY_ORDER]
+
+    def _set(self, payload):
+        hub_status.on_message(self.client, None, _order_msg(payload))
+
+    def test_topics_follow_the_contract(self):
+        self.assertEqual(hub_status.TOPIC_RELAY_ORDER, "renewvan/hub/relay-order")
+        self.assertEqual(hub_status.TOPIC_RELAY_ORDER_SET, "renewvan/hub/relay-order/set")
+
+    def test_connect_subscribes_and_publishes_an_empty_order_retained(self):
+        hub_status.on_connect(self.client, None, {}, 0)
+        self.assertIn(hub_status.TOPIC_RELAY_ORDER_SET, self.client.subscribed)
+        self.assertEqual(self._state_publishes(), [(hub_status.TOPIC_RELAY_ORDER, "[]", True)])
+
+    def test_connect_publishes_the_persisted_order(self):
+        self.path.parent.mkdir(parents=True)
+        self.path.write_text('["relay-x8-02", "relay-x8-01"]')
+        hub_status.on_connect(self.client, None, {}, 0)
+        self.assertEqual(json.loads(self._state_publishes()[0][1]), ["relay-x8-02", "relay-x8-01"])
+
+    def test_a_command_persists_and_republishes_the_order_retained(self):
+        self._set(["relay-x8-02", "relay-x8-01"])
+        self.assertEqual(json.loads(self.path.read_text()), ["relay-x8-02", "relay-x8-01"])
+        topic, payload, retained = self._state_publishes()[-1]
+        self.assertTrue(retained)
+        self.assertEqual(json.loads(payload), ["relay-x8-02", "relay-x8-01"])
+
+    def test_a_later_command_replaces_the_whole_order(self):
+        self._set(["a", "b"])
+        self._set(["b"])
+        self.assertEqual(json.loads(self.path.read_text()), ["b"])
+
+    def test_the_order_survives_a_restart(self):
+        self._set(["b", "a"])
+        restarted = _FakeClient()
+        hub_status.on_connect(restarted, None, {}, 0)
+        published = [p for p in restarted.published if p[0] == hub_status.TOPIC_RELAY_ORDER]
+        self.assertEqual(json.loads(published[0][1]), ["b", "a"])
+
+    def test_save_is_atomic_and_leaves_no_temp_file(self):
+        hub_status.save_relay_order(["a"])
+        hub_status.save_relay_order(["b"])
+        self.assertEqual([p.name for p in self.path.parent.iterdir()], [self.path.name])
+
+    def test_512_relays_are_allowed_and_513_are_not(self):
+        ids = [f"relay-{i}" for i in range(512)]
+        self._set(ids)
+        self.assertEqual(json.loads(self.path.read_text()), ids)
+        self._set([*ids, "one-more"])
+        self.assertEqual(json.loads(self.path.read_text()), ids)
+
+    def test_invalid_commands_are_ignored_and_change_nothing(self):
+        self._set(["a", "b"])
+        self.client.published.clear()
+        invalid = [
+            b"",
+            b"not json",
+            b"\xff\xfe",
+            b'"a"',
+            b"{}",
+            ["a", "a"],  # duplicate
+            ["a", ""],
+            ["a", "b/c"],
+            ["a", "b c"],
+            ["a", "b+"],
+            ["a", 3],
+            ["a", None],
+            [["a"]],
+        ]
+        for payload in invalid:
+            with self.subTest(payload=payload):
+                hub_status.on_message(self.client, None, _order_msg(payload))
+        self.assertEqual(self.client.published, [])
+        self.assertEqual(json.loads(self.path.read_text()), ["a", "b"])
+
+    def test_unreadable_persisted_order_falls_back_to_empty(self):
+        for bad in (b"", b"not json", b'"x"', b"{}", b"\xff\xfe", b'["a", "a"]'):
+            with self.subTest(bad=bad):
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                self.path.write_bytes(bad)
+                self.assertEqual(hub_status.load_relay_order(), [])
+
+    def test_unwritable_state_is_not_applied_or_published(self):
+        with mock.patch.object(hub_status, "save_relay_order", side_effect=OSError("ro")):
+            self._set(["a"])
+        self.assertEqual(self.client.published, [])
+
+    def test_the_order_does_not_touch_the_groups(self):
+        self._set(["a"])
+        self.assertEqual({p[0] for p in self.client.published}, {hub_status.TOPIC_RELAY_ORDER})
 
 
 if __name__ == "__main__":

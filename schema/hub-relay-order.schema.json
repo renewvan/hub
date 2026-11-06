@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://renewvan.dev/schema/hub-relay-order.schema.json",
+  "title": "hub-relay-order",
+  "description": "The shared order a client lists relay channels in inside a group card: one array of relay ids (the <id> of renewvan/relay/<id>/...), first to last. A presentation choice, so it lives here and never on the relay's own topics. Published retained by the hub plugin to renewvan/hub/relay-order, restored from the value it persisted on the Pi and published on every (re)connect, default []; replaced whole by a client sending the same payload, unretained, to renewvan/hub/relay-order/set; a client never writes the state topic. Up to 512 distinct ids; the hub plugin does not know which relays exist, so it checks only the shape. A relay missing from the array sorts after the listed ones, and an id that is not on the bus is ignored by a consumer.",
+  "type": "array",
+  "maxItems": 512,
+  "uniqueItems": true,
+  "items": {
+    "type": "string",
+    "pattern": "^[^/#+\\s]+$"
+  }
+}
