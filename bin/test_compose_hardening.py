@@ -38,11 +38,26 @@ class ExposureTest(unittest.TestCase):
             self.assertTrue(hosts, f"{service} publishes nothing")
             self.assertEqual(set(hosts), {"127.0.0.1"}, service)
 
-    def test_no_service_publishes_on_all_interfaces_except_caddy(self):
+    def test_no_service_publishes_on_all_interfaces(self):
         for name in SERVICES:
-            if name == "caddy":
-                continue
             self.assertNotIn("", published_hosts(name), f"{name} binds 0.0.0.0")
+
+    def test_caddy_443_is_loopback_here_and_lan_plus_tailnet_in_the_pi_override(self):
+        self.assertEqual(published_hosts("caddy"), ["127.0.0.1"])
+        lan = yaml.safe_load((ROOT / "docker-compose.lan.yml").read_text())
+        ports = [str(p) for p in lan["services"]["caddy"]["ports"]]
+        self.assertEqual(len(ports), 2)
+        hosts = {p.rsplit(":443:443", 1)[0] for p in ports}
+        self.assertTrue(all(p.endswith(":443:443") for p in ports))
+        self.assertEqual(
+            {h.split(":?")[0] for h in hosts}, {"${MQTT_BIND_ADDR", "${TAILSCALE_BIND_ADDR"}
+        )
+        self.assertRegex(ENV_EXAMPLE, r"(?m)^TAILSCALE_BIND_ADDR=$")
+
+    def test_check_exposure_covers_the_caddy_publish(self):
+        script = (ROOT / "bin" / "check-exposure.sh").read_text()
+        self.assertIn("--published", script)
+        self.assertIn("renewvan-caddy", script)
 
 
 class CredentialsTest(unittest.TestCase):
@@ -84,6 +99,73 @@ class CredentialsTest(unittest.TestCase):
             "GF_SECURITY_ADMIN_PASSWORD",
         ):
             self.assertRegex(ENV_EXAMPLE, rf"(?m)^{name}=$")
+
+
+class BrokerAccountsTest(unittest.TestCase):
+    """ADR 0025: each client connects with its own account, never one shared credential."""
+
+    COMPOSE_CLIENTS = {
+        "driver-autoterm": "autoterm",
+        "driver-demo": "demo",
+        "driver-gps": "gps",
+        "driver-router": "router",
+        "driver-tank": "tank",
+        "driver-temperature": "temperature",
+        "driver-tilt": "tilt",
+        "driver-vedirect": "vedirect",
+        "driver-venus": "venus",
+        "logger": "logger",
+    }
+
+    def test_no_shared_broker_credential_remains(self):
+        text = (ROOT / "docker-compose.yml").read_text()
+        self.assertNotIn("RENEWVAN_USERNAME", text)
+        self.assertNotIn("RENEWVAN_PASSWORD", text)
+        self.assertNotIn("RENEWVAN_USERNAME", ENV_EXAMPLE)
+
+    def test_each_compose_client_gets_its_own_account(self):
+        for service, key in self.COMPOSE_CLIENTS.items():
+            env = env_of(service)
+            var = f"MQTT_{key.upper()}_PASSWORD"
+            self.assertEqual(env["MQTT_USERNAME"], f"${{{var}:+{key}}}", service)
+            self.assertEqual(env["MQTT_PASSWORD"], f"${{{var}:-}}", service)
+            self.assertRegex(ENV_EXAMPLE, rf"(?m)^{var}=$")
+
+    def test_dashboard_uses_the_command_account(self):
+        env = env_of("dashboard")
+        self.assertEqual(env["VITE_MQTT_USERNAME"], "${MQTT_COMMAND_PASSWORD:+command}")
+        self.assertEqual(env["VITE_MQTT_PASSWORD"], "${MQTT_COMMAND_PASSWORD:-}")
+
+    def test_config_ini_drivers_and_plugins_are_covered_by_ensure_secrets(self):
+        accounts = (ROOT / "bin" / "broker-accounts.sh").read_text()
+        for key in ("wattcycle", "kiosk", "tailscale", "hub", "esp32", "command"):
+            self.assertIn(f'"{key}:', accounts)
+        for service, key in self.COMPOSE_CLIENTS.items():
+            self.assertIn(f'"{key}:', accounts)
+
+    def test_caddy_gets_the_login_and_the_kiosk_bypasses_it(self):
+        env = env_of("caddy")
+        for name in ("CADDY_BASIC_AUTH_USER", "CADDY_BASIC_AUTH_HASH"):
+            self.assertTrue(env[name].startswith(f"${{{name}:?"), name)
+        # the kiosk loads http://localhost:80, the dashboard container itself, not Caddy
+        self.assertEqual(published_hosts("dashboard"), ["127.0.0.1"])
+        self.assertTrue(any(str(p).endswith(":80:80") for p in SERVICES["dashboard"]["ports"]))
+        self.assertRegex(ENV_EXAMPLE, r"(?m)^CADDY_BASIC_AUTH_HASH=$")
+
+    def test_caddyfile_gates_the_whole_site_when_the_dashboard_checkout_is_present(self):
+        caddyfile = ROOT.parent / "dashboard" / "docker" / "Caddyfile"
+        if not caddyfile.exists():
+            self.skipTest("no ../dashboard checkout")
+        text = caddyfile.read_text()
+        self.assertIn("basic_auth {", text)
+        self.assertIn("{$CADDY_BASIC_AUTH_USER} {$CADDY_BASIC_AUTH_HASH}", text)
+        # the gate comes before any handler, so /mqtt and /influx are both behind it
+        self.assertLess(text.index("basic_auth {"), text.index("handle_path /influx/*"))
+
+    def test_deploy_restarts_clients_whose_credential_file_changed(self):
+        deploy = (ROOT / "bin" / "deploy.sh").read_text()
+        self.assertIn(".env.changed-clients", deploy)
+        self.assertIn("restart_client", deploy)
 
 
 class DriverHardeningTest(unittest.TestCase):

@@ -125,8 +125,8 @@ services:
     environment:
       MQTT_HOST: ${RENEWVAN_HOST:-mosquitto}
       MQTT_PORT: ${RENEWVAN_PORT:-1883}
-      MQTT_USERNAME: ${RENEWVAN_USERNAME:-}
-      MQTT_PASSWORD: ${RENEWVAN_PASSWORD:-}
+      MQTT_USERNAME: ${MQTT_DEMO_PASSWORD:+demo}
+      MQTT_PASSWORD: ${MQTT_DEMO_PASSWORD:-}
 
   # Native MQTT GPS/GLONASS/BeiDou driver (NMEA 0183 over USB-serial,
   # u-blox-chip module) -- see driver-gps's own README's "Topics published"
@@ -153,8 +153,8 @@ services:
     environment:
       MQTT_HOST: ${RENEWVAN_HOST:-mosquitto}
       MQTT_PORT: ${RENEWVAN_PORT:-1883}
-      MQTT_USERNAME: ${RENEWVAN_USERNAME:-}
-      MQTT_PASSWORD: ${RENEWVAN_PASSWORD:-}
+      MQTT_USERNAME: ${MQTT_GPS_PASSWORD:+gps}
+      MQTT_PASSWORD: ${MQTT_GPS_PASSWORD:-}
     volumes:
       - ${GPS_CONFIG_PATH:-./config/gps/config.ini}:/app/config.ini:ro
 
@@ -183,8 +183,8 @@ services:
     environment:
       MQTT_HOST: ${RENEWVAN_HOST:-mosquitto}
       MQTT_PORT: ${RENEWVAN_PORT:-1883}
-      MQTT_USERNAME: ${RENEWVAN_USERNAME:-}
-      MQTT_PASSWORD: ${RENEWVAN_PASSWORD:-}
+      MQTT_USERNAME: ${MQTT_AUTOTERM_PASSWORD:+autoterm}
+      MQTT_PASSWORD: ${MQTT_AUTOTERM_PASSWORD:-}
     volumes:
       - ${AUTOTERM_CONFIG_PATH:-./config/autoterm/config.ini}:/app/config.ini:ro
 
@@ -201,8 +201,8 @@ services:
     environment:
       MQTT_HOST: ${RENEWVAN_HOST:-mosquitto}
       MQTT_PORT: ${RENEWVAN_PORT:-1883}
-      MQTT_USERNAME: ${RENEWVAN_USERNAME:-}
-      MQTT_PASSWORD: ${RENEWVAN_PASSWORD:-}
+      MQTT_USERNAME: ${MQTT_ROUTER_PASSWORD:+router}
+      MQTT_PASSWORD: ${MQTT_ROUTER_PASSWORD:-}
       ROUTER_ID: ${ROUTER_ID:-main}
 
   # Native MQTT tank driver (fresh + grey ADS1115 senders) — see
@@ -221,8 +221,8 @@ services:
     environment:
       MQTT_HOST: ${RENEWVAN_HOST:-mosquitto}
       MQTT_PORT: ${RENEWVAN_PORT:-1883}
-      MQTT_USERNAME: ${RENEWVAN_USERNAME:-}
-      MQTT_PASSWORD: ${RENEWVAN_PASSWORD:-}
+      MQTT_USERNAME: ${MQTT_TANK_PASSWORD:+tank}
+      MQTT_PASSWORD: ${MQTT_TANK_PASSWORD:-}
     volumes:
       - ${TANK_CONFIG_PATH:-./config/tank/config.ini}:/app/config.ini:ro
 
@@ -248,8 +248,8 @@ services:
     environment:
       MQTT_HOST: ${RENEWVAN_HOST:-mosquitto}
       MQTT_PORT: ${RENEWVAN_PORT:-1883}
-      MQTT_USERNAME: ${RENEWVAN_USERNAME:-}
-      MQTT_PASSWORD: ${RENEWVAN_PASSWORD:-}
+      MQTT_USERNAME: ${MQTT_TEMPERATURE_PASSWORD:+temperature}
+      MQTT_PASSWORD: ${MQTT_TEMPERATURE_PASSWORD:-}
     volumes:
       - ${TEMPERATURE_CONFIG_PATH:-./config/temperature/config.ini}:/app/config.ini:ro
       - ${TEMPERATURE_STATE_PATH:-./config/temperature/state}:/app/state
@@ -275,8 +275,8 @@ services:
     environment:
       MQTT_HOST: ${RENEWVAN_HOST:-mosquitto}
       MQTT_PORT: ${RENEWVAN_PORT:-1883}
-      MQTT_USERNAME: ${RENEWVAN_USERNAME:-}
-      MQTT_PASSWORD: ${RENEWVAN_PASSWORD:-}
+      MQTT_USERNAME: ${MQTT_TILT_PASSWORD:+tilt}
+      MQTT_PASSWORD: ${MQTT_TILT_PASSWORD:-}
     volumes:
       - ${TILT_CONFIG_PATH:-./config/tilt/config.ini}:/app/config.ini:ro
       - ${TILT_STATE_PATH:-./config/tilt/state}:/app/state
@@ -317,8 +317,8 @@ services:
     environment:
       MQTT_HOST: ${RENEWVAN_HOST:-mosquitto}
       MQTT_PORT: ${RENEWVAN_PORT:-1883}
-      MQTT_USERNAME: ${RENEWVAN_USERNAME:-}
-      MQTT_PASSWORD: ${RENEWVAN_PASSWORD:-}
+      MQTT_USERNAME: ${MQTT_VEDIRECT_PASSWORD:+vedirect}
+      MQTT_PASSWORD: ${MQTT_VEDIRECT_PASSWORD:-}
     volumes:
       - /dev:/dev:ro
       - ${VEDIRECT_CONFIG_PATH:-./config/vedirect/config.ini}:/app/config.ini:ro
@@ -345,8 +345,8 @@ services:
     environment:
       MQTT_HOST: ${RENEWVAN_HOST:-mosquitto}
       MQTT_PORT: ${RENEWVAN_PORT:-1883}
-      MQTT_USERNAME: ${RENEWVAN_USERNAME:-}
-      MQTT_PASSWORD: ${RENEWVAN_PASSWORD:-}
+      MQTT_USERNAME: ${MQTT_VENUS_PASSWORD:+venus}
+      MQTT_PASSWORD: ${MQTT_VENUS_PASSWORD:-}
       VENUS_MQTT_HOST: ${VENUS_MQTT_HOST}
       VENUS_MQTT_PORT: ${VENUS_MQTT_PORT:-1883}
       VENUS_PORTAL_ID: ${VENUS_PORTAL_ID}
@@ -397,8 +397,8 @@ services:
     environment:
       MQTT_HOST: ${RENEWVAN_HOST:-mosquitto}
       MQTT_PORT: ${RENEWVAN_PORT:-1883}
-      MQTT_USERNAME: ${RENEWVAN_USERNAME:-}
-      MQTT_PASSWORD: ${RENEWVAN_PASSWORD:-}
+      MQTT_USERNAME: ${MQTT_LOGGER_PASSWORD:+logger}
+      MQTT_PASSWORD: ${MQTT_LOGGER_PASSWORD:-}
       INFLUXDB_URL: http://influxdb:8086
       # Write-only, scoped to the renewvan bucket.
       INFLUXDB_TOKEN: ${INFLUXDB_LOGGER_TOKEN:?run bin/deploy.sh, which generates the InfluxDB secrets}
@@ -410,7 +410,7 @@ services:
   # not a polling backend. See
   # .scratch/renewvan-hub-v0-build/issues/06-dashboard-web-app.md.
   dashboard:
-    image: ghcr.io/renewvan/dashboard:v0.27.1
+    image: ghcr.io/renewvan/dashboard:v0.28.0
     container_name: renewvan-dashboard
     restart: unless-stopped
     # Loopback only: the kiosk browser (renewvan-kiosk-browser.sh, KIOSK_URL=http://localhost) reads
@@ -419,8 +419,10 @@ services:
       - "127.0.0.1:80:80"
     environment:
       VITE_MQTT_WS_URL: ${VITE_MQTT_WS_URL}
-      VITE_MQTT_USERNAME: ${VITE_MQTT_USERNAME:-}
-      VITE_MQTT_PASSWORD: ${VITE_MQTT_PASSWORD:-}
+      # The `command` account: public through /env.js, so the real gate is Caddy's basic_auth on /mqtt
+      # (ADR 0025). It may only write the `set` topics.
+      VITE_MQTT_USERNAME: ${MQTT_COMMAND_PASSWORD:+command}
+      VITE_MQTT_PASSWORD: ${MQTT_COMMAND_PASSWORD:-}
     volumes:
       # The Basemap: ONE file, never its directory -- a directory mount would hide the
       # fonts and sprites baked into the image under /maps. Single-file mounts pin the
@@ -439,13 +441,20 @@ services:
     depends_on:
       - dashboard
       - influxdb
+    # Loopback only here. The Pi adds its van-LAN and Tailscale addresses through
+    # docker-compose.lan.yml. Never 443:443 (every interface): /mqtt behind it can switch relays, and an
+    # uplink interface must not reach it (docs/adr/0025-broker-has-per-client-accounts-and-anonymous-read-only.md).
     ports:
-      - "443:443"
+      - "127.0.0.1:443:443"
     environment:
       DASHBOARD_HOST: ${DASHBOARD_HOST:?set DASHBOARD_HOST to the Pi LAN IP or name}
       # Read-only, bucket-scoped. Injected by the Caddyfile's /influx proxy, never sent to browsers
       # (docs/adr/0024-history-reaches-browsers-through-a-caddy-influx-proxy.md).
       INFLUXDB_DASHBOARD_TOKEN: ${INFLUXDB_DASHBOARD_TOKEN:?run bin/deploy.sh, which generates the InfluxDB secrets}
+      # The shared login in front of the whole site, /mqtt and /influx included (ADR 0025). bcrypt hash only;
+      # the password is shown once by bin/ensure-secrets.sh. The kiosk uses 127.0.0.1:80, not this site.
+      CADDY_BASIC_AUTH_USER: ${CADDY_BASIC_AUTH_USER:?run bin/deploy.sh, which generates the Caddy login}
+      CADDY_BASIC_AUTH_HASH: ${CADDY_BASIC_AUTH_HASH:?run bin/deploy.sh, which generates the Caddy login}
     volumes:
       - ../dashboard/docker/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

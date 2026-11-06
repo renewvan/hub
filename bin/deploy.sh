@@ -38,7 +38,7 @@ echo "==> Syncing compose artifacts to ${HOST}:${REMOTE_DIR}"
 ssh "${HOST}" "mkdir -p ${REMOTE_DIR} && sudo mkdir -p /opt/renewvan/plugins/kiosk /opt/renewvan/plugins/tailscale /opt/renewvan/plugins/hub /opt/renewvan/venvs"
 rsync -az docker-compose.yml docker-compose.lan.yml "${HOST}:${REMOTE_DIR}/"
 ssh "${HOST}" "mkdir -p ${REMOTE_DIR}/bin"
-rsync -az bin/vedirect-gate.sh bin/ensure-secrets.sh "${HOST}:${REMOTE_DIR}/bin/"
+rsync -az bin/vedirect-gate.sh bin/ensure-secrets.sh bin/broker-accounts.sh bin/rotate-secret.sh bin/validate-broker-config.sh bin/check-broker-auth.sh bin/cutover-broker-acl.sh "${HOST}:${REMOTE_DIR}/bin/"
 rsync -az --delete docker/ "${HOST}:${REMOTE_DIR}/docker/"
 rsync -az .env.example "${HOST}:${REMOTE_DIR}/.env.example"
 rsync -az bin/heater-hint.sh "${HOST}:${REMOTE_DIR}/heater-hint.sh"
@@ -330,16 +330,61 @@ if ! { hostname -I 2>/dev/null | tr ' ' '\\n'; } | grep -qxF "\${bind_addr}"; th
   exit 1
 fi
 
+# Caddy's 443 is published on MQTT_BIND_ADDR and the Pi's Tailscale address only (docker-compose.lan.yml),
+# never every interface: /mqtt behind it can switch relays. Seed the tailnet address from tailscale, then
+# require it to be an address this Pi has right now (tailscale must be logged in: sudo tailscale up).
+if ! grep -Eq '^TAILSCALE_BIND_ADDR=.+' .env; then
+  ts_ip="\$(tailscale ip -4 2>/dev/null | head -n1 || true)"
+  if printf '%s' "\${ts_ip}" | grep -Eq '^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+\$'; then
+    sed -i '/^TAILSCALE_BIND_ADDR=/d' .env
+    echo "TAILSCALE_BIND_ADDR=\${ts_ip}" >> .env
+    echo "==> TAILSCALE_BIND_ADDR not set: using tailscale ip (\${ts_ip})"
+  else
+    echo "ERROR: TAILSCALE_BIND_ADDR in ${REMOTE_DIR}/.env is empty and tailscale has no IPv4 address: run sudo tailscale up, or set it, and re-run." >&2
+    exit 1
+  fi
+fi
+ts_addr="\$(sed -n 's|^TAILSCALE_BIND_ADDR=||p' .env | tr -d '\\r' | head -n1)"
+if ! { hostname -I 2>/dev/null | tr ' ' '\\n'; } | grep -qxF "\${ts_addr}"; then
+  echo "ERROR: TAILSCALE_BIND_ADDR=\${ts_addr} is not an address of this Pi (\$(hostname -I 2>/dev/null | xargs || true))." >&2
+  echo "       Set it to the output of 'tailscale ip -4' in ${REMOTE_DIR}/.env and re-run." >&2
+  exit 1
+fi
+
 # Generate any missing or example-valued secret, create the scoped InfluxDB tokens, and rotate a van
 # that still runs on legacy default values. Idempotent; never wipes a volume. Values are never printed.
 echo "==> Ensuring secrets"
 bash bin/ensure-secrets.sh .env
+
+# The broker's password file and ACL (ADR 0025) are checked in a throwaway container before the running
+# broker is touched; a bad ACL line would make it exit on reload. Stops the deploy on failure.
+echo "==> Validating the broker config and ACL"
+bash bin/validate-broker-config.sh
 
 echo "==> docker compose pull && up -d"
 docker compose pull
 # --remove-orphans: containers have fixed container_name values, so a renamed service key leaves
 # the old container holding the name and a plain up -d aborts half-way (ADR 0014's rename did).
 docker compose up -d --remove-orphans
+# New password file / ACL: a changed mosquitto.conf needs a restart (listeners and auth settings), the files
+# alone a SIGHUP. Neither runs when the validation above failed (the deploy stopped there).
+if [[ -f /etc/renewvan/mosquitto/mosquitto.conf.changed ]]; then
+  rm -f /etc/renewvan/mosquitto/mosquitto.conf.changed
+  docker compose restart mosquitto
+else
+  docker kill -s HUP renewvan-mosquitto >/dev/null
+fi
+# A node refused with rc=5 does not retry, and a driver reads its config.ini only at start: restart every
+# client whose credential file ensure-secrets just changed (compose clients are recreated by up -d above,
+# their environment changed). The list is rewritten on each ensure-secrets run.
+if [[ -s .env.changed-clients ]]; then
+  : > .env.changed-clients.failed
+  while read -r client; do
+    echo "==> Restarting \${client} (new broker credential)"
+    ( ENV_FILE=.env; source bin/broker-accounts.sh; restart_client "\${client}" ) || { echo "WARN: could not restart \${client}; kept for the next deploy" >&2; echo "\${client}" >> .env.changed-clients.failed; }
+  done < .env.changed-clients
+  mv .env.changed-clients.failed .env.changed-clients
+fi
 # caddy bind-mounts the Caddyfile as a single file: each deploy replaces it with a new inode, which the
 # running container keeps reading until it restarts. Restart it here (brief TLS blip; the root CA lives in
 # the caddy-data volume, so devices keep trusting it).
