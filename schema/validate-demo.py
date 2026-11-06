@@ -202,6 +202,14 @@ def main() -> int:
             failures.append(f"{rel}: no {entity}.schema.json to validate against")
             continue
         covered.add(entity)
+        # The id is a topic segment, outside the payload schema; a schema may carry its
+        # grammar as definitions/id (relay does), checked here and in validate-examples.sh.
+        id_schema = load(entity_schemas()[entity]).get("definitions", {}).get("id")
+        if id_schema and not Draft7Validator(id_schema).is_valid(scenario["id"]):
+            failures.append(
+                f"{rel}: id '{scenario['id']}' is outside the {entity} id slug grammar "
+                f"{id_schema['pattern']}"
+            )
         if "driver" in scenario["initial"]:
             attributed.append((str(rel), entity, scenario["initial"]["driver"]))
         validator = schemas[entity]

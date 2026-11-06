@@ -1,4 +1,4 @@
 {
-  "state": true,
-  "driver": "driver-esp32"
+  "driver": "driver-esp32-front",
+  "state": true
 }

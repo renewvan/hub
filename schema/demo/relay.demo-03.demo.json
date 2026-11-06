@@ -1,10 +1,10 @@
 {
   "entity": "relay",
-  "id": "relay_03",
+  "id": "demo-03",
   "description": "Named relay, off and static",
   "loop_s": 120,
   "initial": {
-    "driver": "esp32",
+    "driver": "esp32-demo",
     "state": false,
     "name": "Water pump"
   },

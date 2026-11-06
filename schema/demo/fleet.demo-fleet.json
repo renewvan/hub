@@ -1,5 +1,5 @@
 {
-  "description": "Simulated Drivers for the Drivers page: healthy multi-entity, a second battery source (wattcycle, so one bank has two sources), dev build, entities with no info, offline with retained info, ESP32 with a MAC, and the router dropping out when its signal bottoms out. Versions and serials are fake.",
+  "description": "Simulated Drivers for the Drivers page: healthy multi-entity, a second battery source (wattcycle, so one bank has two sources), dev build, entities with no info, offline with retained info, an ESP32 relay board with a MAC, and the router dropping out when its signal bottoms out. Versions and serials are fake.",
   "loop_s": 120,
   "drivers": [
     {
@@ -71,16 +71,17 @@
       }
     },
     {
-      "driver": "esp32",
+      "driver": "esp32-demo",
       "health": "online",
       "info": {
-        "driver": "esp32",
-        "product": "ESP32-WROOM-E 16-channel relay board",
+        "driver": "esp32-demo",
+        "product": "ESP32 relay board (simulated)",
         "source": "ESP32-WROOM-E",
         "publishes": ["relay"],
         "version": "v0.0.0-demo",
         "board_serial": "DE:AD:BE:EF:00:01",
-        "ip": "192.0.2.57"
+        "ip": "192.0.2.57",
+        "variant": "esp32-16x-relay"
       }
     },
     {

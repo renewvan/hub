@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://renewvan.dev/schema/driver-info.schema.json",
   "title": "driver-info",
-  "description": "Payload published retained by each Driver to renewvan/<driver>/info (three segments, so it is never mistaken for a four-segment entity topic). The Driver's manifest (driver-manifest.schema.json) plus a REQUIRED build-stamped version and OPTIONAL board_serial and ip. Published on every connect immediately before 'online' on renewvan/<driver>/health, and left retained when the Driver goes offline so consumers can show 'offline, last seen <version>'. Home Assistant field mapping, for anyone bridging Driver info to an HA device block (documented here only; nothing HA-shaped goes on the wire): product -> model, version -> sw_version, board_serial -> serial_number, homepage -> configuration_url, driver -> identifiers. board_serial is a support identity for display, never a join key, and every Driver on one Host publishes the same value. Formats seen so far: (1) a Raspberry Pi SoC serial, the Serial line of /proc/cpuinfo, 16 hex digits such as 10000000abcdef01; (2) an ESP32 MAC address as AA:BB:CC:DD:EE:FF. It is omitted, never faked or 'unknown', when it cannot be read or is empty or all zeros. ip is the Board's own current IPv4 address, for a Driver that runs on a Board with its own network address (an ESP32 on WiFi): it is as of the last connect, because info is republished on every connect, and it is omitted when the Driver has no address of its own to report (a Pi-side Driver does not publish it: the Pi's address is on renewvan/hub/status).",
+  "description": "Payload published retained by each Driver to renewvan/<driver>/info (three segments, so it is never mistaken for a four-segment entity topic). The Driver's manifest (driver-manifest.schema.json) plus a REQUIRED build-stamped version and OPTIONAL board_serial, ip and variant (informational only: consumers must not branch on it). Published on every connect immediately before 'online' on renewvan/<driver>/health, and left retained when the Driver goes offline so consumers can show 'offline, last seen <version>'. Home Assistant field mapping, for anyone bridging Driver info to an HA device block (documented here only; nothing HA-shaped goes on the wire): product -> model, version -> sw_version, board_serial -> serial_number, homepage -> configuration_url, driver -> identifiers. board_serial is a support identity for display, never a join key, and every Driver on one Host publishes the same value. Formats seen so far: (1) a Raspberry Pi SoC serial, the Serial line of /proc/cpuinfo, 16 hex digits such as 10000000abcdef01; (2) an ESP32 MAC address as AA:BB:CC:DD:EE:FF. It is omitted, never faked or 'unknown', when it cannot be read or is empty or all zeros. ip is the Board's own current IPv4 address, for a Driver that runs on a Board with its own network address (an ESP32 on WiFi): it is as of the last connect, because info is republished on every connect, and it is omitted when the Driver has no address of its own to report (a Pi-side Driver does not publish it: the Pi's address is on renewvan/hub/status).",
   "type": "object",
   "required": ["driver", "product", "source", "publishes", "version"],
   "additionalProperties": false,
@@ -57,6 +57,11 @@
       "type": "string",
       "minLength": 1,
       "description": "Build-stamped version (Home Assistant: sw_version): the git release tag for a Python Driver, the 'git describe --tags --always --dirty' string for the ESP32 relay, or the literal 'dev' when no version was stamped. Never read from the manifest."
+    },
+    "variant": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Optional, informational. The kind of firmware or build the Driver runs (for example a driver-esp32 variant such as esp32-16x-relay), shown for support. Never on the bus as an identity: it is not a key, not part of an id, and not a manifest field. Consumers must not branch on it, key anything by it, or require it; omit it when there is nothing to report."
     },
     "board_serial": {
       "type": "string",
