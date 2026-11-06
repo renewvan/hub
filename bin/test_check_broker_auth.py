@@ -127,6 +127,12 @@ class CheckBrokerAuthTest(unittest.TestCase):
         self.logs.write_text(self.logs.read_text() + connect("auto-9") + gone)
         self.assertEqual(self.run_check("--stage3").returncode, 0)
 
+    def test_mosquitto_2_1_disconnect_lines_with_an_address_count(self):
+        # Real eclipse-mosquitto 2.1.2 wording: "Client <id> [<addr>] disconnected: <reason>."
+        gone = "1700000100: Client auto-9 [172.18.0.5:4000] disconnected: Broken pipe.\n"
+        self.logs.write_text(self.logs.read_text() + connect("auto-9") + gone)
+        self.assertEqual(self.run_check("--stage3").returncode, 0)
+
     def test_anonymous_write_is_only_checked_after_the_cutover(self):
         self.envfile.write_text("BROKER_ACL_OPEN=1\n")
         self.allowed.append(f"anonymous|{SET_PROBE}")

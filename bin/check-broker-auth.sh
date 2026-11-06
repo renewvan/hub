@@ -60,7 +60,12 @@ expect_denied() { # <user> <topic> <payload>
 PROBE_RELAY="renewvan/relay/zz-check-probe"
 
 # A failed probe must not read as a denial: the broker has to answer first.
-if ! docker exec "${BROKER_CONTAINER}" mosquitto_sub -h localhost -t '$SYS/broker/uptime' -W 3 -C 1 >/dev/null 2>&1; then
+# The ACL only lets anonymous clients read renewvan/#, so $SYS is denied: probe that. mosquitto_sub exits 27
+# when it stayed connected until -W ran out (nothing retained), 0 when a message arrived; anything else is
+# a connection failure.
+reach_rc=0
+docker exec "${BROKER_CONTAINER}" mosquitto_sub -h localhost -t 'renewvan/#' -W 3 -C 1 >/dev/null 2>&1 || reach_rc=$?
+if [[ "${reach_rc}" != "0" && "${reach_rc}" != "27" ]]; then
   echo "ERROR: cannot reach the broker in ${BROKER_CONTAINER}; no denial can be proven" >&2
   exit 1
 fi
@@ -76,7 +81,7 @@ connections() {
       if (match($0, /u\047[^\047]*\047/)) user = substr($0, RSTART + 2, RLENGTH - 3)
       state[id] = "up"; who[id] = user; next
     }
-    / Client [^ ]+ (closed its connection|disconnected|has exceeded timeout)/ {
+    / Client [^ ]+ (\[[^]]*\] )?(closed its connection|disconnected|has exceeded timeout)/ {
       id = $0; sub(/.*Client /, "", id); sub(/ .*/, "", id); state[id] = "down"
     }
     END { for (id in state) if (state[id] == "up") print id "\t" who[id] }'
