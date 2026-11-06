@@ -11,7 +11,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "bin" / "validate-broker-config.sh"
 
-# Exit code of the fake throwaway broker; 124 is `timeout` stopping a broker that stayed up.
+# Exit code of the fake throwaway broker. A broker that stayed up until `timeout` stopped it exits 0
+# on eclipse-mosquitto 2.1.2 (it handles SIGTERM; checked against the real image). A startup
+# failure exits 1 or 3.
 FAKE_DOCKER = """#!/usr/bin/env bash
 echo "$*" >>"$FAKE_DOCKER_LOG"
 [[ "$1" == run ]] && exit "${FAKE_BROKER_RC:-124}"
@@ -78,6 +80,14 @@ class ValidateBrokerConfigTest(unittest.TestCase):
         self.assertIn("--network none", run)
         self.assertIn(f"{self.mosq}:/mosquitto/config:ro", run, "mounted read-only")
         self.assertIn("mosquitto.conf.new", run, "the candidate is what gets tested")
+
+    def test_a_broker_that_stayed_up_exits_zero_or_with_timeout_codes(self):
+        for rc in ("0", "124", "143"):
+            with self.subTest(rc=rc):
+                self.assertEqual(self.run_script(FAKE_BROKER_RC=rc).returncode, 0)
+        for rc in ("1", "3"):
+            with self.subTest(rc=rc):
+                self.assertEqual(self.run_script(FAKE_BROKER_RC=rc).returncode, 1)
 
     def test_unchanged_conf_leaves_no_restart_marker(self):
         self.assertEqual(self.run_script().returncode, 0)

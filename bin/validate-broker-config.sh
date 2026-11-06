@@ -40,12 +40,13 @@ rollback() {
   done
 }
 
-# Exit 124 (or 143, busybox killing it with SIGTERM) = still running when timeout stopped it = it loaded everything. Any other code is a startup
-# failure. The mount is read-only, so the throwaway broker cannot change the files it checks.
+# Still running when timeout stopped it = it loaded everything. Mosquitto handles the SIGTERM and exits
+# cleanly, so busybox timeout reports 0 (checked against eclipse-mosquitto 2.1.2); 124 and 143 cover other
+# timeout builds. A startup failure (bad ACL, missing file) exits 1 within a second. The mount is read-only, so the throwaway broker cannot change the files it checks.
 rc=0
 docker run --rm --network none --tmpfs /mosquitto/data -v "${DIR}:/mosquitto/config:ro" "${image}" \
   timeout "${SECONDS_UP}" mosquitto -c /mosquitto/config/mosquitto.conf.new >/dev/null 2>&1 || rc=$?
-if [[ "${rc}" != "124" && "${rc}" != "143" ]]; then
+if [[ "${rc}" != "0" && "${rc}" != "124" && "${rc}" != "143" ]]; then
   # Re-run once with output so the operator sees mosquitto's own message (e.g. "Invalid line in acl file").
   docker run --rm --network none --tmpfs /mosquitto/data -v "${DIR}:/mosquitto/config:ro" "${image}" \
     timeout "${SECONDS_UP}" mosquitto -c /mosquitto/config/mosquitto.conf.new 2>&1 | tail -n 15 >&2 || true
