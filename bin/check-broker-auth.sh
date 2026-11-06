@@ -73,8 +73,13 @@ fi
 # --- 1. Connected accounts ------------------------------------------------------------------------
 # The log has one "New client connected ... (p2, c1, k60, u'name')" per connection; the last event per
 # client id decides whether it is still connected.
+# Only the log since the broker last started counts: the log survives a restart, and a connection from
+# before it never logs a disconnect, so it would read as still connected forever.
 connections() {
-  docker logs "${BROKER_CONTAINER}" 2>&1 | awk '
+  local since=() started
+  started="$(docker inspect -f '{{.State.StartedAt}}' "${BROKER_CONTAINER}" 2>/dev/null || true)"
+  [[ -z "${started}" ]] || since=(--since "${started}")
+  docker logs "${since[@]}" "${BROKER_CONTAINER}" 2>&1 | awk '
     /New client connected from/ {
       id = $0; sub(/.* as /, "", id); sub(/ \(.*/, "", id)
       user = ""
