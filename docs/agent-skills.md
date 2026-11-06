@@ -54,7 +54,7 @@ Scaffolds a new `renewvan/driver-<entity>` repo in the shape `driver-tank` docum
 
 ### `flash-esp32`
 
-Builds and flashes an ESP32 board from the `renewvan/driver-esp32` checkout by driving its `scripts/flash.sh`, which stamps the version from `git describe`. It asks for what is missing: the variant, USB first flash or OTA update, the serial port, and the `secrets.yaml` values (WiFi, broker, OTA password, API key). It never prints or commits secrets. It checks `esphome` and the layout, warns about `-dirty` versions, the relay board's `OE` pull-up and the one-board-per-van limit, then verifies the retained state, info, and health topics on the bus.
+Builds and flashes an ESP32 board from the `renewvan/driver-esp32` checkout by driving its `scripts/flash.sh`, which stamps the version from `git describe`. It asks for what is missing: the variant, USB first flash or OTA update, the serial port, and the `secrets.yaml` values (WiFi, broker, OTA password, API key). It never prints or commits secrets. It checks `esphome` and the layout, warns about `-dirty` versions, and the relay board's `OE` pull-up, then verifies the retained state, info, and health topics on the bus.
 
 ### `build-basemap`
 
