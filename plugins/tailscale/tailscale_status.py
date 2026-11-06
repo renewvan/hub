@@ -138,9 +138,12 @@ def on_connect(client: mqtt.Client, userdata, flags, rc, properties=None):
     log.info("Connected to MQTT broker %s:%d", MQTT_HOST, MQTT_PORT)
 
 
-def on_disconnect(client: mqtt.Client, userdata, rc, properties=None):
-    if rc != 0:
-        log.warning("Unexpected MQTT disconnect (rc=%d) — paho will reconnect", rc)
+# paho callback API v2 calls this with (client, userdata, flags, reason_code, properties); the v1
+# signature raised TypeError, which killed paho's loop and left the plugin offline after a broker
+# restart.
+def on_disconnect(client: mqtt.Client, userdata, flags, rc=None, properties=None):
+    if rc not in (None, 0) and getattr(rc, "value", rc) != 0:
+        log.warning("Unexpected MQTT disconnect (rc=%s) — paho will reconnect", rc)
 
 
 # ---------------------------------------------------------------------------
