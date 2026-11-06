@@ -410,7 +410,7 @@ services:
   # not a polling backend. See
   # .scratch/renewvan-hub-v0-build/issues/06-dashboard-web-app.md.
   dashboard:
-    image: ghcr.io/renewvan/dashboard:v0.31.0
+    image: ghcr.io/renewvan/dashboard:v0.31.1
     container_name: renewvan-dashboard
     restart: unless-stopped
     # Loopback only: the kiosk browser (renewvan-kiosk-browser.sh, KIOSK_URL=http://localhost) reads
@@ -423,6 +423,10 @@ services:
       # (ADR 0025). It may only write the `set` topics.
       VITE_MQTT_USERNAME: ${MQTT_COMMAND_PASSWORD:+command}
       VITE_MQTT_PASSWORD: ${MQTT_COMMAND_PASSWORD:-}
+      # Read-only, bucket-scoped. The container's nginx injects it into /influx/api/v2/query for the
+      # kiosk, which loads this container directly and so bypasses Caddy's /influx. Never sent to a
+      # browser (docs/adr/0024-history-reaches-browsers-through-a-caddy-influx-proxy.md).
+      INFLUXDB_DASHBOARD_TOKEN: ${INFLUXDB_DASHBOARD_TOKEN:?run bin/deploy.sh, which generates the InfluxDB secrets}
     volumes:
       # The Basemap: ONE file, never its directory -- a directory mount would hide the
       # fonts and sprites baked into the image under /maps. Single-file mounts pin the

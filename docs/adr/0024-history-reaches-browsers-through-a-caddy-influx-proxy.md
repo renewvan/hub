@@ -4,7 +4,7 @@ status: accepted
 
 # Dashboard history reaches InfluxDB through a same-origin Caddy proxy that holds a read-only token
 
-The dashboard's history charts query InfluxDB from the browser (the kiosk on localhost, a phone on the LAN, a dev machine). They do it through a same-origin path, `/influx/...`, that the Caddy fronting the dashboard forwards to `influxdb:8086`. Caddy allows only `POST /api/v2/query`, strips any client `Authorization` header, caps the request body, and injects the token itself from `{env.INFLUXDB_DASHBOARD_TOKEN}`. InfluxDB and Grafana publish on `127.0.0.1` only; neither is reachable from the LAN directly. The browser never holds an Influx token.
+The dashboard's history charts query InfluxDB from the browser (the kiosk on localhost, a phone on the LAN, a dev machine). They do it through a same-origin path, `/influx/...`, that the Caddy fronting the dashboard forwards to `influxdb:8086`. Caddy allows only `POST /api/v2/query`, strips any client `Authorization` header, caps the request body, and injects the token itself from `{env.INFLUXDB_DASHBOARD_TOKEN}`. InfluxDB and Grafana publish on `127.0.0.1` only; neither is reachable from the LAN directly. The browser never holds an Influx token. The kiosk loads the dashboard container directly (`http://localhost`), not Caddy, so that container's nginx serves the same `/influx/api/v2/query` rules with the same token, passed in its environment.
 
 In development the dashboard's Vite dev server proxies `/influx` to `localhost:8086` (an `ssh -L 8086:localhost:8086 renewvan` tunnel, or a local compose Influx) and attaches a read-only token from the dev `.env`, so prod and dev use identical relative URLs.
 
