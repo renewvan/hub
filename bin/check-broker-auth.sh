@@ -5,7 +5,8 @@
 #
 #   1. Every client whose process runs is connected with its OWN account (broker log, `u'<key>'`).
 #   2. `command` can write a set topic; the demo driver cannot write renewvan/demo/enabled/set; a driver
-#      cannot write another client's set or state topics; the ESP32 cannot write a set topic.
+#      cannot write another client's set or state topics; a board (esp32-<name>) cannot write a set
+#      topic or another board's Driver topics (hub#162, ADR 0027).
 #   3. --stage3: no anonymous client is connected (the cutover gate: after it they are refused). Clients
 #      you know are harmless can be excluded with CHECK_ALLOW_ANON=<regex on the client id>.
 #   4. When the broker is closed (BROKER_ACL_OPEN=0), an anonymous client cannot even connect.
@@ -114,7 +115,11 @@ users="$(cut -f2 <<<"${conns}" | sort -u)"
 for key in $(running_clients); do
   if grep -qx "${key}" <<<"${users}"; then pass "${key} is connected as ${key}"; else fail "${key} runs but no connection as '${key}' is in the broker log (restart it? rc=5 does not retry)"; fi
 done
-grep -qx esp32 <<<"${users}" && pass "esp32 is connected as esp32" || note "esp32 not seen connected (offline, or not flashed with its account yet)"
+BOARDS=()
+while IFS= read -r name; do [[ -z "${name}" ]] || BOARDS+=("${name}"); done < <(board_names) # once: the list is checked on every call
+for name in ${BOARDS[@]+"${BOARDS[@]}"}; do
+  grep -qx "esp32-${name}" <<<"${users}" && pass "esp32-${name} is connected as esp32-${name}" || note "esp32-${name} not seen connected (offline, or not flashed with its account yet)"
+done
 
 # --- 3. Anonymous clients (stage 3 gate) ------------------------------------------------------------
 anon="$(awk -F'\t' '$2 == "" {print $1}' <<<"${conns}" | { grep -Ev "${CHECK_ALLOW_ANON:-^$}" || true; })"
@@ -128,7 +133,15 @@ fi
 expect_allowed command "${PROBE_RELAY}/set" false
 expect_denied command "${PROBE_RELAY}/state" false
 expect_denied tank "${PROBE_RELAY}/set" false
-expect_denied esp32 "${PROBE_RELAY}/set" false
+# Each board: no set topic, its own Driver namespace is writable, and the next board's (a ring, so every board
+# is both writer and victim once) is not. One cross probe per board keeps the cost linear in the boards.
+for i in "${!BOARDS[@]}"; do
+  name="${BOARDS[i]}"
+  expect_denied "esp32-${name}" "${PROBE_RELAY}/set" false
+  expect_allowed "esp32-${name}" "renewvan/esp32-${name}/zz-check-probe" false
+  neighbour="${BOARDS[(i + 1) % ${#BOARDS[@]}]}"
+  [[ "${neighbour}" == "${name}" ]] || expect_denied "esp32-${name}" "renewvan/esp32-${neighbour}/zz-check-probe" false
+done
 expect_denied reader "${PROBE_RELAY}/set" false
 demo_now="$(docker exec "${BROKER_CONTAINER}" mosquitto_sub -h localhost -u reader -P "${READER_PW}" -t renewvan/demo/enabled -W 2 -C 1 2>/dev/null || true)"
 expect_denied demo renewvan/demo/enabled/set "${demo_now:-false}"

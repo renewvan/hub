@@ -112,11 +112,43 @@ class CheckBrokerAuthTest(unittest.TestCase):
         self.assertEqual(r.returncode, 1)
         self.assertIn(f"command cannot write {SET_PROBE} (it must)", r.stderr)
 
-    def test_a_driver_or_the_esp32_writing_a_set_topic_fails(self):
-        self.allowed.append(f"esp32|{SET_PROBE}")
+    def test_a_driver_or_a_board_writing_a_set_topic_fails(self):
+        self.envfile.write_text(self.envfile.read_text() + "BROKER_ESP32_BOARDS=front\n")
+        self.allowed.append(f"esp32-front|{SET_PROBE}")
         r = self.run_check()
-        self.assertIn("esp32 CAN write", r.stderr)
+        self.assertIn("esp32-front CAN write", r.stderr)
         self.assertEqual(r.returncode, 1)
+
+    def board_env(self):
+        self.envfile.write_text(self.envfile.read_text() + "BROKER_ESP32_BOARDS=front rear\n")
+        self.allowed += [
+            "esp32-front|renewvan/esp32-front/zz-check-probe",
+            "esp32-rear|renewvan/esp32-rear/zz-check-probe",
+        ]
+
+    def test_each_board_writes_its_own_driver_topics_and_not_the_others(self):
+        self.board_env()
+        r = self.run_check()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("ok    esp32-front can write renewvan/esp32-front/zz-check-probe", r.stdout)
+        self.assertIn("ok    esp32-front cannot write renewvan/esp32-rear/zz-check-probe", r.stdout)
+        self.assertIn("ok    esp32-rear cannot write renewvan/esp32-front/zz-check-probe", r.stdout)
+
+    def test_a_board_writing_another_boards_driver_topics_fails(self):
+        self.board_env()
+        self.allowed.append("esp32-front|renewvan/esp32-rear/zz-check-probe")
+        r = self.run_check()
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("esp32-front CAN write renewvan/esp32-rear/zz-check-probe", r.stderr)
+
+    def test_a_board_unable_to_write_its_own_topics_fails(self):
+        self.board_env()
+        self.allowed.remove("esp32-rear|renewvan/esp32-rear/zz-check-probe")
+        r = self.run_check()
+        self.assertEqual(r.returncode, 1)
+        self.assertIn(
+            "esp32-rear cannot write renewvan/esp32-rear/zz-check-probe (it must)", r.stderr
+        )
 
     def test_stage3_fails_on_an_anonymous_client_unless_allowed(self):
         self.logs.write_text(self.logs.read_text() + connect("auto-9"))

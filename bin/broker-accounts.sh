@@ -20,7 +20,7 @@ CADDY_LOGIN_USER="renewvan"
 # key:kind:target[:unit]. kind = config.ini (the driver reads /etc/renewvan/<key>/config.ini, not the
 # environment), compose (MQTT_USERNAME/PASSWORD from compose; target is the service), or envfile (a host
 # plugin's /etc/renewvan/<target>; unit is its systemd service). `command` is the dashboard's public
-# account; esp32 is flashed, never written from the Pi; `reader` is the read-only login for people and tools
+# account; esp32-<name> board accounts (below) are flashed, never written from the Pi; `reader` is the read-only login for people and tools
 # (MQTT Explorer, a dev dashboard) and for bin/check-broker-auth.sh: it has no process to restart.
 BROKER_CLIENTS=(
   "tank:config.ini:driver-tank"
@@ -37,18 +37,57 @@ BROKER_CLIENTS=(
   "kiosk:envfile:kiosk.env:renewvan-kiosk"
   "tailscale:envfile:tailscale.env:renewvan-tailscale"
   "hub:envfile:hub.env:renewvan-hub"
-  "esp32:esp32:"
   "command:compose:dashboard"
   "reader:reader:"
 )
 
+# Board accounts (ADR 0027, hub#162): one account per ESP32 board, named by its Driver key esp32-<name>.
+# The boards are the space-separated <name>s in BROKER_ESP32_BOARDS in .env (the same name chosen when the
+# board is flashed); each gets MQTT_ESP32_<NAME>_PASSWORD, and the account may write only
+# renewvan/esp32-<name>/# plus the relay topics listed in client_writes.
+BOARD_NAME_RE='^[a-z][a-z0-9]*(-[a-z0-9]+)*$' # the Driver slug (schema/relay.schema.json definitions/id)
+
+# The checked board list, one <name> per line. Fails closed: when any entry is bad (not a slug, repeated) it
+# prints the error on stderr and NO board at all, so no consumer (ACL, password file, check, rotation) can
+# act on a half-valid list. Nothing when .env is absent or the variable is empty. The value is read the way
+# compose's env_file reads it (one pair of surrounding quotes removed) and split without globbing.
+board_names() {
+  [[ -n "${ENV_FILE:-}" && -f "${ENV_FILE}" ]] || return 0
+  local raw names=() name seen=" "
+  raw="$(get BROKER_ESP32_BOARDS)"
+  if [[ "${raw}" =~ ^\"(.*)\"$ || "${raw}" =~ ^\'(.*)\'$ ]]; then raw="${BASH_REMATCH[1]}"; fi
+  read -r -a names <<<"${raw}" # read does not glob
+  for name in ${names[@]+"${names[@]}"}; do
+    if [[ ! "${name}" =~ ${BOARD_NAME_RE} || "${seen}" == *" ${name} "* ]]; then
+      printf "ERROR: BROKER_ESP32_BOARDS entry '%s' is not a unique lowercase slug (a-z, 0-9, single hyphens); no board accounts are created until it is fixed\n" "${name}" >&2
+      return 1
+    fi
+    seen+="${name} "
+  done
+  for name in ${names[@]+"${names[@]}"}; do printf '%s\n' "${name}"; done
+}
+
+validate_boards() { board_names >/dev/null; } # for the caller that must stop on a bad list
+
+is_board_key() { [[ "$1" == esp32-?* ]]; }
+
 client_keys() {
-  local spec
+  local spec name
   for spec in "${BROKER_CLIENTS[@]}"; do printf '%s\n' "${spec%%:*}"; done
+  for name in $(board_names); do printf 'esp32-%s\n' "${name}"; done
+  return 0
 }
 
 client_spec() { # <key> -> the full spec line
-  local spec
+  local spec name
+  if is_board_key "$1"; then
+    for name in $(board_names); do
+      if [[ "esp32-${name}" == "$1" ]]; then
+        printf '%s:esp32:' "$1"
+        return 0
+      fi
+    done
+  fi
   for spec in "${BROKER_CLIENTS[@]}"; do
     if [[ "${spec%%:*}" == "$1" ]]; then
       printf '%s' "${spec}"
@@ -58,8 +97,8 @@ client_spec() { # <key> -> the full spec line
   return 1
 }
 
-# MQTT_<KEY>_PASSWORD
-client_var() { printf 'MQTT_%s_PASSWORD' "$(printf '%s' "$1" | tr '[:lower:]' '[:upper:]')"; }
+# MQTT_<KEY>_PASSWORD (a hyphen in a board key becomes an underscore)
+client_var() { printf 'MQTT_%s_PASSWORD' "$(printf '%s' "$1" | tr '[:lower:]-' '[:upper:]_')"; }
 
 # Topic filters each account may write. Everyone reads renewvan/# (global rule), so no read lines here.
 client_writes() {
@@ -73,8 +112,10 @@ client_writes() {
     # State topics only (four segments); the five-segment .../set topics belong to `command`.
     kiosk) echo "renewvan/kiosk/display/+" ;;
     hub) printf '%s\n' "renewvan/hub/status" "renewvan/hub/primary-battery" "renewvan/hub/icons" ;;
-    # Own state, name, driver, health and info: never relay/+/set.
-    esp32) printf '%s\n' "renewvan/esp32/#" "renewvan/relay/+/state" "renewvan/relay/+/name" "renewvan/relay/+/driver" ;;
+    # A board: its own Driver namespace (info, health, last will) plus relay state, name and driver, never
+    # relay/+/set. Relay ids are opaque (ADR 0027), so those three are not scoped to the board's own ids: see
+    # "Relay ownership" in the ADR 0027 addendum.
+    esp32-*) printf '%s\n' "renewvan/$1/#" "renewvan/relay/+/state" "renewvan/relay/+/name" "renewvan/relay/+/driver" ;;
     # Only the command topics, never state or health.
     command)
       printf '%s\n' "renewvan/relay/+/set" "renewvan/relay/+/name/set" "renewvan/kiosk/display/+/set" \
@@ -266,7 +307,7 @@ restart_client() { # <key>
     config.ini) docker compose restart "${target}" ;;
     compose) docker compose up -d --force-recreate --no-deps "${target}" ;; # a restart keeps the old environment
     envfile) sudo -n systemctl restart "${unit}" ;;
-    esp32) echo "esp32 is rotated by OTA only (skill renewvan-flash-esp32)" >&2 ;;
+    esp32) echo "${key} is rotated by OTA only (skill renewvan-flash-esp32)" >&2 ;;
     reader) echo "reader has no process to restart: tell whoever uses it the new password" >&2 ;;
   esac
 }

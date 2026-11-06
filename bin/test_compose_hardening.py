@@ -138,8 +138,10 @@ class BrokerAccountsTest(unittest.TestCase):
 
     def test_config_ini_drivers_and_plugins_are_covered_by_ensure_secrets(self):
         accounts = (ROOT / "bin" / "broker-accounts.sh").read_text()
-        for key in ("wattcycle", "kiosk", "tailscale", "hub", "esp32", "command"):
+        for key in ("wattcycle", "kiosk", "tailscale", "hub", "command"):
             self.assertIn(f'"{key}:', accounts)
+        self.assertIn("BROKER_ESP32_BOARDS", accounts)  # board accounts esp32-<name>, hub#162
+        self.assertRegex(ENV_EXAMPLE, r"(?m)^BROKER_ESP32_BOARDS=$")
         for service, key in self.COMPOSE_CLIENTS.items():
             self.assertIn(f'"{key}:', accounts)
 

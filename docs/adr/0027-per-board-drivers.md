@@ -58,10 +58,19 @@ Hard to reverse: Driver keys, relay ids and the required `driver` are public wir
 ## Not done here
 
 - **Firmware and flashing in `driver-esp32`**: the `--board <name>` build and flash flow, per-board secrets, and flash-time validation of the board name.
-- **Broker ACL.** `bin/broker-accounts.sh` grants the `esp32` account `renewvan/esp32/#`; per-board keys need that widened (for example `renewvan/esp32-+/#`). Separate change.
+- **Broker ACL.** Done in hub#162, see the addendum below.
 - **Clearing retained topics** of a renamed or removed board (a ghost Driver) is a manual step, as in ADR 0020's cutover.
 - **Dashboard** (not built here): it needs a per-Driver replacement for the single `relayDriversOnline` boolean, which assumes one relay Driver, and should treat a retained `driver` that flips on one id as a misconfiguration signal. Grouping channels by board and naming boards is dashboard configuration.
 - Docs elsewhere that describe the single `esp32` Driver (`README.md` of `driver-esp32`, the Settings page) change with that repo.
+
+## Addendum: broker accounts per board (hub#162)
+
+The broker (ADRs 0025 and 0026) had one `esp32` account allowed `renewvan/esp32/#`. Now each board has its own account, named by its Driver key, and that is the only thing that changed on the broker:
+
+- **One account per board, `esp32-<name>`.** The `<name>`s are listed in `BROKER_ESP32_BOARDS` in `.env`; `bin/ensure-secrets.sh` generates `MQTT_ESP32_<NAME>_PASSWORD` for each and adds the account to the password file and ACL. The `esp32` account is gone (nothing is deployed). A name must be a slug and appear once, or the script refuses to run.
+- **Write grant.** `renewvan/esp32-<name>/#` and `renewvan/relay/+/state`, `name` and `driver`. Never a `set` topic, and never another board's namespace or the retired `renewvan/esp32/*`. Nothing is granted by wildcard over board keys (`esp32-+`), so a board cannot be admitted by accident, and a board account that is not listed does not exist.
+- **Proved by effect.** `bin/test_broker_acl_live.py` runs a real Mosquitto with the generated ACL (two boards connect with their own credentials; neither can publish the other's `health`, `info` or deeper topics, nor `renewvan/esp32/*`, nor a relay `set`); `bin/check-broker-auth.sh` makes the same checks on the Pi.
+- **Relay ownership is not enforced by the ACL.** The issue asked that a board write only "the `renewvan/relay/*` topics it owns". Relay ids are opaque and not tied to the Driver key by schema (this ADR), and Mosquitto can substitute only the username (`%u`) into a pattern, never a prefix of an id or a partial wildcard like `front-+`. So the ACL cannot say "relay ids that belong to this board" without giving up one of two things: opaque ids (ESP32-shaped contract, rejected above) or a per-board list of ids in the hub config (a central list, rejected above). The three relay topics a board may write (`state`, `name`, `driver`) are therefore shared by every board account. What stays true: no board can switch any relay, and no board can write another board's Driver topics (`info`, `health`, last will). What does not: a compromised board could overwrite the retained `state`, `name` or `driver` of another board's channels. The retained `driver` property stays the ownership record (a flip on an id is the misconfiguration signal above), and the ACL does not enforce it. Closing this needs relay topics namespaced by Driver key (`renewvan/relay/<driver>/<id>/...`), a wire-contract change for a later ADR if a van ever carries a board it does not trust.
 
 ## Supersedes
 
