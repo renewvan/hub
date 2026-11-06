@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://renewvan.dev/schema/hub-relay-group-set.schema.json",
+  "title": "hub-relay-group-set",
+  "description": "Command payload for the shared relay groups setting: sent unretained by a client to renewvan/hub/relay-groups/set. 'id' is a relay id (the <id> of renewvan/relay/<id>/...), 'group' is a group name of 1 to 32 characters with no leading or trailing whitespace, or null to clear the entry so the relay is Unassigned again. The hub plugin persists the change on the Pi and republishes the whole map retained on renewvan/hub/relay-groups (hub-relay-groups.schema.json); a client never writes the state topic.",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[^/#+\\s]+$",
+      "description": "A relay id: the <id> of renewvan/relay/<id>/..."
+    },
+    "group": {
+      "type": ["string", "null"],
+      "minLength": 1,
+      "maxLength": 32,
+      "pattern": "^\\S(.*\\S)?$",
+      "description": "A group name, or null to clear the entry."
+    }
+  },
+  "required": ["id", "group"],
+  "additionalProperties": false
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://renewvan.dev/schema/hub-relay-groups.schema.json",
+  "title": "hub-relay-groups",
+  "description": "State for the shared relay groups setting: which group (Lights, Appliances, USB, ...) every client files a relay channel under. A presentation choice, so it lives here and never on the relay's own topics. Published retained by the hub plugin to renewvan/hub/relay-groups, restored from the value it persisted on the Pi and published on every (re)connect, default {}; changed by a client sending a command (hub-relay-group-set.schema.json) unretained to renewvan/hub/relay-groups/set. Each key is a relay id (the <id> of renewvan/relay/<id>/...); each value is a group name of 1 to 32 characters with no leading or trailing whitespace. The hub plugin does not know which relays exist or which group names a consumer offers, so it checks only the shape: a consumer ignores an entry whose relay is not on the bus, and a relay with no entry is Unassigned.",
+  "type": "object",
+  "propertyNames": {
+    "pattern": "^[^/#+\\s]+$"
+  },
+  "additionalProperties": {
+    "type": "string",
+    "minLength": 1,
+    "maxLength": 32,
+    "pattern": "^\\S(.*\\S)?$"
+  }
+}
