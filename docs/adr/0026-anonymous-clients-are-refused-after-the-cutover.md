@@ -6,7 +6,7 @@ status: accepted
 
 Supersedes the anonymous-read part of [ADR 0025](0025-broker-has-per-client-accounts-and-anonymous-read-only.md). The per-client accounts, the `command` account and the Caddy gate stand.
 
-At the end of the migration `allow_anonymous` is `false` on both listeners. Every client needs an account, including people and tools that only read: MQTT Explorer and a development dashboard use the new `reader` account, which may read `renewvan/#` and write nothing. During the migration `allow_anonymous` stays `true` together with the temporary `pattern readwrite renewvan/#` line, and both go away at the same step: `BROKER_ACL_OPEN=0`, applied by `bin/cutover-broker-acl.sh` with a SIGHUP.
+At the end of the migration `allow_anonymous` is `false` on both listeners. Every client needs an account, including people and tools that only read: MQTT Explorer and a development dashboard use the new `reader` account, which may read `renewvan/#` and write nothing. During the migration `allow_anonymous` stays `true` together with the temporary `topic readwrite renewvan/#` line (anonymous clients only, so every account is already scoped), and both go away at the same step: `BROKER_ACL_OPEN=0`, applied by `bin/cutover-broker-acl.sh` with a SIGHUP.
 
 ## Why
 

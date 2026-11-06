@@ -262,8 +262,10 @@ class BrokerAccountsTest(Harness):
         # `pattern`, not `topic`: a global `topic` line applies to anonymous clients only, so
         # authenticated drivers would read nothing (checked on eclipse-mosquitto 2.1.2)
         self.assertIn("pattern read renewvan/#", head)
-        self.assertNotIn("\ntopic read", "\n" + head)
-        self.assertIn("pattern readwrite renewvan/#", head, "temporary migration line on a new van")
+        self.assertNotIn("\ntopic read renewvan/#\n", "\n" + head + "\n")
+        # `topic` (anonymous only), never `pattern`: accounts are scoped during the migration too
+        self.assertIn("topic readwrite renewvan/#", head, "temporary migration line on a new van")
+        self.assertNotIn("pattern readwrite", head)
         self.assertEqual(self.values()["BROKER_ACL_OPEN"], "1")
         # drivers write only their own namespaces, never a set topic of another client
         self.assertIn("topic write renewvan/tank/#", self.acl_block("tank"))

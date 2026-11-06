@@ -14,7 +14,7 @@
 #     file and ACL in /etc/renewvan/mosquitto/, each driver's/plugin's own credential file, and the
 #     Caddy login (CADDY_BASIC_AUTH_USER/HASH; its password is shown once, never stored). Clients
 #     whose credential file changed are listed in <env file>.changed-clients for deploy to restart.
-#     BROKER_ACL_OPEN=1 keeps the temporary `pattern readwrite renewvan/#` line and allow_anonymous true.
+#     BROKER_ACL_OPEN=1 keeps the temporary `topic readwrite renewvan/#` line (anonymous only) and allow_anonymous true.
 #   - Prints the names of the variables it changed, never their values (the one-time Caddy password
 #     is the exception).
 #

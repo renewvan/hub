@@ -4,7 +4,7 @@
 #
 #   bin/cutover-broker-acl.sh              stage 3: bin/check-broker-auth.sh --stage3 must find no anonymous
 #                                          client; stage 4: BROKER_ACL_OPEN=0 drops the temporary
-#                                          `pattern readwrite renewvan/#` line and sets `allow_anonymous
+#                                          `topic readwrite renewvan/#` line and sets `allow_anonymous
 #                                          false`, validates the new files in a throwaway broker, SIGHUPs
 #                                          (which refuses anonymous clients) and checks again. A failed
 #                                          check puts the migration state back.
