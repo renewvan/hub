@@ -153,7 +153,7 @@ def test_fleet_must_show_a_dev_build(schema_copy: Path) -> None:
 def test_fleet_must_show_a_driver_with_a_mac_serial(schema_copy: Path) -> None:
     edit_fleet(
         schema_copy,
-        lambda f: driver(f, "esp32")["info"].update(board_serial="DEMO0000000000B2"),
+        lambda f: driver(f, "esp32-demo")["info"].update(board_serial="DEMO0000000000B2"),
     )
     result = run_validator(schema_copy)
     assert result.returncode == 1
@@ -193,7 +193,7 @@ def test_a_real_looking_pi_serial_is_rejected(schema_copy: Path, serial: str) ->
 
 
 def test_fleet_must_show_a_driver_with_an_ip_address(schema_copy: Path) -> None:
-    edit_fleet(schema_copy, lambda f: driver(f, "esp32")["info"].pop("ip"))
+    edit_fleet(schema_copy, lambda f: driver(f, "esp32-demo")["info"].pop("ip"))
     result = run_validator(schema_copy)
     assert result.returncode == 1
     assert "an IP address" in result.stdout
@@ -201,7 +201,7 @@ def test_fleet_must_show_a_driver_with_an_ip_address(schema_copy: Path) -> None:
 
 @pytest.mark.parametrize("address", ["192.168.10.57", "10.0.0.2", "198.51.101.4"])
 def test_a_real_looking_ip_is_rejected(schema_copy: Path, address: str) -> None:
-    edit_fleet(schema_copy, lambda f: driver(f, "esp32")["info"].update(ip=address))
+    edit_fleet(schema_copy, lambda f: driver(f, "esp32-demo")["info"].update(ip=address))
     result = run_validator(schema_copy)
     assert result.returncode == 1
     assert "ip" in result.stdout and "documentation range" in result.stdout
@@ -225,7 +225,7 @@ def test_driver_slug_pattern_must_not_drift_between_schemas(schema_copy: Path) -
 
 
 def test_a_relay_scenario_that_blanks_the_name_is_rejected(schema_copy: Path) -> None:
-    path = schema_copy / "demo" / "relay.relay_02.demo.json"
+    path = schema_copy / "demo" / "relay.demo-02.demo.json"
     scenario = json.loads(path.read_text())
     scenario["timeline"].append({"t": 100, "set": {"name": ""}})
     path.write_text(json.dumps(scenario))
@@ -254,3 +254,23 @@ def test_a_scenario_naming_a_driver_missing_from_the_fleet_is_rejected(schema_co
     result = run_validator(schema_copy)
     assert result.returncode == 1
     assert "driver 'jk-bms' is not a fleet driver that publishes 'battery'" in result.stdout
+
+
+def test_a_relay_scenario_id_outside_the_slug_grammar_is_rejected(schema_copy: Path) -> None:
+    path = schema_copy / "demo" / "relay.demo-01.demo.json"
+    scenario = json.loads(path.read_text())
+    scenario["id"] = "relay_01"  # the legacy pre-slug id
+    path.write_text(json.dumps(scenario))
+    result = run_validator(schema_copy)
+    assert result.returncode == 1
+    assert "relay.demo-01.demo.json" in result.stdout and "slug grammar" in result.stdout
+
+
+def test_a_relay_scenario_driver_must_be_a_fleet_driver(schema_copy: Path) -> None:
+    path = schema_copy / "demo" / "relay.demo-01.demo.json"
+    scenario = json.loads(path.read_text())
+    scenario["initial"]["driver"] = "esp32-nowhere"
+    path.write_text(json.dumps(scenario))
+    result = run_validator(schema_copy)
+    assert result.returncode == 1
+    assert "driver 'esp32-nowhere' is not a fleet driver that publishes 'relay'" in result.stdout

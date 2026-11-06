@@ -1,3 +1,4 @@
 {
+  "driver": "esp32-front",
   "state": true
 }

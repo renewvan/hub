@@ -2,13 +2,20 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://renewvan.dev/schema/relay.schema.json",
   "title": "relay",
-  "description": "v0.2 device-model entity: a binary on/off load, one per channel, published under renewvan/relay/<id>/<property>. `state` is the output as commanded and latched, published only after the physical output changed; it does NOT mean the load is energised (no feedback sensor: a stuck relay or blown fuse is not detected). `name` is the optional, retained, human label and the only label on the wire. Command topics (unretained, not separate schema files): `renewvan/relay/<id>/set` carries JSON `true` or `false` only (no toggle: it is not idempotent); `renewvan/relay/<id>/name/set` carries a JSON string (five segments, so it never matches the four-segment entity topic). A consumer treats `state` as unknown whenever the owning Driver's health is not `online` or is absent. After any restart every channel is off; the Driver alone owns boot state and the hub never re-asserts a desired state. One source per id: two Drivers must not publish the same renewvan/relay/<id>/... topic. A Driver that stops publishing an id it knows about publishes an empty retained payload (no value). See docs/adr/0013-writable-relay-and-its-wire-contract.md.",
+  "description": "v0.2 device-model entity: a binary on/off load, one per channel, published under renewvan/relay/<id>/<property>. `<id>` is an opaque slug matching definitions/id (^[a-z][a-z0-9]*(-[a-z0-9]+)*$): the id is a topic segment, not a payload field, so this schema's payload check cannot see it and schema/validate-examples.sh and schema/validate-demo.py enforce the grammar against definitions/id instead. The schema does not tie an id to its Driver's key, and a consumer treats an id as opaque and never parses it for a board or channel (the <board>-<nn> shape is a driver-esp32 convention, not part of this contract). `driver` is REQUIRED: the key of the Driver that publishes the instance, and the only link from an id to its Driver. `state` is the output as commanded and latched, published only after the physical output changed; it does NOT mean the load is energised (no feedback sensor: a stuck relay or blown fuse is not detected). `name` is the optional, retained, human label and the only label on the wire. Command topics (unretained, not separate schema files): `renewvan/relay/<id>/set` carries JSON `true` or `false` only (no toggle: it is not idempotent); `renewvan/relay/<id>/name/set` carries a JSON string (five segments, so it never matches the four-segment entity topic). A consumer treats `state` as unknown whenever the owning Driver's health is not `online` or is absent; health is per Driver, there is no per-relay availability topic. After any restart every channel is off; the Driver alone owns boot state and the hub never re-asserts a desired state. One source per id: two Drivers must not publish the same renewvan/relay/<id>/... topic. A Driver that stops publishing an id it knows about publishes an empty retained payload (no value). Contract neutrality: no relay property may require anything specific to one kind of Driver (a firmware variant, ESPHome, a firmware version, a board kind), so a bridge Driver for another relay family can publish the same contract. See docs/adr/0013-writable-relay-and-its-wire-contract.md and docs/adr/0027-per-board-drivers.md.",
+  "definitions": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+      "description": "The relay instance id, the <id> segment of renewvan/relay/<id>/...: a lowercase slug starting with a letter (letters, digits, single hyphens). Not used by the payload check below; see the schema description."
+    }
+  },
   "type": "object",
   "properties": {
     "driver": {
       "type": "string",
       "pattern": "^(?!driver-)(?!demo$)[a-z][a-z0-9]*(-[a-z0-9]+)*$",
-      "description": "Optional, retained. The key of the Driver publishing this instance: the <driver> segment of renewvan/<driver>/info, published as renewvan/relay/<id>/driver. Same slug rule as driver-info.schema.json. Identity field. A consumer must tolerate it being absent (a Driver that predates it) and then attributes the instance to every Driver whose info `publishes` lists 'relay'."
+      "description": "Required, retained. The key of the Driver publishing this instance: the <driver> segment of renewvan/<driver>/info, published as renewvan/relay/<id>/driver. Same slug rule as driver-info.schema.json. Identity field. There is no fallback: a relay without it is invalid, and a retained `driver` that flips on one id signals a misconfiguration (two Drivers claiming the id)."
     },
     "state": {
       "type": "boolean"
@@ -18,6 +25,6 @@
       "minLength": 1
     }
   },
-  "required": ["state"],
+  "required": ["driver", "state"],
   "additionalProperties": false
 }

@@ -1,10 +1,10 @@
 {
   "entity": "relay",
-  "id": "relay_01",
+  "id": "demo-01",
   "description": "Named relay, on and static",
   "loop_s": 120,
   "initial": {
-    "driver": "esp32",
+    "driver": "esp32-demo",
     "state": true,
     "name": "Ceiling lights"
   },

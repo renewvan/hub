@@ -1,0 +1,5 @@
+{
+  "driver": "shelly-pump",
+  "state": false,
+  "name": "Water pump"
+}

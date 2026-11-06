@@ -67,4 +67,35 @@ for schema in *.schema.json; do
   done
 done
 
+# Instance ids are topic segments, not payload fields, so no entity payload schema can
+# check them. relay.schema.json carries the id grammar as definitions/id; each fixture
+# under examples/ids/ is a bare JSON string checked against it through a $ref wrapper.
+check_ids() {
+  local wrapper fixture
+  # ajv-cli picks the parser from the file extension, so the wrapper needs a .json name.
+  wrapper="$(mktemp -d)/relay-id-ref.json"
+  echo '{"$ref":"https://renewvan.dev/schema/relay.schema.json#/definitions/id"}' >"$wrapper"
+  for fixture in examples/ids/relay.*.valid.json; do
+    [ -e "$fixture" ] || continue
+    if npx --yes ajv-cli@5 test -s "$wrapper" -r relay.schema.json -d "$fixture" --valid >/dev/null; then
+      echo "PASS  $fixture validates as a relay id"
+    else
+      echo "FAIL  $fixture should validate as a relay id but did not"
+      status=1
+    fi
+  done
+  for fixture in examples/ids/relay.*.invalid.json; do
+    [ -e "$fixture" ] || continue
+    if npx --yes ajv-cli@5 test -s "$wrapper" -r relay.schema.json -d "$fixture" --invalid >/dev/null; then
+      echo "PASS  $fixture correctly rejected as a relay id"
+    else
+      echo "FAIL  $fixture should be rejected as a relay id but was not"
+      status=1
+    fi
+  done
+  rm -rf "$(dirname "$wrapper")"
+}
+
+check_ids
+
 exit "$status"
