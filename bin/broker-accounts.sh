@@ -106,10 +106,12 @@ client_writes() {
     tank | gps | temperature | tilt | router | logger | tailscale) echo "renewvan/$1/#" ;;
     wattcycle) printf '%s\n' "renewvan/wattcycle/#" "renewvan/battery/#" ;;
     venus | vedirect) printf '%s\n' "renewvan/$1/#" "renewvan/battery/#" "renewvan/solar/#" "renewvan/charger/#" ;;
-    # Heater info/health (also its last will) and per-heater telemetry (four segments). The five-segment
-    # .../<prop>/set command topics are deliberately not covered: the driver only subscribes to them, and
-    # they belong to `command` (ADR 0021).
-    autoterm) printf '%s\n' "renewvan/heater/info" "renewvan/heater/health" "renewvan/heater/+/+" ;;
+    # The driver's own info/health (also its last will) are under renewvan/autoterm/ (checked in the pinned
+    # image, driver-autoterm v0.2.3: publisher.py), plus per-heater telemetry (four segments). The
+    # five-segment .../<prop>/set command topics are deliberately not covered: the driver only subscribes to
+    # them, and they belong to `command` (ADR 0021). Re-check these against the pinned image, not a checkout,
+    # when the driver-autoterm pin changes.
+    autoterm) printf '%s\n' "renewvan/autoterm/info" "renewvan/autoterm/health" "renewvan/heater/+/+" ;;
     # Everything demo publishes except renewvan/demo/enabled/set, which only `command` may write.
     demo) printf '%s\n' "renewvan/demo/enabled" "renewvan/demo/health" "renewvan/demo/+/info" "renewvan/demo/+/+/+" ;;
     # State topics only (four segments); the five-segment .../set topics belong to `command`.
