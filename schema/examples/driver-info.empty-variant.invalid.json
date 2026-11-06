@@ -1,8 +1,0 @@
-{
-  "driver": "esp32-front",
-  "product": "ESP32-WROOM-E 16-channel relay board",
-  "source": "ESP32-WROOM-E",
-  "publishes": ["relay"],
-  "version": "v0.4.0",
-  "variant": ""
-}

@@ -104,7 +104,7 @@ An entity is not done until it has a demo scenario. Concretely, a change that ad
 
 A new **required** property on the Driver info schema (`schema/driver-info.schema.json`) likewise needs a fleet update in the same change: every entry's `info` in `schema/demo/fleet.demo-fleet.json` must still validate, and `validate-demo.py` fails until it does. A new entity type also needs it listed in the `publishes` enum of both Driver schemas (`schema/validate-examples.sh` enforces that) and, for the dashboard to show it under a Driver, a fleet Driver that publishes it.
 
-Command topics (`<field>/set`, e.g. temperature `name`/`unit`, relay `set` and `name/set`) are not simulated by `driver-demo`: demo state is read-only. The dashboard disables or no-ops its writes in demo mode. This matters most for relays: the demo ids (`demo-01`…`demo-05`) overlap the real ids, so a consumer must never publish a relay `set` or `name/set` while Demo mode is on (`docs/adr/0013-writable-relay-and-its-wire-contract.md`).
+Command topics (`<field>/set`, e.g. temperature `name`/`unit`, relay `set` and `name/set`) are not simulated by `driver-demo`: demo state is read-only. The dashboard disables or no-ops its writes in demo mode. This matters most for relays: demo ids (`demo-01`…`demo-05`) share the id space with real ones (a board named `demo` would produce `demo-01`), so a consumer must never publish a relay `set` or `name/set` while Demo mode is on (`docs/adr/0013-writable-relay-and-its-wire-contract.md`).
 
 ## Run it
 

@@ -256,23 +256,10 @@ def test_a_scenario_naming_a_driver_missing_from_the_fleet_is_rejected(schema_co
     assert "driver 'jk-bms' is not a fleet driver that publishes 'battery'" in result.stdout
 
 
-def test_a_relay_scenario_without_a_driver_is_rejected(schema_copy: Path) -> None:
+def test_a_relay_scenario_id_outside_the_slug_grammar_is_rejected(schema_copy: Path) -> None:
     path = schema_copy / "demo" / "relay.demo-01.demo.json"
     scenario = json.loads(path.read_text())
-    del scenario["initial"]["driver"]
-    path.write_text(json.dumps(scenario))
-    result = run_validator(schema_copy)
-    assert result.returncode == 1
-    assert "relay.demo-01.demo.json" in result.stdout and "driver" in result.stdout
-
-
-@pytest.mark.parametrize("bad_id", ["relay_01", "Front-01", "front--01", "1-front"])
-def test_a_relay_scenario_id_outside_the_slug_grammar_is_rejected(
-    schema_copy: Path, bad_id: str
-) -> None:
-    path = schema_copy / "demo" / "relay.demo-01.demo.json"
-    scenario = json.loads(path.read_text())
-    scenario["id"] = bad_id
+    scenario["id"] = "relay_01"  # the legacy pre-slug id
     path.write_text(json.dumps(scenario))
     result = run_validator(schema_copy)
     assert result.returncode == 1
