@@ -4,6 +4,9 @@ Skipped when mosquitto and its clients are not installed. No docker: the broker 
 port with the ACL that bin/broker-accounts.sh renders and a password file made by mosquitto_passwd.
 """
 
+import os
+import pty
+import select
 import shutil
 import socket
 import subprocess
@@ -69,10 +72,18 @@ class BoardAclLiveTest(unittest.TestCase):
         cls._tmp.cleanup()
 
     def delivered(self, user, topic, payload="x"):
-        """Publish as `user`; True when a reader gets it (a denied publish is silent)."""
+        """Publish as `user`; True when a reader gets it (a denied publish is silent).
+
+        No fixed sleep: the subscriber runs with -d on a pty (a pipe would block-buffer its
+        output until exit), and the publish waits for its SUBACK line, so the subscription is
+        attached before anything is sent. A denied publish then only needs a short window (-W)
+        for a late delivery to show up; an allowed one ends the subscriber at once (-C 1).
+        """
+        master, slave = pty.openpty()
         sub = subprocess.Popen(
             [
                 "mosquitto_sub",
+                "-d",
                 "-h",
                 "127.0.0.1",
                 "-p",
@@ -84,14 +95,18 @@ class BoardAclLiveTest(unittest.TestCase):
                 "-t",
                 topic,
                 "-W",
-                "3",
+                "2",
                 "-C",
                 "1",
             ],
-            stdout=subprocess.PIPE,
-            text=True,
+            stdout=slave,
+            stderr=slave,
         )
-        time.sleep(0.7)
+        os.close(slave)
+        self.addCleanup(os.close, master)
+        self.addCleanup(sub.wait)
+        out = self.read_until(master, "received SUBACK", 5)
+        self.assertIn("received SUBACK", out, f"subscriber never attached: {out!r}")
         pub = subprocess.run(
             [
                 "mosquitto_pub",
@@ -111,8 +126,25 @@ class BoardAclLiveTest(unittest.TestCase):
             capture_output=True,
         )
         self.assertEqual(pub.returncode, 0, f"{user} could not connect: {pub.stderr!r}")
-        out, _ = sub.communicate()
-        return payload in out
+        out += self.read_until(master, None, 3)  # to the subscriber's exit (EOF/EIO on the pty)
+        return "received PUBLISH" in out
+
+    @staticmethod
+    def read_until(fd, marker, timeout):
+        """Read the pty until `marker` shows up (None: until EOF) or time runs out."""
+        buf, deadline = "", time.time() + timeout
+        while time.time() < deadline and (marker is None or marker not in buf):
+            ready, _, _ = select.select([fd], [], [], 0.1)
+            if not ready:
+                continue
+            try:
+                chunk = os.read(fd, 4096)
+            except OSError:  # EIO: the child closed its end
+                break
+            if not chunk:
+                break
+            buf += chunk.decode(errors="replace")
+        return buf
 
     def test_two_boards_connect_with_their_own_credentials(self):
         for user in ("esp32-front", "esp32-rear"):
