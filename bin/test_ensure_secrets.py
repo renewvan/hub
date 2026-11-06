@@ -342,7 +342,14 @@ class BrokerAccountsTest(Harness):
         self.assertIn("topic write renewvan/tank/#", self.acl_block("tank"))
         self.assertNotIn("relay", self.acl_block("tank"))
         self.assertIn("topic write renewvan/battery/#", self.acl_block("wattcycle"))
-        self.assertIn("topic write renewvan/heater/#", self.acl_block("autoterm"))
+        autoterm = self.acl_block("autoterm")
+        for topic in ("renewvan/heater/info", "renewvan/heater/health", "renewvan/heater/+/+"):
+            self.assertIn(f"topic write {topic}\n", autoterm + "\n")
+        # the driver only subscribes to its set topics: no write on them, nor on a dead namespace
+        self.assertNotIn("renewvan/heater/#", autoterm)
+        self.assertNotIn("renewvan/autoterm", autoterm)
+        for line in autoterm.splitlines():
+            self.assertFalse(line.endswith("/set"), line)
         # command writes only set topics
         command = self.acl_block("command")
         for topic in (

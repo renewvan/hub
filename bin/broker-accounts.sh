@@ -106,7 +106,10 @@ client_writes() {
     tank | gps | temperature | tilt | router | logger | tailscale) echo "renewvan/$1/#" ;;
     wattcycle) printf '%s\n' "renewvan/wattcycle/#" "renewvan/battery/#" ;;
     venus | vedirect) printf '%s\n' "renewvan/$1/#" "renewvan/battery/#" "renewvan/solar/#" "renewvan/charger/#" ;;
-    autoterm) printf '%s\n' "renewvan/autoterm/#" "renewvan/heater/#" ;;
+    # Heater info/health (also its last will) and per-heater telemetry (four segments). The five-segment
+    # .../<prop>/set command topics are deliberately not covered: the driver only subscribes to them, and
+    # they belong to `command` (ADR 0021).
+    autoterm) printf '%s\n' "renewvan/heater/info" "renewvan/heater/health" "renewvan/heater/+/+" ;;
     # Everything demo publishes except renewvan/demo/enabled/set, which only `command` may write.
     demo) printf '%s\n' "renewvan/demo/enabled" "renewvan/demo/health" "renewvan/demo/+/info" "renewvan/demo/+/+/+" ;;
     # State topics only (four segments); the five-segment .../set topics belong to `command`.

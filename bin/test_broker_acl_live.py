@@ -17,7 +17,13 @@ from pathlib import Path
 
 BIN = Path(__file__).resolve().parent
 TOOLS = ("mosquitto", "mosquitto_passwd", "mosquitto_pub", "mosquitto_sub")
-PASSWORDS = {"esp32-front": "pw-front", "esp32-rear": "pw-rear", "reader": "pw-reader"}
+PASSWORDS = {
+    "esp32-front": "pw-front",
+    "esp32-rear": "pw-rear",
+    "autoterm": "pw-autoterm",
+    "command": "pw-command",
+    "reader": "pw-reader",
+}
 
 
 def free_port():
@@ -184,6 +190,20 @@ class BoardAclLiveTest(unittest.TestCase):
 
     def test_a_board_publishes_relay_state_for_its_own_channels(self):
         self.assertTrue(self.delivered("esp32-front", "renewvan/relay/front-01/state", "true"))
+
+    def test_autoterm_publishes_heater_state_but_cannot_command_the_heater(self):
+        for topic in (
+            "renewvan/heater/info",
+            "renewvan/heater/health",
+            "renewvan/heater/main/phase",
+        ):
+            self.assertTrue(self.delivered("autoterm", topic), topic)
+        for topic in ("mode", "setpoint_c", "power_level", "ventilating", "clear_error"):
+            self.assertFalse(self.delivered("autoterm", f"renewvan/heater/main/{topic}/set"), topic)
+        self.assertFalse(self.delivered("autoterm", "renewvan/autoterm/health"))
+
+    def test_command_can_still_send_a_heater_command(self):
+        self.assertTrue(self.delivered("command", "renewvan/heater/main/mode/set", '"heat"'))
 
 
 if __name__ == "__main__":
