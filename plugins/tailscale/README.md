@@ -63,11 +63,13 @@ Restart the service after changes: `sudo systemctl restart renewvan-tailscale`
 
 ## Remote access
 
-Once connected, all Pi services are reachable at the Tailscale IP:
+Once connected, the Pi is reachable at its Tailscale address or MagicDNS name. Only Caddy's port 443 (dashboard, `/mqtt`, `/influx`) and SSH are open on it: the dashboard container's port 80 and the broker's ports are not published on the tailnet.
 
-| Service   | URL                                                                             |
-| --------- | ------------------------------------------------------------------------------- |
-| Dashboard | `http://<tailscale-ip>`                                                         |
-| SSH       | `ssh <pi-user>@<tailscale-ip>`                                                  |
-| Grafana   | `ssh -L 3000:localhost:3000 <pi-user>@<tailscale-ip>` (loopback-only on the Pi) |
-| MQTT      | `<tailscale-ip>:1883`                                                           |
+| Service   | URL                                                                                                                                                |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dashboard | `https://<magicdns-name>` (`renewvan.<tailnet>.ts.net`), then the shared Caddy login. `https://<tailscale-ip>` works but warns on the certificate. |
+| SSH       | `ssh <pi-user>@<tailscale-ip>`                                                                                                                     |
+| Grafana   | `ssh -L 3000:localhost:3000 <pi-user>@<tailscale-ip>` (loopback-only on the Pi)                                                                    |
+| MQTT      | Through the dashboard's `/mqtt` proxy, or `ssh -L 1883:localhost:1883 <pi-user>@<tailscale-ip>` (the broker is not on the tailnet)                 |
+
+`bin/deploy.sh` seeds `TAILSCALE_BIND_ADDR` and `TAILSCALE_DNS_NAME` from `tailscale` into `/opt/renewvan/hub/.env`. See [HTTPS on the LAN](../../docs/reference.md#https-on-the-lan) for the certificate and the login.
