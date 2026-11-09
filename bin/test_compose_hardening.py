@@ -42,16 +42,22 @@ class ExposureTest(unittest.TestCase):
         for name in SERVICES:
             self.assertNotIn("", published_hosts(name), f"{name} binds 0.0.0.0")
 
-    def test_caddy_443_is_loopback_here_and_lan_plus_tailnet_in_the_pi_override(self):
+    def test_caddy_is_loopback_here_and_lan_plus_tailnet_in_the_pi_override(self):
+        # 443 is the site; 80 is only Caddy's automatic redirect to https. Both on the same two
+        # addresses, never every interface, and never loopback 80 (the dashboard's, for the kiosk).
         self.assertEqual(published_hosts("caddy"), ["127.0.0.1"])
         lan = yaml.safe_load((ROOT / "docker-compose.lan.yml").read_text())
         ports = [str(p) for p in lan["services"]["caddy"]["ports"]]
-        self.assertEqual(len(ports), 2)
-        hosts = {p.rsplit(":443:443", 1)[0] for p in ports}
-        self.assertTrue(all(p.endswith(":443:443") for p in ports))
-        self.assertEqual(
-            {h.split(":?")[0] for h in hosts}, {"${MQTT_BIND_ADDR", "${TAILSCALE_BIND_ADDR"}
-        )
+        self.assertEqual(len(ports), 4)
+        for port in (443, 80):
+            hosts = {
+                p.rsplit(f":{port}:{port}", 1)[0] for p in ports if p.endswith(f":{port}:{port}")
+            }
+            self.assertEqual(
+                {h.split(":?")[0] for h in hosts},
+                {"${MQTT_BIND_ADDR", "${TAILSCALE_BIND_ADDR"},
+                port,
+            )
         self.assertRegex(ENV_EXAMPLE, r"(?m)^TAILSCALE_BIND_ADDR=$")
 
     def test_caddy_serves_its_site_on_the_tailnet_address_and_name(self):
@@ -68,6 +74,7 @@ class ExposureTest(unittest.TestCase):
         script = (ROOT / "bin" / "check-exposure.sh").read_text()
         self.assertIn("--published", script)
         self.assertIn("renewvan-caddy", script)
+        self.assertIn("for port in 443 80", script)
 
 
 class CredentialsTest(unittest.TestCase):

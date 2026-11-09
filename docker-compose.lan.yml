@@ -15,7 +15,12 @@ services:
       - "${MQTT_BIND_ADDR:?set MQTT_BIND_ADDR to the Pi LAN IP}:9001:9001"
 
   # Caddy 443 (dashboard, /mqtt, /influx): van-LAN and tailnet addresses only, never every interface.
+  # Caddy's 80 on the same two addresses serves nothing but the automatic 308 redirect to https, so a
+  # URL typed without https:// still lands on the login. Never loopback: the dashboard container owns
+  # 127.0.0.1:80 for the kiosk.
   caddy:
     ports:
       - "${MQTT_BIND_ADDR:?set MQTT_BIND_ADDR to the Pi LAN IP}:443:443"
       - "${TAILSCALE_BIND_ADDR:?set TAILSCALE_BIND_ADDR to the Pi Tailscale IPv4 (tailscale ip -4)}:443:443"
+      - "${MQTT_BIND_ADDR:?set MQTT_BIND_ADDR to the Pi LAN IP}:80:80"
+      - "${TAILSCALE_BIND_ADDR:?set TAILSCALE_BIND_ADDR to the Pi Tailscale IPv4 (tailscale ip -4)}:80:80"
