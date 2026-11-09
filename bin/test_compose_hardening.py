@@ -180,10 +180,25 @@ class BrokerAccountsTest(unittest.TestCase):
             self.skipTest("no ../dashboard checkout")
         text = caddyfile.read_text()
         self.assertIn("{$DASHBOARD_HOST}, {$TAILSCALE_BIND_ADDR}, {$TAILSCALE_DNS_NAME} {", text)
-        self.assertIn("basic_auth {", text)
+        self.assertIn("basic_auth @private {", text)
         self.assertIn("{$CADDY_BASIC_AUTH_USER} {$CADDY_BASIC_AUTH_HASH}", text)
         # the gate comes before any handler, so /mqtt and /influx are both behind it
-        self.assertLess(text.index("basic_auth {"), text.index("handle_path /influx/*"))
+        self.assertLess(text.index("basic_auth @private {"), text.index("handle_path /influx/*"))
+        # Chrome fetches the PWA manifest and icons without the saved login, so only those files are
+        # public. Pin the list: anything added here is reachable without the login.
+        exempt = re.search(r"(?m)^\s*@private not path (.+)$", text)
+        self.assertIsNotNone(
+            exempt, "the login exemption must stay a single `@private not path` line"
+        )
+        self.assertEqual(
+            set(exempt.group(1).split()),
+            {
+                "/manifest.webmanifest",
+                "/icon-192.png",
+                "/icon-512.png",
+                "/icon-maskable-512.png",
+            },
+        )
 
     def test_deploy_restarts_clients_whose_credential_file_changed(self):
         deploy = (ROOT / "bin" / "deploy.sh").read_text()
