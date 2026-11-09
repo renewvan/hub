@@ -351,6 +351,19 @@ if ! { hostname -I 2>/dev/null | tr ' ' '\\n'; } | grep -qxF "\${ts_addr}"; then
   exit 1
 fi
 
+# Caddy serves its site under the Pi's MagicDNS name too (the Caddyfile lists it), and its certificate names
+# it. Seed it from tailscale; leave it empty when MagicDNS is off (the Caddyfile then falls back to localhost).
+if ! grep -Eq '^TAILSCALE_DNS_NAME=.+' .env; then
+  ts_dns="\$(tailscale status --json 2>/dev/null | python3 -c 'import sys, json; print(json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))' 2>/dev/null || true)"
+  if printf '%s' "\${ts_dns}" | grep -Eq '^[A-Za-z0-9.-]+\$'; then
+    sed -i '/^TAILSCALE_DNS_NAME=/d' .env
+    echo "TAILSCALE_DNS_NAME=\${ts_dns}" >> .env
+    echo "==> TAILSCALE_DNS_NAME not set: using the MagicDNS name (\${ts_dns})"
+  else
+    echo "==> No MagicDNS name found: Caddy will not serve a Tailscale name (set TAILSCALE_DNS_NAME to add one)"
+  fi
+fi
+
 # Generate any missing or example-valued secret, create the scoped InfluxDB tokens, and rotate a van
 # that still runs on legacy default values. Idempotent; never wipes a volume. Values are never printed.
 echo "==> Ensuring secrets"

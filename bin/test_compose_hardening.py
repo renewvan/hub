@@ -54,6 +54,16 @@ class ExposureTest(unittest.TestCase):
         )
         self.assertRegex(ENV_EXAMPLE, r"(?m)^TAILSCALE_BIND_ADDR=$")
 
+    def test_caddy_serves_its_site_on_the_tailnet_address_and_name(self):
+        # Caddy routes by Host: a host matching no site address gets a blank 200. The Caddyfile
+        # lists the tailnet address and MagicDNS name, so compose must pass both, with defaults
+        # that keep local dev starting.
+        env = env_of("caddy")
+        self.assertEqual(env["TAILSCALE_BIND_ADDR"], "${TAILSCALE_BIND_ADDR:-127.0.0.1}")
+        self.assertEqual(env["TAILSCALE_DNS_NAME"], "${TAILSCALE_DNS_NAME:-localhost}")
+        self.assertRegex(ENV_EXAMPLE, r"(?m)^TAILSCALE_DNS_NAME=$")
+        self.assertIn("TAILSCALE_DNS_NAME", (ROOT / "bin" / "deploy.sh").read_text())
+
     def test_check_exposure_covers_the_caddy_publish(self):
         script = (ROOT / "bin" / "check-exposure.sh").read_text()
         self.assertIn("--published", script)
@@ -159,6 +169,7 @@ class BrokerAccountsTest(unittest.TestCase):
         if not caddyfile.exists():
             self.skipTest("no ../dashboard checkout")
         text = caddyfile.read_text()
+        self.assertIn("{$DASHBOARD_HOST}, {$TAILSCALE_BIND_ADDR}, {$TAILSCALE_DNS_NAME} {", text)
         self.assertIn("basic_auth {", text)
         self.assertIn("{$CADDY_BASIC_AUTH_USER} {$CADDY_BASIC_AUTH_HASH}", text)
         # the gate comes before any handler, so /mqtt and /influx are both behind it

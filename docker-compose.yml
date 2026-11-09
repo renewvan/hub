@@ -452,6 +452,11 @@ services:
       - "127.0.0.1:443:443"
     environment:
       DASHBOARD_HOST: ${DASHBOARD_HOST:?set DASHBOARD_HOST to the Pi LAN IP or name}
+      # The Caddyfile serves the same site on these too, or a request by the Tailscale address or MagicDNS
+      # name matches no site and gets a blank 200. Pi only, seeded by bin/deploy.sh; local dev falls back
+      # to loopback names, so it needs no setup.
+      TAILSCALE_BIND_ADDR: ${TAILSCALE_BIND_ADDR:-127.0.0.1}
+      TAILSCALE_DNS_NAME: ${TAILSCALE_DNS_NAME:-localhost}
       # Read-only, bucket-scoped. Injected by the Caddyfile's /influx proxy, never sent to browsers
       # (docs/adr/0024-history-reaches-browsers-through-a-caddy-influx-proxy.md).
       INFLUXDB_DASHBOARD_TOKEN: ${INFLUXDB_DASHBOARD_TOKEN:?run bin/deploy.sh, which generates the InfluxDB secrets}
