@@ -7,7 +7,7 @@
 #      (CHECK_EXPOSURE_PASSWORD, user renewvan) /influx answers a query (Caddy injects the read-only token).
 #   3. A write through /influx is rejected (only POST /api/v2/query is forwarded).
 #
-#   4. (--published, run ON the Pi) Caddy's 443 is published on specific addresses only, never
+#   4. (--published, run ON the Pi) Caddy's 443 and 80 are published on specific addresses only, never
 #      0.0.0.0 / [::] (docs/adr/0025-broker-has-per-client-accounts-and-anonymous-read-only.md).
 #      From a second host a wildcard publish is indistinguishable from the LAN bind, so this one
 #      reads the container's port mappings (CONTAINER_CLI, default docker).
@@ -22,20 +22,21 @@ FAILED=0
 pass() { printf 'ok    %s\n' "$*"; }
 fail() { printf 'FAIL  %s\n' "$*" >&2; FAILED=1; }
 
-# Fails on any all-interface publish of 443; reads `docker port` lines like `443/tcp -> 10.0.0.5:443`.
+# Fails on any all-interface publish of 443 or 80 (80 is only Caddy's redirect to https); reads
+# `docker port` lines like `443/tcp -> 10.0.0.5:443`.
 check_published() {
-  local cli="${CONTAINER_CLI:-docker}" out
-  if ! out="$("${cli}" port renewvan-caddy 443/tcp 2>&1)"; then
-    fail "cannot read renewvan-caddy's published ports (${cli} port: ${out})"
-    return
-  fi
-  if [[ -z "${out}" ]]; then
-    fail "renewvan-caddy publishes nothing on 443"
-  elif printf '%s\n' "${out}" | grep -Eq '(^|-> )(0\.0\.0\.0|\[::\]|::):'; then
-    fail "Caddy 443 is published on every interface: ${out//$'\n'/, }"
-  else
-    pass "Caddy 443 is published on specific addresses only: ${out//$'\n'/, }"
-  fi
+  local cli="${CONTAINER_CLI:-docker}" out port
+  for port in 443 80; do
+    if ! out="$("${cli}" port renewvan-caddy "${port}/tcp" 2>&1)"; then
+      fail "cannot read renewvan-caddy's published ports (${cli} port: ${out})"
+    elif [[ -z "${out}" ]]; then
+      fail "renewvan-caddy publishes nothing on ${port}"
+    elif printf '%s\n' "${out}" | grep -Eq '(^|-> )(0\.0\.0\.0|\[::\]|::):'; then
+      fail "Caddy ${port} is published on every interface: ${out//$'\n'/, }"
+    else
+      pass "Caddy ${port} is published on specific addresses only: ${out//$'\n'/, }"
+    fi
+  done
 }
 
 if [[ "${1:-}" == "--published" ]]; then
