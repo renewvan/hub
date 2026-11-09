@@ -75,6 +75,9 @@ class ExposureTest(unittest.TestCase):
         self.assertIn("--published", script)
         self.assertIn("renewvan-caddy", script)
         self.assertIn("for port in 443 80", script)
+        # --published runs on the Pi, so deploy must ship the script there
+        deploy = (ROOT / "bin" / "deploy.sh").read_text()
+        self.assertRegex(deploy, r"rsync -az [^\n]*bin/check-exposure\.sh [^\n]*/bin/")
 
 
 class CredentialsTest(unittest.TestCase):
