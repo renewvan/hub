@@ -79,8 +79,7 @@ The dashboard never touches the display hardware directly; it speaks MQTT only.
 
 Before relying on touch-to-wake in production: confirm that the Official Touch
 Display 2's digitizer reports events to the compositor while
-`vcgencmd display_power 0` has cut the backlight. Victron's own GX displays do
-(confirmed in `.scratch/renewvan-kiosk-distro/issues/08-research-venus-gui-v2-display-sleep-wake.md`),
+`vcgencmd display_power 0` has cut the backlight. Victron's own GX displays do,
 but this specific panel needs a live check. If the digitizer goes silent with
 the backlight off, touch-to-wake is not viable; a physical GPIO button or an
 alternative mechanism would be needed.

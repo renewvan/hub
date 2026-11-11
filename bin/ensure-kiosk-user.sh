@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # Runs ON the Pi (copied and run over ssh by bin/bootstrap-pi.sh and bin/bootstrap-kiosk-pi.sh).
 # Idempotent. Creates the unprivileged system user the kiosk browser and the display bridge run as,
-# and strips it of any admin group. Decided in
-# .scratch/security-audit/issues/04-kiosk-privilege-split.md:
+# and strips it of any admin group:
 #
 #   renewvan-kiosk   locked password, no login shell, groups video/input/render only,
 #                    never sudo or docker (docker is root-equivalent).

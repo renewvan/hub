@@ -191,7 +191,7 @@ services:
   # RUT-360 Data to Server MQTT -> renewvan-bus router remap. Single
   # connection to this compose's own bus: subscribes the router's raw
   # feed on renewvan/router/<id>/raw, republishes normalized retained
-  # fields. See .scratch/driver-router/map.md.
+  # fields.
   driver-router:
     image: ghcr.io/renewvan/driver-router:v0.4.0
     container_name: renewvan-router
@@ -206,8 +206,7 @@ services:
       ROUTER_ID: ${ROUTER_ID:-main}
 
   # Native MQTT tank driver (fresh + grey ADS1115 senders) — see
-  # docs/authoring-a-driver.md and
-  # .scratch/renewvan-hub-v0-build/issues/02-native-mqtt-tank-driver.md.
+  # docs/authoring-a-driver.md.
   # Needs I2C device passthrough for the ADS1115; layered config.ini
   # override lives on the bind-mounted host path below.
   driver-tank:
@@ -385,8 +384,7 @@ services:
 
   # --- services ------------------------------------------------------
 
-  # renewvan/# -> InfluxDB point writer, one point per message. See
-  # .scratch/renewvan-hub-v0-build/issues/05-influxdb-logger.md.
+  # renewvan/# -> InfluxDB point writer, one point per message.
   logger:
     image: ghcr.io/renewvan/logger:v0.1.5
     container_name: renewvan-logger
@@ -407,8 +405,7 @@ services:
 
   # Read-only kiosk/laptop dashboard, served static (nginx/Caddy per its
   # own Dockerfile), connecting client-side over MQTT-over-WebSocket —
-  # not a polling backend. See
-  # .scratch/renewvan-hub-v0-build/issues/06-dashboard-web-app.md.
+  # not a polling backend.
   dashboard:
     image: ghcr.io/renewvan/dashboard:v0.32.0
     container_name: renewvan-dashboard
