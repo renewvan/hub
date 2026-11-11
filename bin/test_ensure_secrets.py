@@ -314,12 +314,15 @@ class BrokerAccountsTest(Harness):
             self.assertNotIn(v[client_var(k)], text, "the password file holds hashes only")
         self.assertEqual(stat.S_IMODE((self.etc / "mosquitto" / "passwd").stat().st_mode), 0o640)
 
-    def test_caddy_login_is_hashed_and_shown_once(self):
+    def test_dashboard_login_is_hashed_and_shown_once(self):
         self.write_env()
         r = self.run_script()
         v = self.values()
-        self.assertEqual(v["CADDY_BASIC_AUTH_USER"], "renewvan")
-        self.assertTrue(v["CADDY_BASIC_AUTH_HASH"].startswith("'$2a$"), "single-quoted for compose")
+        self.assertEqual(v["LOGIN_USER"], "renewvan")
+        self.assertTrue(
+            v["LOGIN_PASSWORD_HASH"].startswith("scrypt:"), "scrypt, no $ for compose to expand"
+        )
+        self.assertGreaterEqual(len(v["LOGIN_SESSION_SECRET"]), 32)
         pw = r.stdout.split("password ")[1].split()[0]
         self.assertNotIn(pw, self.envfile.read_text(), "only the hash is stored")
         again = self.run_script()
@@ -532,15 +535,15 @@ class BrokerAccountsTest(Harness):
             self.assertNotEqual(r.returncode, 0, bad)
         self.assertEqual(self.values(), before)
 
-    def test_rotating_the_caddy_login_shows_the_new_password_once(self):
+    def test_rotating_the_login_shows_the_new_password_once(self):
         self.write_env()
         self.assertEqual(self.run_script().returncode, 0)
-        before = self.values()["CADDY_BASIC_AUTH_HASH"]
-        r = self.run_rotate("caddy")
+        before = self.values()["LOGIN_PASSWORD_HASH"]
+        r = self.run_rotate("login")
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertNotEqual(self.values()["CADDY_BASIC_AUTH_HASH"], before)
+        self.assertNotEqual(self.values()["LOGIN_PASSWORD_HASH"], before)
         self.assertIn("password ", r.stdout)
-        self.assertIn("compose up -d --force-recreate --no-deps caddy", self.calls())
+        self.assertIn("compose up -d --force-recreate --no-deps login", self.calls())
 
 
 if __name__ == "__main__":

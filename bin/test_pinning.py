@@ -13,7 +13,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 COMPOSE = yaml.safe_load((ROOT / "docker-compose.yml").read_text())
-INFRA = {"eclipse-mosquitto", "influxdb", "caddy", "grafana/grafana"}
+INFRA = {"eclipse-mosquitto", "influxdb", "caddy", "grafana/grafana", "python"}
 WORKFLOWS = sorted((ROOT / ".github" / "workflows").glob("*.y*ml"))
 
 

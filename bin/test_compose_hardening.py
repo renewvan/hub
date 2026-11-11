@@ -165,14 +165,18 @@ class BrokerAccountsTest(unittest.TestCase):
         for service, key in self.COMPOSE_CLIENTS.items():
             self.assertIn(f'"{key}:', accounts)
 
-    def test_caddy_gets_the_login_and_the_kiosk_bypasses_it(self):
-        env = env_of("caddy")
-        for name in ("CADDY_BASIC_AUTH_USER", "CADDY_BASIC_AUTH_HASH"):
+    def test_login_service_gets_the_login_and_the_kiosk_bypasses_it(self):
+        env = env_of("login")
+        for name in ("LOGIN_USER", "LOGIN_PASSWORD_HASH", "LOGIN_SESSION_SECRET"):
             self.assertTrue(env[name].startswith(f"${{{name}:?"), name)
+            self.assertRegex(ENV_EXAMPLE, rf"(?m)^{name}=$")
+        # only Caddy reaches it: no published port, and Caddy waits for it
+        self.assertNotIn("ports", SERVICES["login"])
+        self.assertIn("login", SERVICES["caddy"]["depends_on"])
+        self.assertNotIn("LOGIN_PASSWORD_HASH", env_of("caddy"))
         # the kiosk loads http://localhost:80, the dashboard container itself, not Caddy
         self.assertEqual(published_hosts("dashboard"), ["127.0.0.1"])
         self.assertTrue(any(str(p).endswith(":80:80") for p in SERVICES["dashboard"]["ports"]))
-        self.assertRegex(ENV_EXAMPLE, r"(?m)^CADDY_BASIC_AUTH_HASH=$")
 
     def test_caddyfile_gates_the_whole_site_when_the_dashboard_checkout_is_present(self):
         caddyfile = ROOT.parent / "dashboard" / "docker" / "Caddyfile"
@@ -180,12 +184,13 @@ class BrokerAccountsTest(unittest.TestCase):
             self.skipTest("no ../dashboard checkout")
         text = caddyfile.read_text()
         self.assertIn("{$DASHBOARD_HOST}, {$TAILSCALE_BIND_ADDR}, {$TAILSCALE_DNS_NAME} {", text)
-        self.assertIn("basic_auth @private {", text)
-        self.assertIn("{$CADDY_BASIC_AUTH_USER} {$CADDY_BASIC_AUTH_HASH}", text)
+        self.assertIn("forward_auth @private login:8080 {", text)
+        self.assertNotIn("basic_auth", text.replace("no native", ""), "no browser Basic popup")
         # the gate comes before any handler, so /mqtt and /influx are both behind it
-        self.assertLess(text.index("basic_auth @private {"), text.index("handle_path /influx/*"))
-        # Chrome fetches the PWA manifest and icons without the saved login, so only those files are
-        # public. Pin the list: anything added here is reachable without the login.
+        self.assertLess(text.index("forward_auth @private"), text.index("handle_path /influx/*"))
+        # Only the login page, its static assets, the PWA files and the login service's /api/* are
+        # public. Pin the list: anything added here is reachable without a session. /env.js, /mqtt,
+        # /influx and /maps must stay off it.
         exempt = re.search(r"(?m)^\s*@private not path (.+)$", text)
         self.assertIsNotNone(
             exempt, "the login exemption must stay a single `@private not path` line"
@@ -193,10 +198,19 @@ class BrokerAccountsTest(unittest.TestCase):
         self.assertEqual(
             set(exempt.group(1).split()),
             {
+                "/login",
+                "/assets/*",
+                "/sw.js",
+                "/workbox-*.js",
+                "/registerSW.js",
+                "/favicon.ico",
+                "/favicon.svg",
+                "/apple-touch-icon.png",
                 "/manifest.webmanifest",
                 "/icon-192.png",
                 "/icon-512.png",
                 "/icon-maskable-512.png",
+                "/api/*",
             },
         )
 

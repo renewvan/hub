@@ -3,8 +3,8 @@
 # Verifies docs/adr/0024-history-reaches-browsers-through-a-caddy-influx-proxy.md:
 #
 #   1. InfluxDB (8086) and Grafana (3000) refuse connections on the Pi's LAN address.
-#   2. Caddy's basic_auth gate (ADR 0025): /influx and /mqtt answer 401 with no login. With the login
-#      (CHECK_EXPOSURE_PASSWORD, user renewvan) /influx answers a query (Caddy injects the read-only token).
+#   2. The login gate (ADR 0029): /influx and /mqtt answer 401 with no login. With the login
+#      (CHECK_EXPOSURE_PASSWORD, user renewvan; signs in for a session cookie) /influx answers a query (Caddy injects the read-only token).
 #   3. A write through /influx is rejected (only POST /api/v2/query is forwarded).
 #
 #   4. (--published, run ON the Pi) Caddy's 443 and 80 are published on specific addresses only, never
@@ -12,7 +12,7 @@
 #      From a second host a wildcard publish is indistinguishable from the LAN bind, so this one
 #      reads the container's port mappings (CONTAINER_CLI, default docker).
 #
-# Usage: [CHECK_EXPOSURE_PASSWORD=<caddy login>] bin/check-exposure.sh <pi-lan-ip-or-name>
+# Usage: [CHECK_EXPOSURE_PASSWORD=<dashboard login>] bin/check-exposure.sh <pi-lan-ip-or-name>
 #        bin/check-exposure.sh --published      (on the Pi; only check 4)
 # Needs: nc, curl. Exit 0 = every check passed, 1 = at least one failed, 2 = usage error.
 # No -e on purpose: every check runs and failures accumulate into the exit code.
@@ -69,7 +69,7 @@ QUERY_BODY='{"query":"buckets()","type":"flux"}'
 code="$(curl -sk -m 15 -o /dev/null -w '%{http_code}' -X POST "${BASE}/api/v2/query?org=renewvan" \
   -H 'Content-Type: application/json' -d "${QUERY_BODY}" || true)"
 if [[ "${code}" == "401" ]]; then
-  pass "POST /influx/api/v2/query without the Caddy login is refused (401)"
+  pass "POST /influx/api/v2/query without the login is refused (401)"
 else
   fail "POST /influx/api/v2/query without a login returned ${code:-no response}, expected 401"
 fi
@@ -79,28 +79,48 @@ code="$(curl -sk -m 15 -o /dev/null -w '%{http_code}' "https://${HOST}/mqtt" \
   -H 'Connection: Upgrade' -H 'Upgrade: websocket' -H 'Sec-WebSocket-Version: 13' \
   -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' -H 'Sec-WebSocket-Protocol: mqtt' || true)"
 if [[ "${code}" == "401" ]]; then
-  pass "/mqtt without the Caddy login is refused (401)"
+  pass "/mqtt without the login is refused (401)"
 else
   fail "/mqtt without a login returned ${code:-no response}, expected 401"
 fi
 
+# A page navigation without the login must be sent to the login page, not served (302), and the login
+# endpoint must not trigger the browser's native Basic popup (no WWW-Authenticate header anywhere).
+code="$(curl -sk -m 15 -o /dev/null -w '%{http_code}' -H 'Accept: text/html' "https://${HOST}/relays" || true)"
+if [[ "${code}" == "302" ]]; then pass "GET /relays without the login redirects to the login page (302)"; else fail "GET /relays without a login returned ${code:-no response}, expected 302"; fi
+if curl -sk -m 15 -D - -o /dev/null -X POST "${BASE}/api/v2/query?org=renewvan" | grep -qi '^www-authenticate'; then
+  fail "a 401 carries WWW-Authenticate: browsers would show their native popup"
+else
+  pass "a 401 carries no WWW-Authenticate header (no native popup)"
+fi
+
+JAR=""
+if [[ -n "${CHECK_EXPOSURE_PASSWORD:-}" ]]; then
+  JAR="$(mktemp)"
+  trap 'rm -f "${JAR}"' EXIT
+  login_code="$(curl -sk -m 15 -o /dev/null -c "${JAR}" -w '%{http_code}' -X POST "https://${HOST}/api/login" \
+    -H 'Content-Type: application/json' \
+    -d "{\"user\":\"renewvan\",\"password\":\"${CHECK_EXPOSURE_PASSWORD}\"}" || true)"
+  if [[ "${login_code}" == "200" ]]; then pass "sign-in with the login answers (200)"; else fail "sign-in returned ${login_code:-no response}, expected 200"; fi
+fi
+
 if [[ -n "${CHECK_EXPOSURE_PASSWORD:-}" ]]; then
   code="$(curl -sk -m 15 -o /dev/null -w '%{http_code}' -X POST "${BASE}/api/v2/query?org=renewvan" \
-    -u "renewvan:${CHECK_EXPOSURE_PASSWORD}" -H 'Content-Type: application/json' -d "${QUERY_BODY}" || true)"
+    -b "${JAR}" -H 'Content-Type: application/json' -d "${QUERY_BODY}" || true)"
   if [[ "${code}" == "200" ]]; then
-    pass "POST /influx/api/v2/query with the Caddy login answers (200)"
+    pass "POST /influx/api/v2/query with the login answers (200)"
   else
     fail "POST /influx/api/v2/query with the login returned ${code:-no response}, expected 200"
   fi
 else
-  echo "skip  the with-login query (set CHECK_EXPOSURE_PASSWORD to the Caddy login password)"
+  echo "skip  the with-login query (set CHECK_EXPOSURE_PASSWORD to the dashboard login password)"
 fi
 
 if [[ -n "${CHECK_EXPOSURE_PASSWORD:-}" ]]; then
   # Past the gate (with the login) a write and other paths must still be refused by the proxy itself. Without
   # the login these two only prove the gate answers 401, which is weaker but still a refusal.
   AUTH=(-H 'Authorization: Token not-a-real-token')
-  if [[ -n "${CHECK_EXPOSURE_PASSWORD:-}" ]]; then AUTH=(-u "renewvan:${CHECK_EXPOSURE_PASSWORD}"); fi
+  if [[ -n "${CHECK_EXPOSURE_PASSWORD:-}" ]]; then AUTH=(-b "${JAR}"); fi
 
   code="$(curl -sk -m 15 -o /dev/null -w '%{http_code}' -X POST \
     "${BASE}/api/v2/write?org=renewvan&bucket=renewvan" \
