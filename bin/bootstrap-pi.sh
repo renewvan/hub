@@ -158,6 +158,13 @@ sudo tee /etc/dbus-1/system.d/renewvan-wattcycle.conf >/dev/null <<'DBUS'
 DBUS
 sudo systemctl reload dbus 2>/dev/null || true
 
+# Keep the journal across reboots (Debian defaults to RAM only): after a power cut the previous
+# boot's logs are the only evidence of what failed. Capped so it cannot fill the SD card.
+echo "==> Making journald persistent"
+sudo mkdir -p /etc/systemd/journald.conf.d
+printf '[Journal]\nStorage=persistent\nSystemMaxUse=200M\n' | sudo tee /etc/systemd/journald.conf.d/renewvan.conf >/dev/null
+sudo systemctl restart systemd-journald
+
 echo "==> Bootstrap complete"
 EOF
 

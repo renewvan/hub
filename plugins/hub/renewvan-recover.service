@@ -1,0 +1,17 @@
+[Unit]
+Description=renewvan: start hub containers Docker left stopped after an unclean shutdown
+# A power cut (battery pulled, brown-out) can leave a container, notably the MQTT broker, in
+# "exited" even with restart: unless-stopped: Docker only restores what it still has marked
+# running, so every driver then crash-loops without a broker. Start whatever is stopped.
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# Broker first so the drivers it feeds find it. Only renewvan-* containers, only exited/created
+# ones; running containers and anything not created (disabled compose profiles) are untouched.
+ExecStart=/bin/sh -c 'for n in mosquitto $(docker ps -a --filter name=^renewvan- --filter status=exited --filter status=created --format "{{.Names}}" | sed "s/^renewvan-//"); do docker start "renewvan-$n" 2>/dev/null || true; done'
+
+[Install]
+WantedBy=multi-user.target

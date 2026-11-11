@@ -85,6 +85,11 @@ sudo systemctl daemon-reload
 # restart (not just enable --now): an upgraded unit changes user, which a running service would not pick up
 sudo systemctl enable renewvan-kiosk.service
 sudo systemctl restart renewvan-kiosk.service
+# Boot-time recovery: start any renewvan-* container Docker left stopped after a power cut
+# (plugins/hub/renewvan-recover.service). enable only; it is a oneshot that runs at boot.
+sudo install -m 0644 /opt/renewvan/plugins/hub/renewvan-recover.service /etc/systemd/system/renewvan-recover.service
+sudo systemctl daemon-reload
+sudo systemctl enable renewvan-recover.service
 # The cage kiosk session unit (renewvan-cage.service) is installed by
 # bin/bootstrap-kiosk-pi.sh, not here: it needs the kiosk user substituted in.
 if [[ ! -f /etc/renewvan/kiosk.env ]]; then
