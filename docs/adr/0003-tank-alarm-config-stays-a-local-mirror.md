@@ -20,7 +20,6 @@ Hard to reverse in practice: once the dashboard ships a UI built against a hardc
 
 ## See also
 
-- `.scratch/tank-alarm-config/issues/01-mirror-vs-wire-field-decision.md` — full discussion and evidence.
 - `docs/adr/0001-compose-services-via-pinned-images-not-git-submodules.md` — the earlier decision against cross-repo build/CI coupling this ADR extends to config drift-guarding.
 - `CONTEXT.md` — `Tank`, `Node` definitions.
 </content>

@@ -1,6 +1,6 @@
 # renewvan Hub
 
-An open-hardware, vendor-agnostic campervan control platform: a unified device model for van hardware (tanks, relays, batteries, solar controllers, chargers, routers), published on a single MQTT bus by drivers, consumed by a dashboard and logging. Almost everything on the bus is read-only; the exceptions are the settings and command topics (`<field>/set`) such as the **Relay** `set`. See `review/renewvan-hub-research-report.md` for the full research/architecture rationale, and `.scratch/renewvan-hub-v0/map.md` for the v0 spec effort.
+An open-hardware, vendor-agnostic campervan control platform: a unified device model for van hardware (tanks, relays, batteries, solar controllers, chargers, routers), published on a single MQTT bus by drivers, consumed by a dashboard and logging. Almost everything on the bus is read-only; the exceptions are the settings and command topics (`<field>/set`) such as the **Relay** `set`.
 
 ## Language
 

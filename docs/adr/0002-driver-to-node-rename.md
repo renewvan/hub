@@ -25,6 +25,5 @@ Hard to reverse: GitHub repo redirects survive only as long as the old names (`d
 
 ## See also
 
-- `.scratch/driver-to-node-rename/issues/04-cutover-sequence-and-live-pi.md` — full cutover spec and execution log.
 - `CONTEXT.md` — current `Node`/`Host` definitions.
 - `docs/adr/0001-compose-services-via-pinned-images-not-git-submodules.md` — the pinned-image mechanism these renamed artifacts flow through.

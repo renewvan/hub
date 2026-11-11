@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Idempotent "ensure secrets" step, run on the Pi by bin/deploy.sh (cwd = the hub dir, next to
 # docker-compose.yml and .env). Fresh installs and upgrades share this one path.
-# Decided in .scratch/security-audit/issues/03-influx-grafana-exposure-and-credentials.md.
+# See docs/adr/0024-history-reaches-browsers-through-a-caddy-influx-proxy.md.
 #
 #   - Generates any missing or example-valued secret into .env (mode 600): the InfluxDB admin
 #     password and token, the Grafana admin password, and the three scoped InfluxDB tokens

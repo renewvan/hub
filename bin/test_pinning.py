@@ -1,5 +1,5 @@
-"""Lint for the pinning policy decided in
-.scratch/security-audit/issues/06-supply-chain-pinning-policy.md.
+"""Lint for the pinning policy in
+docs/adr/0001-compose-services-via-pinned-images-not-git-submodules.md.
 
 Third-party infra images are `tag@sha256:digest`, renewvan/* images an exact version tag, every
 GitHub Action a full commit SHA, `npx` an exact version, and no script pipes `curl` into a shell.
