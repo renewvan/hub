@@ -6,7 +6,7 @@ status: accepted
 
 The **Heater** entity is a fuel-fired space heater that reports its own phase and faults and accepts a small set of unretained commands. The contract is `schema/heater.schema.json`; this ADR records the safety rules behind it. It is modelled on ADR 0013 (the writable relay), which it extends: a heater is a writable load that can start a flame.
 
-**The broker accepts anonymous clients, so anyone who can reach port 1883 or the 9001 WebSocket listener can start or stop the heater.** `docker/mosquitto/config/mosquitto.conf` sets `allow_anonymous true`. This ADR does not fix it; broker authentication and ACLs are a separate, hub-wide effort. Until then the broker must only be reachable from the van's own network. This is why `commands_enabled` defaults to `false`.
+Who may publish a command is decided by the broker's per-client accounts and ACLs ([ADR 0025](0025-broker-has-per-client-accounts-and-anonymous-read-only.md), [ADR 0026](0026-anonymous-clients-are-refused-after-the-cutover.md)). `commands_enabled` still defaults to `false`, so a heater never accepts commands until someone turns that on.
 
 ## The contract
 
