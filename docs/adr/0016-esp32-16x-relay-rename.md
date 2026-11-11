@@ -32,7 +32,6 @@ Hard to reverse: the repo name, Device key and the two retained topics are publi
 
 - The board that was flashed under the old key is the same physical board (same `board_serial`); reflashing it publishes under the new key. No compatibility shim: there are no external adopters.
 - On the van this repo's author runs, the old key's two retained topics were cleared on the broker when the new key came up.
-- `.scratch/` planning notes still use the old name and are not rewritten.
 
 ## See also
 

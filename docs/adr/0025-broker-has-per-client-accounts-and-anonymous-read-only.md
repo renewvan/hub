@@ -45,4 +45,3 @@ Hard to reverse: every driver, plugin, node and the dashboard depend on the acco
 
 - `docs/adr/0024-history-reaches-browsers-through-a-caddy-influx-proxy.md`: requires broker auth to cover `/mqtt` and `/influx` together.
 - `docs/adr/0013`: the writable relay these `set` topics drive.
-- `.scratch/security-audit/issues/52-broker-auth-scheme.md`: the full decision and migration.

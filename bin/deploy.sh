@@ -27,7 +27,6 @@ cd "${REPO_ROOT}"
 
 # The kiosk browser runs as the unprivileged renewvan-kiosk user (created by bin/bootstrap-kiosk-pi.sh).
 # deploy.sh only deploys: it never creates or migrates that user, it refuses to continue without it.
-# .scratch/security-audit/issues/04-kiosk-privilege-split.md
 echo "==> Checking the kiosk user on ${HOST}"
 if ! ssh "${HOST}" "id renewvan-kiosk >/dev/null 2>&1"; then
   echo "ERROR: user renewvan-kiosk does not exist on ${HOST}: run bin/bootstrap-kiosk-pi.sh first." >&2

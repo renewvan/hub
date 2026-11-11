@@ -1,5 +1,5 @@
-"""Static checks on docker-compose.yml for the security hardening decided in
-.scratch/security-audit/issues (03 exposure and credentials, 05 D-Bus and /dev scope).
+"""Static checks on docker-compose.yml for the security hardening: exposure and
+credentials (docs/adr/0024), D-Bus and /dev scope.
 
 CI is the only automatic gate; the Pi-side runtime checks live in bin/check-hardening.sh."""
 

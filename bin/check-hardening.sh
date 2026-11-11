@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run BY HAND on the Pi (ssh in, then bin/check-hardening.sh, or `ssh <pi> 'bash -s' < bin/check-hardening.sh`)
 # after any deploy that touched compose, the bootstrap scripts or plugin permissions. Not called by
-# deploy.sh and not scheduled. Decided in .scratch/security-audit/issues/07-verifying-the-fixes.md.
+# deploy.sh and not scheduled.
 #
 #   kiosk   renewvan-kiosk is not in sudo/docker and cannot sudo; Chromium and the display bridge run
 #           as it; /opt/renewvan/plugins and /opt/renewvan/venvs are root-owned, not group/world-writable.

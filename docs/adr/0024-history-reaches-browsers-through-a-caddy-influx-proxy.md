@@ -34,5 +34,4 @@ Hard to reverse: clients and the dashboard code depend on the `/influx` path and
 
 ## See also
 
-- `.scratch/security-audit/issues/03-influx-grafana-exposure-and-credentials.md`: the full decision, including secret generation and in-place rotation for deployed vans.
 - `docs/adr/0023-entity-icons-are-a-shared-hub-setting.md`: another case of a static web app that cannot hold credentials or a query API of its own.
