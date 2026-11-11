@@ -6,7 +6,7 @@ status: accepted
 
 The **Relay** entity changes from read-only to read-write. A channel publishes a retained `state` and an optional retained `name`, and accepts two unretained commands. The contract is `schema/relay.schema.json`; this ADR records the decisions behind it.
 
-**The broker accepts anonymous clients, so after this change anyone who can reach port 1883 or the 9001 WebSocket listener can switch a load, including a water pump or a heater.** `docker/mosquitto/config/mosquitto.conf` sets `allow_anonymous true`. That was acceptable while every entity was read-only; it is not once a relay is writable. This ADR does not fix it. A separate, hub-wide effort (broker authentication and ACLs) must lock the broker down before a relay controls a pump on any untrusted network. Until then the broker must only be reachable from the van's own network.
+Who may publish a `set` command is decided by the broker's per-client accounts and ACLs, not by this contract: see [ADR 0025](0025-broker-has-per-client-accounts-and-anonymous-read-only.md) and [ADR 0026](0026-anonymous-clients-are-refused-after-the-cutover.md).
 
 ## The contract
 
