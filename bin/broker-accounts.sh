@@ -15,7 +15,7 @@
 RENEWVAN_ETC="${RENEWVAN_ETC:-/etc/renewvan}"
 BROKER_GID="${BROKER_GID:-1883}" # the eclipse-mosquitto image's mosquitto group
 BROKER_CONTAINER="${BROKER_CONTAINER:-renewvan-mosquitto}"
-CADDY_LOGIN_USER="renewvan"
+LOGIN_USER_NAME="renewvan"
 
 # key:kind:target[:unit]. kind = config.ini (the driver reads /etc/renewvan/<key>/config.ini, not the
 # environment), compose (MQTT_USERNAME/PASSWORD from compose; target is the service), or envfile (a host
@@ -320,10 +320,7 @@ restart_client() { # <key>
   esac
 }
 
-# Caddy's shared login (ticket 54): CADDY_BASIC_AUTH_USER plus a bcrypt hash; the plaintext is shown once.
-caddy_hash() { # <password> -> bcrypt hash, via the Caddy image (password in the environment, not argv)
-  local image
-  image="$(compose_image caddy "${CADDY_IMAGE:-}")"
-  CADDY_PW="$1" docker run --rm -e CADDY_PW --network none "${image}" \
-    sh -c 'caddy hash-password --plaintext "$CADDY_PW"'
+# The dashboard login (ADR 0029): LOGIN_USER plus a scrypt hash; the plaintext is shown once.
+login_hash() { # <password> -> scrypt:N:r:p:salt:hash, from the same file the login service verifies with
+  LOGIN_PASSWORD="$1" python3 "$(dirname "${BASH_SOURCE[0]}")/../docker/login/login.py" hash
 }

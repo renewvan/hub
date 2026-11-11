@@ -2,11 +2,11 @@
 # Rotate one broker credential without touching any other client (docs/adr/0025).
 #
 #   bin/rotate-secret.sh <client>     tank gps temperature tilt wattcycle autoterm vedirect logger venus
-#                                     router demo kiosk tailscale hub command, or `caddy` (the dashboard login)
+#                                     router demo kiosk tailscale hub command, or `login` (the dashboard login)
 #
 # Regenerates that client's password in .env, rewrites the password file, updates the client's own
 # credential file (config.ini or env file), SIGHUPs the broker, and restarts the client. Run on the Pi in
-# the hub directory (next to docker-compose.yml and .env). The new Caddy login password is shown once.
+# the hub directory (next to docker-compose.yml and .env). The new dashboard login password (and every signed-in device is signed out) is shown once.
 # A board account (`esp32-<name>`) is refused: its password is compiled into the firmware, so it is rotated only by OTA with a new
 # secrets.yaml (skill renewvan-flash-esp32), and only on suspected compromise.
 # A client that is refused with rc=5 does not retry by itself, hence the restart.
@@ -18,7 +18,7 @@ KEY="${1:-}"
 source "$(dirname "${BASH_SOURCE[0]}")/broker-accounts.sh"
 
 usage() {
-  echo "usage: $0 <client|caddy>   clients: $(client_keys | grep -v '^esp32-' | tr '\n' ' ')" >&2
+  echo "usage: $0 <client|login>   clients: $(client_keys | grep -v '^esp32-' | tr '\n' ' ')" >&2
   exit 2
 }
 [[ -n "${KEY}" ]] || usage
@@ -29,11 +29,11 @@ if [[ "${KEY}" == esp32 || "${KEY}" == esp32-* ]]; then
   exit 2
 fi
 
-if [[ "${KEY}" == "caddy" ]]; then
+if [[ "${KEY}" == "login" ]]; then
   pw="$(gen 12)"
-  set_var CADDY_BASIC_AUTH_HASH "'$(caddy_hash "${pw}")'"
-  docker compose up -d --force-recreate --no-deps caddy # a restart would keep the old hash
-  echo "==> Caddy login rotated (shown once, only its hash is stored): user ${CADDY_LOGIN_USER} password ${pw}"
+  set_var LOGIN_PASSWORD_HASH "$(login_hash "${pw}")"
+  docker compose up -d --force-recreate --no-deps login # a restart would keep the old hash
+  echo "==> Dashboard login rotated (shown once, only its hash is stored): user ${LOGIN_USER_NAME} password ${pw}"
   exit 0
 fi
 

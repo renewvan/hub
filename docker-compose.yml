@@ -419,7 +419,7 @@ services:
       - "127.0.0.1:80:80"
     environment:
       VITE_MQTT_WS_URL: ${VITE_MQTT_WS_URL}
-      # The `command` account: public through /env.js, so the real gate is Caddy's basic_auth on /mqtt
+      # The `command` account: public through /env.js, so the real gate is the login gate on /mqtt
       # (ADR 0025). It may only write the `set` topics.
       VITE_MQTT_USERNAME: ${MQTT_COMMAND_PASSWORD:+command}
       VITE_MQTT_PASSWORD: ${MQTT_COMMAND_PASSWORD:-}
@@ -435,6 +435,25 @@ services:
       # directory at the source.
       - ${DASHBOARD_BASEMAP_PATH:-./config/dashboard/basemap.pmtiles}:/usr/share/nginx/html/maps/basemap.pmtiles:ro
 
+  # The login in front of the whole site (ADR 0029): Caddy asks it `GET /auth` before serving anything
+  # private, and the dashboard's login page POSTs to it. No published port: only Caddy reaches it. One
+  # stdlib file in a pinned python image, mounted read-only. Password hash only; the password is shown
+  # once by bin/ensure-secrets.sh. The kiosk uses 127.0.0.1:80, not this site.
+  login:
+    image: python:3.13.9-alpine@sha256:e5fa639e49b85986c4481e28faa2564b45aa8021413f31026c3856e5911618b1
+    container_name: renewvan-login
+    restart: unless-stopped
+    command: ["python", "-I", "/app/login.py"]
+    environment:
+      LOGIN_USER: ${LOGIN_USER:?run bin/deploy.sh, which generates the dashboard login}
+      LOGIN_PASSWORD_HASH: ${LOGIN_PASSWORD_HASH:?run bin/deploy.sh, which generates the dashboard login}
+      LOGIN_SESSION_SECRET: ${LOGIN_SESSION_SECRET:?run bin/deploy.sh, which generates the dashboard login}
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    volumes:
+      - ./docker/login/login.py:/app/login.py:ro
+
   # TLS terminator for the kiosk dashboard, LAN-only, with a self-signed local CA (Caddy
   # `tls internal`). Clients must trust the root once to install the PWA over https; see
   # dashboard/docker/Caddyfile. Set DASHBOARD_HOST to the Pi's LAN IP or name.
@@ -445,6 +464,7 @@ services:
     depends_on:
       - dashboard
       - influxdb
+      - login
     # Loopback only here. The Pi adds its van-LAN and Tailscale addresses through
     # docker-compose.lan.yml. Never 443:443 (every interface): /mqtt behind it can switch relays, and an
     # uplink interface must not reach it (docs/adr/0025-broker-has-per-client-accounts-and-anonymous-read-only.md).
@@ -460,10 +480,6 @@ services:
       # Read-only, bucket-scoped. Injected by the Caddyfile's /influx proxy, never sent to browsers
       # (docs/adr/0024-history-reaches-browsers-through-a-caddy-influx-proxy.md).
       INFLUXDB_DASHBOARD_TOKEN: ${INFLUXDB_DASHBOARD_TOKEN:?run bin/deploy.sh, which generates the InfluxDB secrets}
-      # The shared login in front of the whole site, /mqtt and /influx included (ADR 0025). bcrypt hash only;
-      # the password is shown once by bin/ensure-secrets.sh. The kiosk uses 127.0.0.1:80, not this site.
-      CADDY_BASIC_AUTH_USER: ${CADDY_BASIC_AUTH_USER:?run bin/deploy.sh, which generates the Caddy login}
-      CADDY_BASIC_AUTH_HASH: ${CADDY_BASIC_AUTH_HASH:?run bin/deploy.sh, which generates the Caddy login}
     volumes:
       - ../dashboard/docker/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data

@@ -4,6 +4,8 @@ status: accepted
 
 # The broker has one account per client, anonymous read-only access, and the real browser gate sits in Caddy
 
+_(The Caddy `basic_auth` gate is superseded by [ADR 0029](0029-dashboard-login-is-a-session-cookie.md): same gate, now a session cookie.)_
+
 _(Superseded in part by [ADR 0026](0026-anonymous-clients-are-refused-after-the-cutover.md): after the cutover `allow_anonymous` is false and a read-only `reader` account replaces anonymous reads. The rest, per-client accounts and the Caddy gate, stands.)_
 
 Mosquitto keeps `allow_anonymous true` on both listeners, but an ACL limits anonymous clients to `topic read renewvan/#`. Every client that writes has its own account in a password file: each driver (tank, gps, temperature, tilt, wattcycle, logger, venus, router, demo), each host plugin (kiosk, tailscale), the ESP32 relay node, and one `command` account for the dashboard. Username equals the client's topic key, so drivers share one `pattern write renewvan/%u/#` line. Only `command` may write the `set` topics (`relay/+/set`, `relay/+/name/set`, `kiosk/display/*/set`, heater `set` topics, `demo/enabled/set`). Everyone reads `renewvan/#`.

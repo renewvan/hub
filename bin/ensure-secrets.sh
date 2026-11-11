@@ -12,7 +12,7 @@
 #     live admin token/password through the influx and grafana CLIs. It never wipes a volume.
 #   - Broker accounts (docs/adr/0025): one MQTT_<CLIENT>_PASSWORD per client, the Mosquitto password
 #     file and ACL in /etc/renewvan/mosquitto/, each driver's/plugin's own credential file, and the
-#     Caddy login (CADDY_BASIC_AUTH_USER/HASH; its password is shown once, never stored). Clients
+#     dashboard login (LOGIN_USER/LOGIN_PASSWORD_HASH/LOGIN_SESSION_SECRET; its password is shown once, never stored). Clients
 #     whose credential file changed are listed in <env file>.changed-clients for deploy to restart.
 #     BROKER_ACL_OPEN=1 keeps the temporary `topic readwrite renewvan/#` line (anonymous only) and allow_anonymous true.
 #   - Prints the names of the variables it changed, never their values (the one-time Caddy password
@@ -169,13 +169,16 @@ for key in $(client_keys); do
   fi
 done
 
-caddy_password=""
-if is_example_value "$(get CADDY_BASIC_AUTH_HASH)"; then
-  caddy_password="$(gen 12)"
-  # Single-quoted: compose would otherwise expand the $ signs of the bcrypt hash.
-  set_var CADDY_BASIC_AUTH_HASH "'$(caddy_hash "${caddy_password}")'"
-  set_var CADDY_BASIC_AUTH_USER "${CADDY_LOGIN_USER}"
-  note CADDY_BASIC_AUTH_HASH
+login_password=""
+if is_example_value "$(get LOGIN_PASSWORD_HASH)"; then
+  login_password="$(gen 12)"
+  set_var LOGIN_PASSWORD_HASH "$(login_hash "${login_password}")"
+  set_var LOGIN_USER "${LOGIN_USER_NAME}"
+  note LOGIN_PASSWORD_HASH
+fi
+if is_example_value "$(get LOGIN_SESSION_SECRET)"; then
+  set_var LOGIN_SESSION_SECRET "$(gen 32)"
+  note LOGIN_SESSION_SECRET
 fi
 
 mosq_dir="${RENEWVAN_ETC}/mosquitto"
@@ -238,7 +241,7 @@ done
 broker_vars=()
 for key in $(client_keys); do broker_vars+=("$(client_var "${key}")"); done
 for name in INFLUXDB_ADMIN_PASSWORD INFLUXDB_ADMIN_TOKEN INFLUXDB_LOGGER_TOKEN \
-  INFLUXDB_GRAFANA_TOKEN INFLUXDB_DASHBOARD_TOKEN GF_SECURITY_ADMIN_PASSWORD CADDY_BASIC_AUTH_HASH \
+  INFLUXDB_GRAFANA_TOKEN INFLUXDB_DASHBOARD_TOKEN GF_SECURITY_ADMIN_PASSWORD LOGIN_PASSWORD_HASH LOGIN_SESSION_SECRET \
   "${broker_vars[@]}"; do
   if is_example_value "$(get "${name}")"; then
     echo "ERROR: ${name} in ${ENV_FILE} is empty or an example value after the secrets step" >&2
@@ -252,6 +255,6 @@ else
   echo "==> Secrets already set; nothing to change"
 fi
 
-if [[ -n "${caddy_password}" ]]; then
-  echo "==> Caddy login for the dashboard (shown once, only its hash is stored): user ${CADDY_LOGIN_USER} password ${caddy_password}"
+if [[ -n "${login_password}" ]]; then
+  echo "==> Login for the dashboard (shown once, only its hash is stored): user ${LOGIN_USER_NAME} password ${login_password}"
 fi
