@@ -13,7 +13,10 @@
 #                   manifests/<variant>.json, all stamped with the same tag.
 #
 # Stable releases are cut from `main`; a pre-release from whichever branch it is dispatched on
-# (tests gate it, `main` and `:latest` stay untouched).
+# (tests gate it, `main` and `:latest` stay untouched). Neither pushes a commit to a branch: the
+# stamped release commit is reachable only from its tag, so `main` can be branch-protected. A
+# stamped file on `main` (dashboard's package.json) therefore keeps its old version; the next
+# version comes from the latest tag, never from that file.
 name: Release (reusable)
 
 on:
@@ -43,7 +46,7 @@ on:
         type: boolean
         default: false
       stamp-package-json:
-        description: Write the version into package.json in the release commit (JS repos)
+        description: Write the version into package.json in the commit the tag points at (JS repos)
         type: boolean
         default: false
       test-command:
@@ -116,8 +119,8 @@ jobs:
           echo "tag=v$version" >> "$GITHUB_OUTPUT"
 
       # The version is stamped into the commit the tag points at (when the repo keeps one), so
-      # what is built from the tag and the repository agree. A pre-release is a throwaway commit
-      # that only the tag sees: it is never pushed to a branch.
+      # what is built from the tag is what the tag says. The commit is a throwaway that only the tag
+      # sees, stable or pre-release: it is never pushed to a branch.
       - name: Stamp package.json
         if: ${{ inputs.stamp-package-json }}
         env:
@@ -130,11 +133,10 @@ jobs:
             fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
           " "$VERSION"
 
-      - name: Commit, tag and push
+      - name: Commit and tag
         id: commit
         env:
           TAG: ${{ steps.version.outputs.tag }}
-          PRERELEASE: ${{ inputs.prerelease }}
         run: |
           git config user.name "renewvan"
           git config user.email "github@renewvan.com"
@@ -144,13 +146,7 @@ jobs:
             git commit -m "chore: release $TAG"
           fi
           sha="$(git rev-parse HEAD)"
-          if [ "$PRERELEASE" = "true" ]; then
-            git push origin "$sha:refs/tags/$TAG"
-          else
-            git push origin HEAD:main
-            git tag "$TAG" "$sha"
-            git push origin "$TAG"
-          fi
+          git push origin "$sha:refs/tags/$TAG"
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
 
       - name: Create the GitHub release
