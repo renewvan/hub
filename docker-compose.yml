@@ -364,7 +364,7 @@ services:
   # `docker compose up -d` use `docker compose --profile wattcycle up -d`.
   driver-wattcycle:
     profiles: ["wattcycle"]
-    image: ghcr.io/renewvan/driver-wattcycle:v0.4.0
+    image: ghcr.io/renewvan/driver-wattcycle:v0.4.1
     container_name: renewvan-wattcycle
     restart: unless-stopped
     depends_on:
@@ -407,7 +407,7 @@ services:
   # own Dockerfile), connecting client-side over MQTT-over-WebSocket —
   # not a polling backend.
   dashboard:
-    image: ghcr.io/renewvan/dashboard:v0.35.1
+    image: ghcr.io/renewvan/dashboard:v0.36.0
     container_name: renewvan-dashboard
     restart: unless-stopped
     # Loopback only: the kiosk browser (renewvan-kiosk-browser.sh, KIOSK_URL=http://localhost) reads
