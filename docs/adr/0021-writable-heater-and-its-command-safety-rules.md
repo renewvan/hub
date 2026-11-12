@@ -13,7 +13,7 @@ Who may publish a command is decided by the broker's per-client accounts and ACL
 - **Topics.** `renewvan/heater/<id>/<field>`, retained for fields. The Driver key is `heater`; the manifest declares `publishes: [heater]`.
 - **Unknown is absent.** A value the heater cannot supply is an empty retained payload (ADR 0008 "no value"), never `null`, never `0`.
 - **Commands** (unretained, strict JSON, documented in the schema description, no separate schema files, per ADR 0013): `set` (`true`/`false`, never a toggle), `mode/set`, `setpoint_c/set` (1-30), `power_level/set` (0-9), `ventilating/set` (`true`/`false`), `clear_error/set` (`true` only).
-- **Per phase.** `set` true starts only from `off` with `error_code` 0, using the settings the heater reported. `ventilating/set` true starts fan-only (using the read `power_level`) only from `off`. Settings writes are refused during `shutting_down` and while ventilating. `stop` is always accepted, whatever the phase or run time. `ventilating/set` and `clear_error/set` are refused by the Driver (WARNING) until verified on hardware, and the `0x0D` unblock is never exposed.
+- **Per phase.** `set` true starts only from `off` with `error_code` 0, using the settings the heater reported. `ventilating/set` true starts fan-only (using the read `power_level`) only from `off`. Settings writes are refused during `shutting_down` and while ventilating. `stop` is always accepted, whatever the phase or run time. `clear_error/set` is refused by the Driver (WARNING) until verified on hardware, `ventilating/set` is accepted from driver v0.4.0 but its frame is not yet bench-verified, and the `0x0D` unblock is never exposed.
 
 ## Command-safety rules
 
@@ -51,7 +51,7 @@ Verified and no longer listed here: the `0x0F` status poll, the `0x02` settings 
 - the `0x0D` unblock (never exposed);
 - live settings changes (`mode`, `setpoint_c`, `power_level`), the `setpoint_c` bounds, and their confirmation by the next `0x02` read;
 - the `clear_error` frame (refused);
-- status codes `3.35` and `3.4`, and so `ventilating/set` (refused);
+- status codes `3.35` and `3.4`, and the `0x23` ventilate frame behind `ventilating/set` (accepted from v0.4.0; the first real send needs a human-present bench check);
 - stop during `1.x`/`2.x` (early stop).
 
 ## Rejected alternatives
