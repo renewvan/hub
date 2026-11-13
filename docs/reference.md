@@ -130,7 +130,7 @@ Flip the switch:
 
 To turn commands off, set `commands_enabled = false` and restart. Removing the container never starts or stops the heater: its own manual off is the authority.
 
-The Driver accepts `ventilating/set` (fan-only start from off, `false` stops) but its `0x23` frame and the `3.35` status are not yet bench-verified. It refuses `clear_error/set` until verified, and never exposes `0x0D`.
+The Driver accepts `thermostat/set` (`true`/`false`, bench-verified 2026-11-13: with it on, the heater stops the burner above the setpoint, phase `standby`, and re-ignites by itself). It accepts `ventilating/set` (fan-only start from off, `false` stops) but its `0x23` frame and the `3.35` status are not yet bench-verified. It refuses `clear_error/set` until verified, and never exposes `0x0D`.
 
 The Heater page must ask for confirmation before a start, make stop a single tap, and show a pending state that times out honestly rather than assuming the command worked.
 
