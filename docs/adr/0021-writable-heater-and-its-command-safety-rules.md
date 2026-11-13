@@ -22,7 +22,7 @@ Who may publish a command is decided by the broker's per-client accounts and ACL
 - **`commands_enabled`.** Published as a retained boolean and `false` by default. Installing the Driver never gives the LAN a way to start a heater. Its config-file value is only the starting point: `renewvan/heater/<id>/commands_enabled/set` (strict JSON `true` or `false`) flips it for the running Driver, and is the one command accepted while commands are off, because it is what turns them on. The change is not persisted, so a Driver restart returns to the config file. Turning commands off never stops a running heater. This gives anyone who can reach the anonymous broker the same reach as the start command it unlocks, so it adds no exposure beyond the one named above; the dashboard asks for a confirmation first.
 - **The Driver never acts by itself.** It never stops, starts or re-commands the heater on its own. After a reconnect it resyncs from telemetry and does not re-send anything. If the Pi dies the heater keeps its own cycle.
 - **Settings are read, never assumed** (driver-autoterm v0.5.0). The Driver re-reads the `0x02` settings every 5 polls, so a change made on the heater's own panel is published within seconds. Start, ventilate and every settings write read them fresh first (a failed read rejects the command) and send back the whole payload with only the commanded field changed: bytes the Driver does not understand (`use_work_time`, `work_time`, `wait_mode`) keep what was picked on the panel, so a command from the hub never undoes a panel mode such as Thermostat.
-- **Retries.** `stop` is retried at most 3 attempts, spaced 3 polls apart, then one ERROR is logged and nothing more is sent until a new stop arrives. A settings write (`mode`, `setpoint_c`, `power_level`) is confirmed by the next `0x02` settings read; a mismatch is "unconfirmed": one WARNING naming the command and phase, nothing published. Every other command is sent once, with one retry after three polls and the same WARNING on failure. The exception is ventilate: if the heater answers `0x23` with any start other than `3.35`, one ERROR is logged and the frame is not sent again (the Driver still does not stop the heater). A single start or stop frame is sufficient (2026-11-02 capture); there is no blind double-send, and upstream's double send stays rejected.
+- **Retries.** `stop` is retried at most 3 attempts, spaced 3 polls apart, then one ERROR is logged and nothing more is sent until a new stop arrives. A settings write (`mode`, `setpoint_c`, `power_level`) is confirmed by the next `0x02` settings read; a mismatch is "unconfirmed": one WARNING naming the command and phase, nothing published. Every other command is sent once, with one retry after three polls and the same WARNING on failure. The exception is ventilate: if the heater answers `0x23` with any start other than `3.35`, one ERROR is logged and the frame is not sent again (the Driver still does not stop the heater). A single start or stop frame is sufficient (2026-11-02 capture); there is no blind double-send.
 - **Hardware safety stays in hardware.** Thermal cutoffs and a manual off are in the heater and never in software.
 
 ## Phase mapping (Low-Medium confidence)
@@ -39,7 +39,7 @@ The Driver maps the status code through a table. The state names are ours, not t
 | `3.4`, `3.5`                                    | `standby` (Thermostat pause, burner off)           |
 | `4.0`                                           | `shutting_down`                                    |
 
-`1.0` means "start accepted", not upstream's "cooling flame sensor". There is no `fault` phase: `error_code` is independent of `phase`.
+`1.0` means "start accepted" (seen right after a start on 2026-11-02). There is no `fault` phase: `error_code` is independent of `phase`.
 
 **An unknown code is not `off`.** The Driver publishes an empty retained `phase` and the raw `status_code`, logs one WARNING per new code, and accepts only `stop` until the code is mapped. The schema therefore makes `phase` optional, absent only while the code is unmapped.
 
@@ -47,7 +47,7 @@ The Driver maps the status code through a table. The state names are ours, not t
 
 ## Unverified on an AIR 2D
 
-Verified and no longer listed here: the `0x0F` status poll, the `0x02` settings read, live `mode`/`setpoint_c`/`power_level` writes and Thermostat (`thermostat/set`, the `wait_mode` byte; driver-autoterm, 2026-11-13), and that the init sequence is not needed (`send_init` defaults off). Every item below is a research default, not a fact, and is to be revisited after a human-present bench check:
+Verified and no longer listed here: the `0x0F` status poll, the `0x02` settings read, live `mode`/`setpoint_c`/`power_level` writes and Thermostat (`thermostat/set`, the `wait_mode` byte; driver-autoterm, 2026-11-13), and that the init sequence is not needed (`send_init` defaults off). Every item below is an unverified default, not a fact, and is to be revisited after a human-present bench check:
 
 - the `0x0D` unblock (never exposed);
 - the `setpoint_c` bounds, and stop from `standby`;
