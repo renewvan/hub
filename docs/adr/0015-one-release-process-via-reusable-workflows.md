@@ -4,7 +4,7 @@ status: accepted
 
 # One release process for every renewvan repo, as reusable workflows in hub
 
-Every repo that ships something is released the same way: from the Actions tab (or `gh workflow run release.yml -f bump=minor`), one `workflow_dispatch` run computes the next version from the latest stable tag, stamps it where the repo keeps one, tags that commit, creates the GitHub release with generated notes, then builds what the repo ships. The workflow logic lives once, in this repo's `.github/workflows/`, and each repo carries a short caller that passes what differs.
+Every repo that ships something is released the same way: from the Actions tab (or `bin/release.sh <repo> minor`, which resolves the version first so the run is titled "Release v0.37.0" rather than "Release minor bump"; `gh workflow run release.yml -f bump=minor` still works), one `workflow_dispatch` run computes the next version from the latest stable tag, stamps it where the repo keeps one, tags that commit, creates the GitHub release with generated notes, then builds what the repo ships. The workflow logic lives once, in this repo's `.github/workflows/`, and each repo carries a short caller that passes what differs.
 
 | Reusable (in hub) | Does                                                                                            | Called by                                        |
 | ----------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------ |
