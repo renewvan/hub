@@ -173,7 +173,7 @@ services:
   # adapter, use `docker compose --profile autoterm up -d`.
   driver-autoterm:
     profiles: ["autoterm"]
-    image: ghcr.io/renewvan/driver-autoterm:v0.5.0
+    image: ghcr.io/renewvan/driver-autoterm:v0.6.0
     container_name: renewvan-autoterm
     restart: unless-stopped
     depends_on:
@@ -295,7 +295,7 @@ services:
   # `docker compose --profile vedirect up -d`.
   driver-vedirect:
     profiles: ["vedirect"]
-    image: ghcr.io/renewvan/driver-vedirect:v0.1.0
+    image: ghcr.io/renewvan/driver-vedirect:v0.1.1
     container_name: renewvan-vedirect
     restart: unless-stopped
     depends_on:
@@ -416,7 +416,7 @@ services:
   # own Dockerfile), connecting client-side over MQTT-over-WebSocket —
   # not a polling backend.
   dashboard:
-    image: ghcr.io/renewvan/dashboard:v0.37.3
+    image: ghcr.io/renewvan/dashboard:v0.37.5
     container_name: renewvan-dashboard
     restart: unless-stopped
     # Loopback only: the kiosk browser (renewvan-kiosk-browser.sh, KIOSK_URL=http://localhost) reads
