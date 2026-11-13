@@ -313,7 +313,13 @@ restart_client() { # <key>
   IFS=: read -r _ kind target unit <<<"${spec}"
   case "${kind}" in
     config.ini) docker compose restart "${target}" ;;
-    compose) docker compose up -d --force-recreate --no-deps "${target}" ;; # a restart keeps the old environment
+    compose)
+      # A service shipped commented out (driver-venus) has no process to restart.
+      if ! grep -Eq "^  ${target}:" docker-compose.yml; then
+        echo "${target} is not enabled in docker-compose.yml: nothing to restart" >&2
+        return 0
+      fi
+      docker compose up -d --force-recreate --no-deps "${target}" ;; # a restart keeps the old environment
     envfile) sudo -n systemctl restart "${unit}" ;;
     esp32) echo "${key} is rotated by OTA only (skill renewvan-flash-esp32)" >&2 ;;
     reader) echo "reader has no process to restart: tell whoever uses it the new password" >&2 ;;

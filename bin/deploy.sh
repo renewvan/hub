@@ -280,6 +280,11 @@ fi
 if grep -Eq '^VENUS_MQTT_HOST=.+' .env; then
   export COMPOSE_PROFILES="\${COMPOSE_PROFILES:+\${COMPOSE_PROFILES},}venus"
   echo "==> VENUS_MQTT_HOST set: enabling the venus profile"
+  # The driver-venus service ships commented out in docker-compose.yml; the profile alone starts nothing.
+  if ! grep -Eq '^  driver-venus:' docker-compose.yml; then
+    echo "WARNING: VENUS_MQTT_HOST is set but driver-venus is commented out in docker-compose.yml:"
+    echo "         uncomment its block there and re-run bin/deploy.sh to start it."
+  fi
 else
   echo "==> No VENUS_MQTT_HOST in .env: skipping driver-venus (set it and re-run deploy on a van with Venus OS)"
   docker compose rm -sf driver-venus >/dev/null 2>&1 || true
