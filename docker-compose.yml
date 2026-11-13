@@ -322,6 +322,15 @@ services:
       - /dev:/dev:ro
       - ${VEDIRECT_CONFIG_PATH:-./config/vedirect/config.ini}:/app/config.ini:ro
 
+  # ---- driver-venus: COMMENTED OUT (kept for vans that run Venus OS) ----
+  # The default stack reads Victron devices directly over VE.Direct (driver-vedirect
+  # above), so driver-venus is not part of it. To use it on a van with a Venus OS
+  # device (Cerbo GX, a Pi running Venus OS): uncomment
+  # the block below (every line from `driver-venus:` to `VENUS_PORTAL_ID`), set
+  # VENUS_MQTT_HOST and VENUS_PORTAL_ID in .env (or bin/install.sh --venus-host),
+  # and re-run bin/deploy.sh. Do not run it beside driver-vedirect on the same
+  # devices: both publish the same battery/solar/charger entities.
+  #
   # Venus OS MQTT -> renewvan bus remap (battery, solar, charger). Only for
   # vans that already run Venus OS (Cerbo GX, Pi with Venus): subscribes
   # against that device's own broker (VENUS_*), publishes onto this
@@ -334,21 +343,21 @@ services:
   # enables the profile only when VENUS_MQTT_HOST is set in .env. For a manual
   # `docker compose up -d` on a van with Venus OS, use
   # `docker compose --profile venus up -d`.
-  driver-venus:
-    profiles: ["venus"]
-    image: ghcr.io/renewvan/driver-venus:v0.7.0
-    container_name: renewvan-venus
-    restart: unless-stopped
-    depends_on:
-      - mosquitto
-    environment:
-      MQTT_HOST: ${RENEWVAN_HOST:-mosquitto}
-      MQTT_PORT: ${RENEWVAN_PORT:-1883}
-      MQTT_USERNAME: ${MQTT_VENUS_PASSWORD:+venus}
-      MQTT_PASSWORD: ${MQTT_VENUS_PASSWORD:-}
-      VENUS_MQTT_HOST: ${VENUS_MQTT_HOST}
-      VENUS_MQTT_PORT: ${VENUS_MQTT_PORT:-1883}
-      VENUS_PORTAL_ID: ${VENUS_PORTAL_ID}
+  # driver-venus:
+  #   profiles: ["venus"]
+  #   image: ghcr.io/renewvan/driver-venus:v0.8.0
+  #   container_name: renewvan-venus
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - mosquitto
+  #   environment:
+  #     MQTT_HOST: ${RENEWVAN_HOST:-mosquitto}
+  #     MQTT_PORT: ${RENEWVAN_PORT:-1883}
+  #     MQTT_USERNAME: ${MQTT_VENUS_PASSWORD:+venus}
+  #     MQTT_PASSWORD: ${MQTT_VENUS_PASSWORD:-}
+  #     VENUS_MQTT_HOST: ${VENUS_MQTT_HOST}
+  #     VENUS_MQTT_PORT: ${VENUS_MQTT_PORT:-1883}
+  #     VENUS_PORTAL_ID: ${VENUS_PORTAL_ID}
 
   # Native MQTT battery driver: a WattCycle 314Ah (DH04 BMS) read directly
   # over BLE from the hub -- see driver-wattcycle's own README's "Topics

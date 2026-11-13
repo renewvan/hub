@@ -133,9 +133,21 @@ class BrokerAccountsTest(unittest.TestCase):
         "driver-temperature": "temperature",
         "driver-tilt": "tilt",
         "driver-vedirect": "vedirect",
-        "driver-venus": "venus",
         "logger": "logger",
     }
+
+    def test_commented_out_driver_venus_keeps_its_own_account(self):
+        # driver-venus ships commented out in docker-compose.yml (kept for vans with Venus OS), so
+        # it is not in COMPOSE_CLIENTS; uncommented, it must still use its own account, and the
+        # account stays provisioned so enabling it needs no secrets work.
+        text = (ROOT / "docker-compose.yml").read_text()
+        self.assertNotIn("driver-venus", SERVICES)
+        self.assertIn("  # driver-venus:", text)
+        self.assertIn("#     MQTT_USERNAME: ${MQTT_VENUS_PASSWORD:+venus}", text)
+        self.assertIn("#     MQTT_PASSWORD: ${MQTT_VENUS_PASSWORD:-}", text)
+        accounts = (ROOT / "bin" / "broker-accounts.sh").read_text()
+        self.assertIn('"venus:compose:driver-venus"', accounts)
+        self.assertRegex(ENV_EXAMPLE, r"(?m)^MQTT_VENUS_PASSWORD=$")
 
     def test_no_shared_broker_credential_remains(self):
         text = (ROOT / "docker-compose.yml").read_text()
