@@ -407,7 +407,7 @@ services:
   # own Dockerfile), connecting client-side over MQTT-over-WebSocket —
   # not a polling backend.
   dashboard:
-    image: ghcr.io/renewvan/dashboard:v0.37.0
+    image: ghcr.io/renewvan/dashboard:v0.37.2
     container_name: renewvan-dashboard
     restart: unless-stopped
     # Loopback only: the kiosk browser (renewvan-kiosk-browser.sh, KIOSK_URL=http://localhost) reads
