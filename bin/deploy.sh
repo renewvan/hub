@@ -414,6 +414,13 @@ docker compose restart caddy
 # grafana reads its datasource provisioning only at startup, and a changed bind-mounted file does not
 # make \`up -d\` recreate it. Restart so an edited datasource loads (dashboard JSON reloads on its own).
 docker compose restart grafana
+# login bind-mounts login.py as a single file too, so a deploy that changes it leaves the running
+# container on the old code. Restart it only when the running copy differs from the synced one (or
+# cannot be read): sessions are signed cookies, not server state, so a restart signs nobody out.
+if [[ "\$(docker compose exec -T login md5sum /app/login.py 2>/dev/null | cut -d' ' -f1)" != "\$(md5sum docker/login/login.py | cut -d' ' -f1)" ]]; then
+  echo "==> login.py changed: restarting login"
+  docker compose restart login
+fi
 REMOTE
 
 echo "==> Reloading kiosk browser"

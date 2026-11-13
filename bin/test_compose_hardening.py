@@ -231,6 +231,16 @@ class BrokerAccountsTest(unittest.TestCase):
         self.assertIn(".env.changed-clients", deploy)
         self.assertIn("restart_client", deploy)
 
+    def test_deploy_restarts_login_when_its_mounted_file_changed(self):
+        # login.py is a single-file bind mount: up -d never reloads it, so deploy compares the
+        # running copy with the synced one and restarts login when they differ.
+        deploy = (ROOT / "bin" / "deploy.sh").read_text()
+        self.assertIn("docker compose exec -T login md5sum /app/login.py", deploy)
+        self.assertIn("md5sum docker/login/login.py", deploy)
+        self.assertIn("docker compose restart login", deploy)
+        mount = "./docker/login/login.py:/app/login.py:ro"
+        self.assertIn(mount, SERVICES["login"]["volumes"])
+
 
 class DriverHardeningTest(unittest.TestCase):
     def check_common(self, name):
