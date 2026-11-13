@@ -61,6 +61,17 @@ class LoginTest(unittest.TestCase):
         res, _ = self.call("GET", "/auth", headers={"Cookie": self.cookie()})
         self.assertEqual(res.status, 204)
 
+    def test_auth_ignores_the_forwarded_query_string(self):
+        # Caddy's forward_auth keeps the original query, so a chart's
+        # POST /influx/api/v2/query?org=... arrives as GET /auth?org=...:
+        # it must get the session check, not a 404 that blocks it.
+        res, _ = self.call("GET", "/auth?org=renewvan", headers={"Cookie": self.cookie()})
+        self.assertEqual(res.status, 204)
+        res, _ = self.call("GET", "/auth?org=renewvan", headers={"Accept": "*/*"})
+        self.assertEqual(res.status, 401)
+        res, _ = self.call("GET", "/session?x=1", headers={"Cookie": self.cookie()})
+        self.assertEqual(res.status, 204)
+
     def test_no_cookie_is_401_for_scripts_and_websockets(self):
         res, _ = self.call("GET", "/auth", headers={"Accept": "*/*"})
         self.assertEqual(res.status, 401)

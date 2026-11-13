@@ -18,6 +18,7 @@ import sys
 import time
 from collections import defaultdict, deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlsplit
 
 COOKIE = "renewvan_session"
 SESSION_SECONDS = 30 * 24 * 3600
@@ -132,10 +133,17 @@ def make_handler(auth: Auth):
             self.end_headers()
             self.wfile.write(payload)
 
+        def route(self):
+            # Caddy's forward_auth keeps the original request's query string on /auth
+            # (/influx/api/v2/query?org=renewvan arrives as /auth?org=renewvan):
+            # route on the path alone.
+            return urlsplit(self.path).path
+
         def do_GET(self):
-            if self.path == "/session":  # the page asks "am I signed in?"; never redirects
+            path = self.route()
+            if path == "/session":  # the page asks "am I signed in?"; never redirects
                 return self.send(204 if auth.valid(self.session()) else 401)
-            if self.path != "/auth":
+            if path != "/auth":
                 return self.send(404)
             if auth.valid(self.session()):
                 return self.send(204)
@@ -153,9 +161,10 @@ def make_handler(auth: Auth):
             return self.send(401)
 
         def do_POST(self):
-            if self.path == "/logout":
+            path = self.route()
+            if path == "/logout":
                 return self.send(204, headers={"Set-Cookie": cookie_header("", 0)})
-            if self.path != "/login":
+            if path != "/login":
                 return self.send(404)
             ip = self.client_ip()
             if auth.locked(ip):
