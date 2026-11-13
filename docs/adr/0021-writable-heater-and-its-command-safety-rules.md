@@ -53,7 +53,8 @@ Verified and no longer listed here: the `0x0F` status poll, the `0x02` settings 
 - the `setpoint_c` bounds, and stop from `standby`;
 - the `clear_error` frame (refused);
 - status code `3.35`, and the `0x23` ventilate frame behind `ventilating/set` (accepted from v0.4.0; the first real send needs a human-present bench check);
-- stop during `1.x`/`2.x` (early stop).
+- stop during `1.x`/`2.x` (early stop);
+- which panel mode `thermostat` (`wait_mode` 1) is. The Comfort Control manual (§3.3) says Thermostat stops combustion _and_ the fan at the target, while Heat + ventilation stops combustion and keeps ventilating until 5 °C below it. The 2026-11-13 run showed the fan at about 2400 rpm in `3.5`, which matches Heat + ventilation unless the fan byte is wrong. Until a check at the heater (in `3.5`, is air still blowing? then `wait_mode` 3), "Thermostat" in this ADR means "burner pauses at the target", not the panel's mode of that name.
 
 ## Rejected alternatives
 
