@@ -1,0 +1,9 @@
+{
+  "voltage_v": 12.94,
+  "current_a": 0,
+  "power_w": 0,
+  "input_voltage_v": 12.31,
+  "input_voltage_alarm": "low",
+  "source": "alternator",
+  "charge_state": "off"
+}
