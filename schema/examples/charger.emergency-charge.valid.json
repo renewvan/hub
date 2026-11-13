@@ -1,0 +1,8 @@
+{
+  "voltage_v": 12.93,
+  "current_a": -18.4,
+  "power_w": -238,
+  "input_voltage_v": 14.41,
+  "source": "alternator",
+  "charge_state": "emergency_charge"
+}
