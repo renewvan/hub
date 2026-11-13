@@ -12,8 +12,8 @@ Who may publish a command is decided by the broker's per-client accounts and ACL
 
 - **Topics.** `renewvan/heater/<id>/<field>`, retained for fields. The Driver key is `heater`; the manifest declares `publishes: [heater]`.
 - **Unknown is absent.** A value the heater cannot supply is an empty retained payload (ADR 0008 "no value"), never `null`, never `0`.
-- **Commands** (unretained, strict JSON, documented in the schema description, no separate schema files, per ADR 0013): `set` (`true`/`false`, never a toggle), `mode/set`, `setpoint_c/set` (1-30), `power_level/set` (0-9), `ventilating/set` (`true`/`false`), `clear_error/set` (`true` only).
-- **Per phase.** `set` true starts only from `off` with `error_code` 0, using the settings the heater reported. `ventilating/set` true starts fan-only (using the read `power_level`) only from `off`; it is confirmed only by status `3.35`. Settings writes are refused during `shutting_down` and while ventilating. `stop` is always accepted, whatever the phase or run time. `clear_error/set` is refused by the Driver (WARNING) until verified on hardware, `ventilating/set` is accepted from driver v0.4.0 but its frame is not yet bench-verified, and the `0x0D` unblock is never exposed.
+- **Commands** (unretained, strict JSON, documented in the schema description, no separate schema files, per ADR 0013): `set` (`true`/`false`, never a toggle), `mode/set`, `setpoint_c/set` (1-30), `power_level/set` (0-9), `thermostat/set` (`true`/`false`), `ventilating/set` (`true`/`false`), `clear_error/set` (`true` only).
+- **Per phase.** `set` true starts only from `off` with `error_code` 0, using the settings the heater reported. `ventilating/set` true starts fan-only (using the read `power_level`) only from `off`; it is confirmed only by status `3.35`. Settings writes are refused during `shutting_down` and while ventilating, and accepted in `standby`. `stop` is always accepted, whatever the phase or run time. `clear_error/set` is refused by the Driver (WARNING) until verified on hardware, `ventilating/set` is accepted from driver v0.4.0 but its frame is not yet bench-verified, and the `0x0D` unblock is never exposed.
 
 ## Command-safety rules
 
@@ -36,23 +36,23 @@ The Driver maps the status code through a table. The state names are ours, not t
 | `2.4`                                           | `warming_up`                                       |
 | `3.0`                                           | `running`                                          |
 | `3.35`                                          | `running`, `ventilating` true (unverified default) |
-| `3.4`                                           | `shutting_down` (unverified default)               |
+| `3.4`, `3.5`                                    | `standby` (Thermostat pause, burner off)           |
 | `4.0`                                           | `shutting_down`                                    |
 
 `1.0` means "start accepted", not upstream's "cooling flame sensor". There is no `fault` phase: `error_code` is independent of `phase`.
 
 **An unknown code is not `off`.** The Driver publishes an empty retained `phase` and the raw `status_code`, logs one WARNING per new code, and accepts only `stop` until the code is mapped. The schema therefore makes `phase` optional, absent only while the code is unmapped.
 
-**Verified on real hardware (2026-11-02, one start-run-stop cycle, error 0 throughout):** `0.1`, `1.0`, `1.1`, `2.0`, `2.1`, `2.2`, `2.6`, `2.3`, `2.4`, `3.0`, `4.0`. **Still unverified:** `3.35` and `3.4`.
+**Verified on real hardware (2026-11-02, one start-run-stop cycle, error 0 throughout):** `0.1`, `1.0`, `1.1`, `2.0`, `2.1`, `2.2`, `2.6`, `2.3`, `2.4`, `3.0`, `4.0`. **Verified 2026-11-13 (Thermostat run):** `3.4` (burner off, purging) then `3.5` (waiting); raising the setpoint re-ignited the heater (`2.0`-`2.4`) with no start command. A stop goes `4.0` then `0.x`, never through `3.4`. **Still unverified:** `3.35`.
 
 ## Unverified on an AIR 2D
 
-Verified and no longer listed here: the `0x0F` status poll, the `0x02` settings read, and that the init sequence is not needed (`send_init` defaults off). Every item below is a research default, not a fact, and is to be revisited after a human-present bench check:
+Verified and no longer listed here: the `0x0F` status poll, the `0x02` settings read, live `mode`/`setpoint_c`/`power_level` writes and Thermostat (`thermostat/set`, the `wait_mode` byte; driver-autoterm, 2026-11-13), and that the init sequence is not needed (`send_init` defaults off). Every item below is a research default, not a fact, and is to be revisited after a human-present bench check:
 
 - the `0x0D` unblock (never exposed);
-- live settings changes (`mode`, `setpoint_c`, `power_level`), the `setpoint_c` bounds, and their confirmation by the next `0x02` read;
+- the `setpoint_c` bounds, and stop from `standby`;
 - the `clear_error` frame (refused);
-- status codes `3.35` and `3.4`, and the `0x23` ventilate frame behind `ventilating/set` (accepted from v0.4.0; the first real send needs a human-present bench check);
+- status code `3.35`, and the `0x23` ventilate frame behind `ventilating/set` (accepted from v0.4.0; the first real send needs a human-present bench check);
 - stop during `1.x`/`2.x` (early stop).
 
 ## Rejected alternatives
