@@ -117,10 +117,8 @@ else
 fi
 
 if [[ -n "${CHECK_EXPOSURE_PASSWORD:-}" ]]; then
-  # Past the gate (with the login) a write and other paths must still be refused by the proxy itself. Without
-  # the login these two only prove the gate answers 401, which is weaker but still a refusal.
-  AUTH=(-H 'Authorization: Token not-a-real-token')
-  if [[ -n "${CHECK_EXPOSURE_PASSWORD:-}" ]]; then AUTH=(-b "${JAR}"); fi
+  # Past the gate (with the login) a write and other paths must still be refused by the proxy itself.
+  AUTH=(-b "${JAR}")
 
   code="$(curl -sk -m 15 -o /dev/null -w '%{http_code}' -X POST \
     "${BASE}/api/v2/write?org=renewvan&bucket=renewvan" \

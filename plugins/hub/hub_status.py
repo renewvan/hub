@@ -260,9 +260,9 @@ def parse_icon_command(raw: bytes) -> tuple[str, str | None] | None:
     if not isinstance(value, dict) or set(value) != {"key", "icon"}:
         return None
     key, icon = value["key"], value["icon"]
-    if not isinstance(key, str) or not ICON_KEY_RE.match(key):
+    if not isinstance(key, str) or ICON_KEY_RE.fullmatch(key) is None:
         return None
-    if icon is not None and (not isinstance(icon, str) or not ICON_NAME_RE.match(icon)):
+    if icon is not None and (not isinstance(icon, str) or ICON_NAME_RE.fullmatch(icon) is None):
         return None
     return key, icon
 
@@ -289,7 +289,9 @@ def load_icons() -> dict[str, str]:
     return {
         key: icon
         for key, icon in value.items()
-        if ICON_KEY_RE.match(key) and isinstance(icon, str) and ICON_NAME_RE.match(icon)
+        if ICON_KEY_RE.fullmatch(key) is not None
+        and isinstance(icon, str)
+        and ICON_NAME_RE.fullmatch(icon) is not None
     }
 
 

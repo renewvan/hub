@@ -26,6 +26,7 @@ if [[ ! -f "${ENV_FILE}" ]]; then
 # ICONS_PATH=/var/lib/renewvan-hub/icons.json
 ENV
   echo "==> Seeded ${ENV_FILE}"
+  chmod 600 "${ENV_FILE}"
 fi
 
 # The unit ships User=@SERVICE_USER@; run as the ssh user that invoked sudo.

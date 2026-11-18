@@ -71,6 +71,7 @@ if [[ ! -f "${ENV_FILE}" ]]; then
 # POLL_INTERVAL=30
 ENV
   echo "==> Seeded ${ENV_FILE}"
+  chmod 600 "${ENV_FILE}"
 fi
 
 # ---------------------------------------------------------------------------

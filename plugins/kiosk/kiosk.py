@@ -683,7 +683,8 @@ def on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
     if topic == TOPIC_AUTO_SLEEP_TIMEOUT_STATE:
         _got_auto_sleep_timeout_retained = True
         value = _parse_int_payload(msg.payload)
-        if value is not None:
+        # Same rule as the /set path and the wire schema: only the preset values apply.
+        if value in AUTO_SLEEP_TIMEOUT_CHOICES:
             _auto_sleep_timeout_minutes = value
         return
 

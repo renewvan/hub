@@ -116,7 +116,9 @@ def query_tailscale() -> dict:
         peers = sum(1 for p in peers_map.values() if p.get("Online", False))
 
     return {
-        "enabled": enabled or connected,
+        # "Running" is not one of the disabled backend states, so connected implies enabled:
+        # keep the one computed flag instead of an `or connected` that can never change it.
+        "enabled": enabled,
         "connected": connected,
         "ip": ip,
         "hostname": hostname,

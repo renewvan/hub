@@ -277,5 +277,25 @@ class DriverHardeningTest(unittest.TestCase):
         )
 
 
+class LanFacingHardeningTest(unittest.TestCase):
+    """mosquitto and caddy are the only containers reachable from the LAN/Tailnet, so they
+    carry the same cap_drop/no-new-privileges/read-only hardening as the drivers (the image
+    entrypoints permit it: neither writes outside its named volumes, and mosquitto runs as
+    the image's own uid instead of setuid-ing from root)."""
+
+    def test_mosquitto(self):
+        svc = SERVICES["mosquitto"]
+        self.assertEqual(str(svc.get("user")), "1883:1883", "the image's mosquitto uid: no setuid")
+        self.assertEqual(svc.get("cap_drop"), ["ALL"])
+        self.assertIn("no-new-privileges:true", svc.get("security_opt", []))
+        self.assertTrue(svc.get("read_only"), "config is a mount; data/log are named volumes")
+
+    def test_caddy(self):
+        svc = SERVICES["caddy"]
+        self.assertEqual(svc.get("cap_drop"), ["ALL"])
+        self.assertIn("no-new-privileges:true", svc.get("security_opt", []))
+        self.assertTrue(svc.get("read_only"), "writes only /config and /data (named volumes)")
+
+
 if __name__ == "__main__":
     unittest.main()

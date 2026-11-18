@@ -93,6 +93,7 @@ sudo systemctl enable renewvan-recover.service
 # bin/bootstrap-kiosk-pi.sh, not here: it needs the kiosk user substituted in.
 if [[ ! -f /etc/renewvan/kiosk.env ]]; then
   printf '# renewvan kiosk plugin environment overrides\n# See plugins/kiosk/README.md for available variables.\n# Display power defaults to the backlight bl_power device; set all three\n# DISPLAY_*_CMD to override. Uncomment and set to override defaults:\n# MQTT_HOST=localhost\n# MQTT_PORT=1883\n# MQTT_USERNAME=\n# MQTT_PASSWORD=\n' | sudo tee /etc/renewvan/kiosk.env >/dev/null
+  sudo chmod 600 /etc/renewvan/kiosk.env
 fi
 
 # plugin/tailscale: install tailscale, venv, service
