@@ -32,6 +32,16 @@ services:
     image: eclipse-mosquitto:2.1.2-alpine@sha256:860aeb5d63ce509508f6dcfb2bc8a1c1dd2bc60555b562b45ce90e52d8dabb0f
     container_name: renewvan-mosquitto
     restart: unless-stopped
+    # The image starts as root and mosquitto setuids to 1883 itself; run as 1883 from the start
+    # so no capability is needed (the entrypoint's chown only runs as root), and drop everything
+    # else like the login service. The image entrypoint confirms it, not a guess: the broker only
+    # writes /mosquitto/data and /mosquitto/log (named volumes), so the rootfs stays read-only.
+    user: "1883:1883"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     # Loopback only here (local dev, host plugins: kiosk, tailscale). The Pi also publishes
     # these ports on its van-LAN address through docker-compose.lan.yml, selected by
     # COMPOSE_FILE in its .env (bin/deploy.sh seeds it). Never 0.0.0.0: an uplink interface
@@ -467,6 +477,18 @@ services:
     image: caddy:2.11.8@sha256:4fcafa98afd1c2e642e353e3c5cf9ddbe892fcee14bc990e7ba2c5b78e51f9cf
     container_name: renewvan-caddy
     restart: unless-stopped
+    # LAN-facing, like mosquitto above. Writes only /config and /data (the Caddyfile is a pure
+    # reverse proxy with `tls internal`: the CA and autosave live in these named volumes), so the
+    # rootfs stays read-only; Docker sets ip_unprivileged_port_start=0 in the container, so
+    # binding 80/443 needs no capability either. Verified live against the pinned image: `tls
+    # internal` then logs a harmless "failed to install root certificate: read-only file system"
+    # on start — the in-container trust store is unused (clients install the root manually, see
+    # the Caddyfile) and cert issuance/serving are unaffected.
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       - dashboard
       - influxdb

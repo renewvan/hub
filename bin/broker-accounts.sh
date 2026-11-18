@@ -279,7 +279,13 @@ PY
     rm -f "${tmp}"
     return 3 # already current
   fi
-  if [[ -w "${file}" ]]; then cat "${tmp}" >"${file}"; else sudo -n tee "${file}" <"${tmp}" >/dev/null || { rm -f "${tmp}"; return 4; }; fi
+  if [[ -w "${file}" ]]; then
+    cat "${tmp}" >"${file}"
+    chmod 600 "${file}" # every file this writes carries a broker credential
+  else
+    sudo -n tee "${file}" <"${tmp}" >/dev/null || { rm -f "${tmp}"; return 4; }
+    sudo -n chmod 600 "${file}" # a root-owned env file: keep the credential at 600
+  fi
   rm -f "${tmp}"
 }
 

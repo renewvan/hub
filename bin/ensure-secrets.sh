@@ -105,12 +105,26 @@ if [[ "${rotating}" == "1" ]]; then
   # or whatever .env held). Rotate through them. The volume exists, so INIT_* are ignored here.
   influx_running || start_influx "${old_pw:-x}" "${old_token:-x}"
   if [[ "${new_token}" != "${old_token}" ]]; then
+    # Token hashing (InfluxDB >= 2.9, the pinned image) stores hashes, so `auth list` can
+    # never print the old token's value and matching by value is impossible. The legacy
+    # token is the one onboarding created ("admin's Token", tenant/service_onboarding.go):
+    # identify it BEFORE the swap, by description. Anything else is reported, never skipped.
+    old_id="$(influx_cli "${old_token}" auth list --user admin --json |
+      python3 -c 'import json,sys; ids=[a["id"] for a in json.load(sys.stdin) if a.get("description") == "admin\x27s Token"]; print(ids[0] if len(ids) == 1 else "")')"
     created="$(influx_cli "${old_token}" auth create --org "${INFLUX_ORG}" --all-access \
       --description "renewvan-admin" --json)"
     # InfluxDB picks the value of a token it creates; use it rather than the one we generated.
     new_token="$(printf '%s' "${created}" | json_field token)"
-    old_id="$(influx_cli "${new_token}" auth list --hide-headers | awk -v t="${old_token}" '$3 == t {print $1}')"
-    [[ -z "${old_id}" ]] || influx_cli "${new_token}" auth delete --id "${old_id}" >/dev/null
+    if [[ -n "${old_id}" ]]; then
+      influx_cli "${new_token}" auth delete --id "${old_id}" >/dev/null
+    else
+      {
+        echo "WARNING: the old admin token could not be identified for deletion (no unique authorization"
+        echo "         with description \"admin's Token\"); it is still valid. Retire it by hand:"
+        echo "         docker exec ${INFLUX_CONTAINER} influx auth list --user admin --token <new>"
+        echo "         docker exec ${INFLUX_CONTAINER} influx auth delete --id <ID> --token <new>"
+      } >&2
+    fi
   fi
   if [[ "${new_pw}" != "${old_pw}" ]]; then
     influx_cli "${new_token}" user password --name admin --password "${new_pw}" >/dev/null

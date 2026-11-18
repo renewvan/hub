@@ -35,13 +35,20 @@ case "$1" in
     shift  # container name
     if [[ "$1" == influx ]]; then
       shift
-      case "$1 $2" in
-        "ping "*) [[ -e "$state/started" || -e "$state/exists_renewvan-influxdb" ]] ;;
-        "bucket list") echo "bkt123 renewvan 0s" ;;
-        "auth create")
+      case "$*" in
+        "ping" | "ping "*) [[ -e "$state/started" || -e "$state/exists_renewvan-influxdb" ]] ;;
+        "bucket list"*) echo "bkt123 renewvan 0s" ;;
+        "auth create"*)
           n=$(($(cat "$state/n" 2>/dev/null || echo 0) + 1)); echo "$n" >"$state/n"
           echo "{\"id\":\"id$n\",\"token\":\"tok$n\"}" ;;
-        "auth list") printf 'ID1\tdesc\trenewvan-dev-token\tadmin\n' ;;
+        "auth list --user admin --json")
+          # InfluxDB >= 2.9 hashes tokens: the list never contains the plaintext value.
+          if [[ -e "$state/no_legacy_token" ]]; then
+            echo '[]'
+          else
+            echo '[{"id":"ID1","description":"admin\u0027s Token","token":"redacted"}]'
+          fi ;;
+        "auth list"*) printf 'ID1\tdesc\trenewvan-dev-token\tadmin\n' ;;
       esac
     fi ;;
 esac
@@ -150,6 +157,22 @@ class EnsureSecretsTest(Harness):
         self.assertEqual(v["INFLUXDB_ADMIN_TOKEN"], "tok1", "uses the value InfluxDB created")
         self.assertNotEqual(v["INFLUXDB_ADMIN_PASSWORD"], "renewvan-dev-only")
         self.assertNotEqual(v["GF_SECURITY_ADMIN_PASSWORD"], "admin")
+
+    def test_rotation_warns_when_the_old_token_cannot_be_identified(self):
+        # InfluxDB >= 2.9 hashes tokens, so the old one is found by description; when no
+        # authorization matches, nothing is deleted and the operator is told the token
+        # is still valid (the old silent skip).
+        self.write_env(
+            INFLUXDB_ADMIN_PASSWORD="renewvan-dev-only",
+            INFLUXDB_ADMIN_TOKEN="renewvan-dev-token",
+        )
+        self.exists("renewvan-influxdb")
+        (self.state / "no_legacy_token").touch()
+        r = self.run_script()
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertNotIn("auth delete", self.calls())
+        self.assertIn("still valid", r.stderr)
+        self.assertIn("auth delete --id <ID>", r.stderr)
 
     def test_existing_strong_admin_values_are_kept(self):
         self.write_env(INFLUXDB_ADMIN_PASSWORD="strongpw", INFLUXDB_ADMIN_TOKEN="strongtoken")
