@@ -45,12 +45,20 @@ class ValidateBrokerConfigTest(unittest.TestCase):
         docker = bindir / "docker"
         docker.write_text(FAKE_DOCKER)
         docker.chmod(docker.stat().st_mode | stat.S_IXUSR)
+        # Records chown calls: the conf must be group-owned by the broker's gid (1883), like
+        # passwd/acl, or the hardened broker (compose user 1883) cannot read its own config.
+        chown = bindir / "chown"
+        chown.write_text('#!/bin/sh\necho "$@" >>"$CHOWN_LOG"\n')
+        chown.chmod(chown.stat().st_mode | stat.S_IXUSR)
         self.log = self.dir / "docker.log"
+        self.chown_log = self.dir / "chown.log"
         self.env = {
             **os.environ,
             "PATH": f"{bindir}:{os.environ['PATH']}",
             "RENEWVAN_ETC": str(self.etc),
             "FAKE_DOCKER_LOG": str(self.log),
+            "CHOWN_LOG": str(self.chown_log),
+            "ENSURE_SECRETS_CHOWN": str(chown),
             "VALIDATE_BROKER_SECONDS": "1",
         }
 
@@ -80,6 +88,7 @@ class ValidateBrokerConfigTest(unittest.TestCase):
         self.assertIn("--network none", run)
         self.assertIn(f"{self.mosq}:/mosquitto/config:ro", run, "mounted read-only")
         self.assertIn("mosquitto.conf.new", run, "the candidate is what gets tested")
+        self.assertIn(":1883", self.chown_log.read_text(), "the conf is group-owned for the broker uid")
 
     def test_a_broker_that_stayed_up_exits_zero_or_with_timeout_codes(self):
         for rc in ("0", "124", "143"):

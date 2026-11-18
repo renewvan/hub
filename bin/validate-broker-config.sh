@@ -45,7 +45,18 @@ candidate="${DIR}/mosquitto.conf.new"
   echo "# Set by bin/validate-broker-config.sh from BROKER_ACL_OPEN (0 = cut over, no anonymous clients)."
   echo "allow_anonymous ${anonymous}"
 } >"${candidate}"
+# The compose service runs the broker as uid 1883 (docker-compose.yml), so the conf must be
+# readable through the broker's group exactly like the passwd/acl files (install_for_broker):
+# 640, owned by the admin user and group BROKER_GID, never world-readable.
 chmod 640 "${candidate}"
+owner="$(id -u)"
+if [[ -n "${ENSURE_SECRETS_CHOWN:-}" ]]; then
+  ${ENSURE_SECRETS_CHOWN} "${owner}:${BROKER_GID}" "${candidate}"
+elif [[ "${owner}" == "0" ]]; then
+  chown "0:${BROKER_GID}" "${candidate}"
+else
+  sudo -n chown "${owner}:${BROKER_GID}" "${candidate}"
+fi
 
 rollback() {
   rm -f "${candidate}"
