@@ -20,7 +20,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 def _stub_hardware_modules() -> None:
     if "evdev" not in sys.modules:
         sys.modules["evdev"] = types.ModuleType("evdev")
-    if "paho.mqtt.client" not in sys.modules:
+    # Under one pytest process another plugin's test (plugins/hub, plugins/tailscale) may
+    # already have installed a slimmer paho stand-in: build ours only when absent, and
+    # otherwise top up the attributes kiosk.py touches — skipping here is what CI caught
+    # (kiosk.py's mqtt.MQTTMessage annotation broke on hub's stub).
+    client_mod = sys.modules.get("paho.mqtt.client")
+    if client_mod is None:
         paho = types.ModuleType("paho")
         paho_mqtt = types.ModuleType("paho.mqtt")
         client_mod = types.ModuleType("paho.mqtt.client")
@@ -34,12 +39,18 @@ def _stub_hardware_modules() -> None:
 
         client_mod.Client = _Client
         client_mod.CallbackAPIVersion = _CallbackAPIVersion
-        client_mod.MQTTMessage = type("MQTTMessage", (), {})
-        client_mod.MQTTv5 = 5
         paho_mqtt.client = client_mod
         sys.modules["paho"] = paho
         sys.modules["paho.mqtt"] = paho_mqtt
         sys.modules["paho.mqtt.client"] = client_mod
+    if not hasattr(client_mod, "Client"):
+        client_mod.Client = type("Client", (), {"__init__": lambda self, *a, **k: None})
+    if not hasattr(client_mod, "CallbackAPIVersion"):
+        client_mod.CallbackAPIVersion = type("CallbackAPIVersion", (), {"VERSION2": 2})
+    if not hasattr(client_mod, "MQTTMessage"):
+        client_mod.MQTTMessage = type("MQTTMessage", (), {})
+    if not hasattr(client_mod, "MQTTv5"):
+        client_mod.MQTTv5 = 5
 
 
 _stub_hardware_modules()
