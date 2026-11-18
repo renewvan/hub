@@ -38,6 +38,8 @@ services:
     # writes /mosquitto/data and /mosquitto/log (named volumes), so the rootfs stays read-only.
     user: "1883:1883"
     read_only: true
+    tmpfs:
+      - /tmp # tools that docker exec into the broker (bin/check-broker-auth.sh's probe) and POSIX generally expect a writable /tmp
     cap_drop:
       - ALL
     security_opt:
