@@ -289,6 +289,7 @@ class LanFacingHardeningTest(unittest.TestCase):
         self.assertEqual(svc.get("cap_drop"), ["ALL"])
         self.assertIn("no-new-privileges:true", svc.get("security_opt", []))
         self.assertTrue(svc.get("read_only"), "config is a mount; data/log are named volumes")
+        self.assertIn("/tmp", svc.get("tmpfs", []), "exec'd probe tooling and POSIX need a writable /tmp")
 
     def test_caddy(self):
         svc = SERVICES["caddy"]
