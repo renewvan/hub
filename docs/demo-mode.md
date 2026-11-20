@@ -1,6 +1,6 @@
 # Demo mode
 
-A simulated van on the renewvan bus, so the dashboard (and any other consumer) can be built and shown without a van, a Pi, or real hardware. Modelled on Venus OS's Demo mode (`Settings → General → Demo mode`), which replays recordings of real services through `dbus-recorder`'s `play.py` under the same D-Bus service names the real hardware uses, and stops the real sources while it runs (`startdemo.sh`).
+A simulated van on the Renewvan bus, so the dashboard (and any other consumer) can be built and shown without a van, a Pi, or real hardware. Modelled on Venus OS's Demo mode (`Settings → General → Demo mode`), which replays recordings of real services through `dbus-recorder`'s `play.py` under the same D-Bus service names the real hardware uses, and stops the real sources while it runs (`startdemo.sh`).
 
 ## Contract
 
