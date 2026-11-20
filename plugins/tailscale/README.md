@@ -1,6 +1,6 @@
 # plugins/tailscale
 
-Connects the Pi to your [Tailscale](https://tailscale.com) tailnet and publishes VPN status to the renewvan MQTT bus. Shipped by default; only activates after you run `sudo tailscale up`.
+Connects the Pi to your [Tailscale](https://tailscale.com) tailnet and publishes VPN status to the Renewvan MQTT bus. Shipped by default; only activates after you run `sudo tailscale up`.
 
 ## What it does
 

@@ -4,7 +4,7 @@ status: accepted
 
 # Rename `Device` to `Driver`
 
-The project's word for "the software that publishes one specific source onto the renewvan bus" changes from **Device** to **Driver**. Every artifact derived from the old word changes with it, as a clean cutover with no alias or shim. This is the third name for the same concept (Driver to Node in ADR 0002, Node to Device in ADR 0014, Device to Driver here); the mechanics are those of ADR 0014.
+The project's word for "the software that publishes one specific source onto the Renewvan bus" changes from **Device** to **Driver**. Every artifact derived from the old word changes with it, as a clean cutover with no alias or shim. This is the third name for the same concept (Driver to Node in ADR 0002, Node to Device in ADR 0014, Device to Driver here); the mechanics are those of ADR 0014.
 
 | Was                                                                                                               | Now                                                                                                                      |
 | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |

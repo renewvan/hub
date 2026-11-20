@@ -1,6 +1,6 @@
 # plugins/hub
 
-Publishes the Pi's own local-network address and the hub's version to the renewvan MQTT bus, so the dashboard can show the hub's IP and, under Settings › General › Firmware, which hub release is running. It reads the address from the Pi itself, so it works whether or not a router Driver is installed. It also owns the shared **Primary battery**, entity **icons** and **relay groups** settings (below). Shipped by default; nothing to configure.
+Publishes the Pi's own local-network address and the hub's version to the Renewvan MQTT bus, so the dashboard can show the hub's IP and, under Settings › General › Firmware, which hub release is running. It reads the address from the Pi itself, so it works whether or not a router Driver is installed. It also owns the shared **Primary battery**, entity **icons** and **relay groups** settings (below). Shipped by default; nothing to configure.
 
 ## MQTT topics
 

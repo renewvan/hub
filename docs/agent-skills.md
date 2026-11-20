@@ -1,6 +1,6 @@
 # Automating hub work with agent skills
 
-Recurring hub tasks can be driven by agent skills. A skill is a packaged set of instructions an AI coding agent follows for one kind of task. The renewvan skills live in their own repo, [`renewvan/skills`](https://github.com/renewvan/skills), and work with Claude Code and with any harness that reads `.agents/skills/` (Codex, Cursor, OpenCode, and others).
+Recurring hub tasks can be driven by agent skills. A skill is a packaged set of instructions an AI coding agent follows for one kind of task. The Renewvan skills live in their own repo, [`renewvan/skills`](https://github.com/renewvan/skills), and work with Claude Code and with any harness that reads `.agents/skills/` (Codex, Cursor, OpenCode, and others).
 
 Skills are optional. Every task below can also be done by hand with the linked doc.
 

@@ -15,7 +15,7 @@ either `"on"` or `"off"`.
 | `renewvan/kiosk/display/power`     | kiosk plugin → consumers | **yes**  | Current display power state, published after each successful command execution. Initialised from the live backlight `bl_power` reading on startup. |
 | `renewvan/kiosk/display/power/set` | dashboard → kiosk plugin | no       | Command: `"on"` or `"off"`. The kiosk plugin executes the OS-level call and publishes the result to the state topic only on success.               |
 
-The `kiosk` segment is a new domain on the renewvan bus, sitting alongside
+The `kiosk` segment is a new domain on the Renewvan bus, sitting alongside
 `tank`, `battery`, and `relay`. The `display/power` leaf is the only topic
 defined so far; the namespace is reserved for future kiosk-specific topics.
 

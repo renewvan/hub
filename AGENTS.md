@@ -1,4 +1,4 @@
-# renewvan Hub
+# Renewvan Hub
 
 Open-source, vendor-agnostic campervan control hub (MQTT broker + shared device-model schema + deployment compose). See `CONTEXT.md` for domain vocabulary, `README.md` for install, `docs/architecture.md` for the layered design.
 
@@ -33,3 +33,5 @@ Default five canonical labels (`needs-triage`, `needs-info`, `ready-for-agent`, 
 ### Domain docs
 
 Single-context (`CONTEXT.md` + `docs/adr/` at the repo root). See `docs/agents/domain.md`.
+
+- Write the product name "Renewvan" in prose and UI text, never "renewvan" or "RenewVan"; lowercase `renewvan` stays only in identifiers (topics, URLs, bucket, host, bundle IDs). See "Brand spelling" in `hub/CONTEXT.md`.

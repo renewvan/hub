@@ -4,7 +4,7 @@ status: accepted
 
 # Rename `Node` to `Device`, and `Host` to `Board`
 
-The project's word for "anything that publishes one specific device or feed onto the renewvan bus" changes from **Node** to **Device**, and the word for the physical hardware it runs on changes from **Host** to **Board**. Every artifact derived from the old words changes with them, as a clean cutover with no alias or shim.
+The project's word for "anything that publishes one specific device or feed onto the Renewvan bus" changes from **Node** to **Device**, and the word for the physical hardware it runs on changes from **Host** to **Board**. Every artifact derived from the old words changes with them, as a clean cutover with no alias or shim.
 
 | Was                                                                | Now                                                                    |
 | ------------------------------------------------------------------ | ---------------------------------------------------------------------- |
