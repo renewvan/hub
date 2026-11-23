@@ -88,6 +88,36 @@ class WorkflowInjectionTest(unittest.TestCase):
             self.assertNotIn("TEST_COMMAND", str(step.get("env", "")))
 
 
+class ReleaseMonorepoInputsTest(unittest.TestCase):
+    """ADR 0032: an app in a monorepo builds its own Dockerfile from the workspace root."""
+
+    def setUp(self):
+        self.doc = yaml.safe_load((ROOT / ".github/workflows/release.yml").read_text())
+        # PyYAML reads the bare `on:` key as True.
+        self.inputs = self.doc[True]["workflow_call"]["inputs"]
+
+    def test_inputs_default_to_the_repo_root_files(self):
+        self.assertEqual(self.inputs["dockerfile"]["default"], "Dockerfile")
+        self.assertEqual(self.inputs["package-json"]["default"], "package.json")
+
+    def test_dockerfile_is_built_from_the_repo_root_context(self):
+        step = next(
+            s
+            for s in self.doc["jobs"]["publish-image"]["steps"]
+            if s.get("name") == "Build and push"
+        )
+        self.assertEqual(step["with"]["context"], ".")
+        self.assertEqual(step["with"]["file"], "${{ inputs.dockerfile }}")
+
+    def test_stamp_reads_the_package_json_path_from_env(self):
+        step = next(
+            s for s in self.doc["jobs"]["cut"]["steps"] if s.get("name") == "Stamp package.json"
+        )
+        self.assertEqual(step["env"]["PACKAGE_JSON"], "${{ inputs.package-json }}")
+        self.assertIn("process.env.PACKAGE_JSON", step["run"])
+        self.assertNotIn("'package.json'", step["run"])
+
+
 class InstallerPinningTest(unittest.TestCase):
     def test_no_curl_piped_into_a_shell(self):
         for script in shell_scripts():

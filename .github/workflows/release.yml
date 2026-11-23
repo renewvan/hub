@@ -45,10 +45,18 @@ on:
         description: "kind=image: pass the tag as the DRIVER_VERSION build arg (Drivers that publish Driver info)"
         type: boolean
         default: false
+      dockerfile:
+        description: "kind=image: Dockerfile path, relative to the repo root (the build context stays the repo root, e.g. apps/dashboard/Dockerfile in a monorepo)"
+        type: string
+        default: Dockerfile
       stamp-package-json:
         description: Write the version into package.json in the commit the tag points at (JS repos)
         type: boolean
         default: false
+      package-json:
+        description: "stamp-package-json: the package.json to stamp, relative to the repo root (e.g. apps/dashboard/package.json)"
+        type: string
+        default: package.json
       test-command:
         description: "Shell command that gates a pre-release (stable releases rely on the push-to-main CI run)"
         type: string
@@ -97,6 +105,7 @@ jobs:
           if [ -n "$EXPLICIT" ]; then
             version="${EXPLICIT#v}"
           else
+            # Only `v<semver>` tags count; other prefixed tags in the same repo (e.g. mobile-v0.1.0) are ignored.
             latest="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | grep -Ev -- '-' | head -n1)"
             latest="${latest#v}"
             IFS=. read -r major minor patch <<< "${latest:-0.0.0}"
@@ -125,12 +134,14 @@ jobs:
         if: ${{ inputs.stamp-package-json }}
         env:
           VERSION: ${{ steps.version.outputs.version }}
+          PACKAGE_JSON: ${{ inputs.package-json }}
         run: |
           node -e "
             const fs = require('node:fs');
-            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            const file = process.env.PACKAGE_JSON;
+            const pkg = JSON.parse(fs.readFileSync(file, 'utf8'));
             pkg.version = process.argv[1];
-            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+            fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + '\n');
           " "$VERSION"
 
       - name: Commit and tag
@@ -218,7 +229,9 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
+          # The repo root stays the context so a monorepo app's Dockerfile can copy shared workspace packages.
           context: .
+          file: ${{ inputs.dockerfile }}
           push: true
           platforms: linux/amd64,linux/arm64
           cache-from: type=gha
