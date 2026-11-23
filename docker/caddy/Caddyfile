@@ -1,0 +1,92 @@
+# TLS terminator for the dashboard, for a LAN-only kiosk served from a Raspberry Pi.
+#
+# Uses Caddy's internal CA (`tls internal`): no public domain, no Let's Encrypt,
+# no port forwarding. Caddy signs the server cert with a local root CA it
+# generates on first start, stored in the caddy-data volume.
+#
+# To make the PWA installable, each client device must trust that root once:
+#   1. Copy the root out of the container:
+#        docker cp renewvan-caddy:/data/caddy/pki/authorities/local/root.crt .
+#   2. Android: Settings -> Security -> Encryption & credentials ->
+#      Install a certificate -> CA certificate -> pick root.crt.
+#      Then open https://<pi-address> in Chrome.
+#
+# Set DASHBOARD_HOST to the Pi's LAN address or a local name, e.g.
+#   DASHBOARD_HOST=192.168.1.50
+# (IPs work; the cert's SAN will match it, so the browser accepts the name.)
+# Clients that connect by IP send no SNI (curl, Chrome). Without a default, Caddy has no
+# certificate to offer them and the handshake fails with "internal error".
+{
+    default_sni {$DASHBOARD_HOST}
+}
+
+# The same site is served on the Pi's Tailscale address and MagicDNS name, so the tailnet reaches it too.
+# Caddy picks the site by the request's host: a host that matches no address here gets an empty 200,
+# which is a blank page. The hub's compose file passes both values (loopback/localhost when unset, so
+# local dev still starts), and bin/deploy.sh seeds them from tailscale. Browse by the MagicDNS name: it
+# sends SNI, so it gets a certificate for that name. By the bare Tailscale IP a browser sends no SNI,
+# so default_sni answers and the certificate names DASHBOARD_HOST: expect a name mismatch there.
+{$DASHBOARD_HOST}, {$TAILSCALE_BIND_ADDR}, {$TAILSCALE_DNS_NAME} {
+    # Leaf certs live 90 days (Caddy's default is 12h). sign_with_root makes the root sign them
+    # directly: an intermediate would be a 7-day certificate and clamp every leaf to a week.
+    # Devices trust the same root, so renewals never need a reinstall.
+    tls {
+        issuer internal {
+            lifetime 2160h
+            sign_with_root
+        }
+    }
+
+    encode zstd gzip
+
+    # One login for the whole site, so /mqtt (which can switch relays) and /influx are never open to
+    # whoever can reach 443 (hub docs/adr/0029-dashboard-login-is-a-session-cookie.md). The `login`
+    # service answers `GET /auth` for every private request: a valid session cookie passes (204), a page
+    # navigation without one is sent to /login (302), anything else (scripts, the /mqtt WebSocket, /influx)
+    # gets 401. There is no WWW-Authenticate header, so browsers never show their native sign-in popup.
+    # The broker account behind it (`command`) is public through /env.js; this login is the real gate, so
+    # /env.js stays private. The kiosk is not behind it: it loads http://localhost:80 (the dashboard
+    # container, published on the Pi's loopback), never this site.
+    #
+    # Public, because the login page needs them or they hold no data: the /login page itself (the SPA
+    # shell), its hashed build assets and service worker, the PWA manifest and icons (Chrome fetches them
+    # without a session, so behind the gate it never offers "Install app"), and /api/* (the login service's
+    # own endpoints: sign in, sign out, "am I signed in?"). Keep this list to those: the hub's
+    # test_compose_hardening pins it, and /mqtt, /influx and /env.js stay behind the session.
+    @private not path /login /assets/* /sw.js /workbox-*.js /registerSW.js /favicon.ico /favicon.svg /apple-touch-icon.png /manifest.webmanifest /icon-192.png /icon-512.png /icon-maskable-512.png /api/*
+    forward_auth @private login:8080 {
+        uri /auth
+    }
+
+    handle_path /api/* {
+        reverse_proxy login:8080
+    }
+
+    # History for the charts: same-origin /influx/... forwarded to InfluxDB, so no browser holds a token
+    # and there is no CORS (hub docs/adr/0024-history-reaches-browsers-through-a-caddy-influx-proxy.md).
+    # Only POST /api/v2/query passes; anything else is refused. Any client Authorization header is
+    # replaced (a header_up set overrides it; do not add a `header_up -Authorization`, Caddy applies deletes after sets and would drop the token) and the read-only, bucket-scoped dashboard token is injected from the environment.
+    handle_path /influx/* {
+        @query {
+            method POST
+            path /api/v2/query
+        }
+        handle @query {
+            request_body {
+                max_size 64KB
+            }
+            reverse_proxy influxdb:8086 {
+                header_up Authorization "Token {env.INFLUXDB_DASHBOARD_TOKEN}"
+            }
+        }
+        handle {
+            respond "Forbidden" 403
+        }
+    }
+
+    # Proxy everything else to the nginx container, which already serves the SPA,
+    # the /mqtt WebSocket and the /maps/ basemap (including range requests).
+    handle {
+        reverse_proxy dashboard:80
+    }
+}

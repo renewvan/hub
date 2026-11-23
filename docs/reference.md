@@ -54,7 +54,7 @@ Each of these needs a decision or a login only you can make:
 - Tilt axis mapping, if the GY-521 is not mounted face-down (`/etc/renewvan/tilt/config.ini`).
 - Broker authentication, which is **off** by default. Read [Broker security](#broker-security) before exposing the Pi beyond your own network.
 - Flash the ESP32 relay driver once, per [`renewvan/driver-esp32`](https://github.com/renewvan/driver-esp32). Use release `v0.1.2` or later: `v0.1.1` does not build.
-- Install the phone app per [`renewvan/mobile`](https://github.com/renewvan/mobile). It is not part of the compose flow.
+- Install the phone app per [`mobile/` in `renewvan/apps`](https://github.com/renewvan/apps/tree/main/mobile). It is not part of the compose flow.
 
 ## Services
 
@@ -237,7 +237,7 @@ The dashboard's Map page draws one offline file, the **Basemap**. A fresh instal
 - `bin/deploy.sh` creates an empty placeholder only if no file exists. A redeploy never overwrites your map.
 - `scripts/push-basemap.sh <file> [--host <ssh-alias>]` replaces it safely from your own machine: it verifies the file, checks free space, swaps it in atomically, restarts the dashboard, and confirms it serves. It needs the `pmtiles` CLI locally. The smoke procedure is in [`scripts/README.md`](../scripts/README.md).
 
-To build a Basemap, see the [dashboard's offline-map guide](https://github.com/renewvan/dashboard/blob/main/docs/offline-map.md).
+To build a Basemap, see the [dashboard's offline-map guide](https://github.com/renewvan/apps/blob/main/dashboard/docs/offline-map.md).
 
 ## HTTPS on the LAN
 
@@ -250,9 +250,10 @@ Published ports:
 
 ### Setup
 
-1. Keep a `renewvan/dashboard` checkout next to this repo (`../dashboard`). `bin/deploy.sh` ships its `docker/Caddyfile` to the Pi, and compose mounts it from there.
-2. On the Pi, set `DASHBOARD_HOST` in `/opt/renewvan/hub/.env` to its LAN address (`hostname -I | awk '{print $1}'`).
-3. Run `bin/deploy.sh`. It restarts Caddy, because the Caddyfile is a single-file bind mount that a redeploy does not reload.
+1. On the Pi, set `DASHBOARD_HOST` in `/opt/renewvan/hub/.env` to its LAN address (`hostname -I | awk '{print $1}'`).
+2. Run `bin/deploy.sh`. The Caddyfile is this repo's `docker/caddy/Caddyfile`, shipped with the rest of `docker/`; no app checkout is needed. Deploy restarts Caddy when the Caddyfile changed, because it is a single-file bind mount that a redeploy does not reload.
+
+A Pi deployed before the hub owned the Caddyfile still has an old copy under `/opt/renewvan/dashboard/` (or `/opt/renewvan/apps/`). Nothing reads it; delete it by hand.
 
 ### The login
 

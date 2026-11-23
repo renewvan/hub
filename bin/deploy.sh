@@ -38,19 +38,12 @@ ssh "${HOST}" "mkdir -p ${REMOTE_DIR} && sudo mkdir -p /opt/renewvan/plugins/kio
 rsync -az docker-compose.yml docker-compose.lan.yml "${HOST}:${REMOTE_DIR}/"
 ssh "${HOST}" "mkdir -p ${REMOTE_DIR}/bin"
 rsync -az bin/vedirect-gate.sh bin/ensure-secrets.sh bin/broker-accounts.sh bin/rotate-secret.sh bin/validate-broker-config.sh bin/check-broker-auth.sh bin/cutover-broker-acl.sh bin/check-exposure.sh "${HOST}:${REMOTE_DIR}/bin/"
+# docker/ includes docker/caddy/Caddyfile, which caddy bind-mounts: the hub owns it, so no app checkout is
+# needed. A Pi deployed before that still has /opt/renewvan/dashboard/ (or /opt/renewvan/apps/) holding an
+# old copy; nothing reads it any more, delete it by hand.
 rsync -az --delete docker/ "${HOST}:${REMOTE_DIR}/docker/"
 rsync -az .env.example "${HOST}:${REMOTE_DIR}/.env.example"
 rsync -az bin/heater-hint.sh "${HOST}:${REMOTE_DIR}/heater-hint.sh"
-# caddy (docker-compose.yml) bind-mounts ../dashboard/docker/Caddyfile, which resolves to
-# /opt/renewvan/dashboard/docker/Caddyfile on the Pi. Ship it from the sibling dashboard checkout:
-# if the source is missing on the Pi, Docker creates a root-owned directory at that path instead.
-CADDYFILE="${REPO_ROOT}/../dashboard/docker/Caddyfile"
-if [[ ! -f "${CADDYFILE}" ]]; then
-  echo "ERROR: ${CADDYFILE} not found: clone renewvan/dashboard next to this repo." >&2
-  exit 1
-fi
-ssh "${HOST}" "mkdir -p /opt/renewvan/dashboard/docker"
-rsync -az "${CADDYFILE}" "${HOST}:/opt/renewvan/dashboard/docker/Caddyfile"
 # Plugin code is run by systemd (some of it as root), so the trees are root-owned and not writable by the
 # admin login or the kiosk user: rsync runs under sudo and chowns what it writes.
 PLUGIN_RSYNC=(rsync -az --delete --rsync-path="sudo rsync")
@@ -408,10 +401,14 @@ if [[ -s .env.changed-clients ]]; then
   done < .env.changed-clients
   mv .env.changed-clients.failed .env.changed-clients
 fi
-# caddy bind-mounts the Caddyfile as a single file: each deploy replaces it with a new inode, which the
-# running container keeps reading until it restarts. Restart it here (brief TLS blip; the root CA lives in
-# the caddy-data volume, so devices keep trusting it).
-docker compose restart caddy
+# caddy bind-mounts the Caddyfile as a single file: rsync replaces a changed one with a new inode, which the
+# running container keeps reading until it restarts. Restart it only when the running copy differs from the
+# synced one (or cannot be read): a brief TLS blip; the root CA lives in the caddy-data volume, so devices
+# keep trusting it.
+if [[ "\$(docker compose exec -T caddy md5sum /etc/caddy/Caddyfile 2>/dev/null | cut -d' ' -f1)" != "\$(md5sum docker/caddy/Caddyfile | cut -d' ' -f1)" ]]; then
+  echo "==> Caddyfile changed: restarting caddy"
+  docker compose restart caddy
+fi
 # grafana reads its datasource provisioning only at startup, and a changed bind-mounted file does not
 # make \`up -d\` recreate it. Restart so an edited datasource loads (dashboard JSON reloads on its own).
 docker compose restart grafana
