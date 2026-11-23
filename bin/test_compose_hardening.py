@@ -190,11 +190,8 @@ class BrokerAccountsTest(unittest.TestCase):
         self.assertEqual(published_hosts("dashboard"), ["127.0.0.1"])
         self.assertTrue(any(str(p).endswith(":80:80") for p in SERVICES["dashboard"]["ports"]))
 
-    def test_caddyfile_gates_the_whole_site_when_the_dashboard_checkout_is_present(self):
-        caddyfile = ROOT.parent / "apps" / "apps" / "dashboard" / "docker" / "Caddyfile"
-        if not caddyfile.exists():
-            self.skipTest("no ../apps checkout")
-        text = caddyfile.read_text()
+    def test_caddyfile_gates_the_whole_site(self):
+        text = (ROOT / "docker" / "caddy" / "Caddyfile").read_text()
         self.assertIn("{$DASHBOARD_HOST}, {$TAILSCALE_BIND_ADDR}, {$TAILSCALE_DNS_NAME} {", text)
         self.assertIn("forward_auth @private login:8080 {", text)
         self.assertNotIn("basic_auth", text.replace("no native", ""), "no browser Basic popup")
@@ -226,14 +223,23 @@ class BrokerAccountsTest(unittest.TestCase):
             },
         )
 
-    def test_deploy_ships_the_caddyfile_where_compose_mounts_it(self):
-        # The Caddyfile lives in the renewvan/apps monorepo (docs/adr/0032), checked out as ../apps.
-        # Compose resolves ../apps against /opt/renewvan/hub on the Pi, so deploy writes it there.
-        mount = "../apps/apps/dashboard/docker/Caddyfile:/etc/caddy/Caddyfile:ro"
+    def test_compose_mounts_the_in_repo_caddyfile(self):
+        # The Caddyfile describes hub routes, so the hub owns it (docs/adr/0032): deploy ships it
+        # with docker/, and needs no sibling app checkout.
+        mount = "./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro"
         self.assertIn(mount, SERVICES["caddy"]["volumes"])
         deploy = (ROOT / "bin" / "deploy.sh").read_text()
-        self.assertIn('"${REPO_ROOT}/../apps/apps/dashboard/docker/Caddyfile"', deploy)
-        self.assertIn("/opt/renewvan/apps/apps/dashboard/docker/Caddyfile", deploy)
+        self.assertIn('rsync -az --delete docker/ "${HOST}:${REMOTE_DIR}/docker/"', deploy)
+        self.assertNotIn("${REPO_ROOT}/..", deploy)
+        self.assertNotRegex(deploy, r"(rsync|mkdir)[^\n]*/opt/renewvan/(apps|dashboard)/")
+
+    def test_deploy_restarts_caddy_when_its_mounted_caddyfile_changed(self):
+        # A single-file bind mount keeps the old inode after rsync swaps the file, so up -d never
+        # reloads it: deploy compares the running copy with the synced one and restarts on a change.
+        deploy = (ROOT / "bin" / "deploy.sh").read_text()
+        self.assertIn("docker compose exec -T caddy md5sum /etc/caddy/Caddyfile", deploy)
+        self.assertIn("md5sum docker/caddy/Caddyfile", deploy)
+        self.assertIn("docker compose restart caddy", deploy)
 
     def test_deploy_restarts_clients_whose_credential_file_changed(self):
         deploy = (ROOT / "bin" / "deploy.sh").read_text()

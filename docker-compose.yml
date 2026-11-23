@@ -474,7 +474,8 @@ services:
 
   # TLS terminator for the kiosk dashboard, LAN-only, with a self-signed local CA (Caddy
   # `tls internal`). Clients must trust the root once to install the PWA over https; see
-  # apps/dashboard/docker/Caddyfile in renewvan/apps. Set DASHBOARD_HOST to the Pi's LAN IP or name.
+  # docker/caddy/Caddyfile, which the hub owns: it describes hub routes (login, /mqtt, /influx, /maps).
+  # Set DASHBOARD_HOST to the Pi's LAN IP or name.
   caddy:
     image: caddy:2.11.8@sha256:4fcafa98afd1c2e642e353e3c5cf9ddbe892fcee14bc990e7ba2c5b78e51f9cf
     container_name: renewvan-caddy
@@ -511,7 +512,7 @@ services:
       # (docs/adr/0024-history-reaches-browsers-through-a-caddy-influx-proxy.md).
       INFLUXDB_DASHBOARD_TOKEN: ${INFLUXDB_DASHBOARD_TOKEN:?run bin/deploy.sh, which generates the InfluxDB secrets}
     volumes:
-      - ../apps/apps/dashboard/docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
 

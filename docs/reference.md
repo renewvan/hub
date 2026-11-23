@@ -250,9 +250,10 @@ Published ports:
 
 ### Setup
 
-1. Keep a `renewvan/apps` checkout next to this repo (`../apps`). `bin/deploy.sh` ships its `apps/dashboard/docker/Caddyfile` to the Pi, and compose mounts it from there.
-2. On the Pi, set `DASHBOARD_HOST` in `/opt/renewvan/hub/.env` to its LAN address (`hostname -I | awk '{print $1}'`).
-3. Run `bin/deploy.sh`. It restarts Caddy, because the Caddyfile is a single-file bind mount that a redeploy does not reload.
+1. On the Pi, set `DASHBOARD_HOST` in `/opt/renewvan/hub/.env` to its LAN address (`hostname -I | awk '{print $1}'`).
+2. Run `bin/deploy.sh`. The Caddyfile is this repo's `docker/caddy/Caddyfile`, shipped with the rest of `docker/`; no app checkout is needed. Deploy restarts Caddy when the Caddyfile changed, because it is a single-file bind mount that a redeploy does not reload.
+
+A Pi deployed before the hub owned the Caddyfile still has an old copy under `/opt/renewvan/dashboard/` (or `/opt/renewvan/apps/`). Nothing reads it; delete it by hand.
 
 ### The login
 
