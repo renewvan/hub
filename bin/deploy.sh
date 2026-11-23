@@ -41,16 +41,17 @@ rsync -az bin/vedirect-gate.sh bin/ensure-secrets.sh bin/broker-accounts.sh bin/
 rsync -az --delete docker/ "${HOST}:${REMOTE_DIR}/docker/"
 rsync -az .env.example "${HOST}:${REMOTE_DIR}/.env.example"
 rsync -az bin/heater-hint.sh "${HOST}:${REMOTE_DIR}/heater-hint.sh"
-# caddy (docker-compose.yml) bind-mounts ../dashboard/docker/Caddyfile, which resolves to
-# /opt/renewvan/dashboard/docker/Caddyfile on the Pi. Ship it from the sibling dashboard checkout:
+# caddy (docker-compose.yml) bind-mounts ../apps/apps/dashboard/docker/Caddyfile, which resolves to
+# /opt/renewvan/apps/apps/dashboard/docker/Caddyfile on the Pi. Ship it from the sibling renewvan/apps
+# checkout (the dashboard and mobile monorepo, docs/adr/0032-dashboard-and-mobile-share-one-apps-monorepo.md):
 # if the source is missing on the Pi, Docker creates a root-owned directory at that path instead.
-CADDYFILE="${REPO_ROOT}/../dashboard/docker/Caddyfile"
+CADDYFILE="${REPO_ROOT}/../apps/apps/dashboard/docker/Caddyfile"
 if [[ ! -f "${CADDYFILE}" ]]; then
-  echo "ERROR: ${CADDYFILE} not found: clone renewvan/dashboard next to this repo." >&2
+  echo "ERROR: ${CADDYFILE} not found: clone renewvan/apps next to this repo." >&2
   exit 1
 fi
-ssh "${HOST}" "mkdir -p /opt/renewvan/dashboard/docker"
-rsync -az "${CADDYFILE}" "${HOST}:/opt/renewvan/dashboard/docker/Caddyfile"
+ssh "${HOST}" "mkdir -p /opt/renewvan/apps/apps/dashboard/docker"
+rsync -az "${CADDYFILE}" "${HOST}:/opt/renewvan/apps/apps/dashboard/docker/Caddyfile"
 # Plugin code is run by systemd (some of it as root), so the trees are root-owned and not writable by the
 # admin login or the kiosk user: rsync runs under sudo and chowns what it writes.
 PLUGIN_RSYNC=(rsync -az --delete --rsync-path="sudo rsync")

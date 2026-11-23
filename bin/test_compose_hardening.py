@@ -191,9 +191,9 @@ class BrokerAccountsTest(unittest.TestCase):
         self.assertTrue(any(str(p).endswith(":80:80") for p in SERVICES["dashboard"]["ports"]))
 
     def test_caddyfile_gates_the_whole_site_when_the_dashboard_checkout_is_present(self):
-        caddyfile = ROOT.parent / "dashboard" / "docker" / "Caddyfile"
+        caddyfile = ROOT.parent / "apps" / "apps" / "dashboard" / "docker" / "Caddyfile"
         if not caddyfile.exists():
-            self.skipTest("no ../dashboard checkout")
+            self.skipTest("no ../apps checkout")
         text = caddyfile.read_text()
         self.assertIn("{$DASHBOARD_HOST}, {$TAILSCALE_BIND_ADDR}, {$TAILSCALE_DNS_NAME} {", text)
         self.assertIn("forward_auth @private login:8080 {", text)
@@ -225,6 +225,15 @@ class BrokerAccountsTest(unittest.TestCase):
                 "/api/*",
             },
         )
+
+    def test_deploy_ships_the_caddyfile_where_compose_mounts_it(self):
+        # The Caddyfile lives in the renewvan/apps monorepo (docs/adr/0032), checked out as ../apps.
+        # Compose resolves ../apps against /opt/renewvan/hub on the Pi, so deploy writes it there.
+        mount = "../apps/apps/dashboard/docker/Caddyfile:/etc/caddy/Caddyfile:ro"
+        self.assertIn(mount, SERVICES["caddy"]["volumes"])
+        deploy = (ROOT / "bin" / "deploy.sh").read_text()
+        self.assertIn('"${REPO_ROOT}/../apps/apps/dashboard/docker/Caddyfile"', deploy)
+        self.assertIn("/opt/renewvan/apps/apps/dashboard/docker/Caddyfile", deploy)
 
     def test_deploy_restarts_clients_whose_credential_file_changed(self):
         deploy = (ROOT / "bin" / "deploy.sh").read_text()
@@ -289,7 +298,9 @@ class LanFacingHardeningTest(unittest.TestCase):
         self.assertEqual(svc.get("cap_drop"), ["ALL"])
         self.assertIn("no-new-privileges:true", svc.get("security_opt", []))
         self.assertTrue(svc.get("read_only"), "config is a mount; data/log are named volumes")
-        self.assertIn("/tmp", svc.get("tmpfs", []), "exec'd probe tooling and POSIX need a writable /tmp")
+        self.assertIn(
+            "/tmp", svc.get("tmpfs", []), "exec'd probe tooling and POSIX need a writable /tmp"
+        )
 
     def test_caddy(self):
         svc = SERVICES["caddy"]
