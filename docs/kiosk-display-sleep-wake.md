@@ -52,7 +52,7 @@ service that surfaces the broker) to avoid the same boot-order race documented
 in `docs/pi-agent-sudo-setup.md` and resolved for Chromium in the
 `07-kiosk-power-loss-recovery` ticket.
 
-## Dashboard (`apps/dashboard` in `renewvan/apps`)
+## Dashboard (`dashboard/` in `renewvan/apps`)
 
 1. **Sleep button** (`DisplaySleepButton`, header icon) — publishes `"off"`
    / `"on"` to the command topic.

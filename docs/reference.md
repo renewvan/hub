@@ -54,7 +54,7 @@ Each of these needs a decision or a login only you can make:
 - Tilt axis mapping, if the GY-521 is not mounted face-down (`/etc/renewvan/tilt/config.ini`).
 - Broker authentication, which is **off** by default. Read [Broker security](#broker-security) before exposing the Pi beyond your own network.
 - Flash the ESP32 relay driver once, per [`renewvan/driver-esp32`](https://github.com/renewvan/driver-esp32). Use release `v0.1.2` or later: `v0.1.1` does not build.
-- Install the phone app per [`apps/mobile` in `renewvan/apps`](https://github.com/renewvan/apps/tree/main/apps/mobile). It is not part of the compose flow.
+- Install the phone app per [`mobile/` in `renewvan/apps`](https://github.com/renewvan/apps/tree/main/mobile). It is not part of the compose flow.
 
 ## Services
 
@@ -237,7 +237,7 @@ The dashboard's Map page draws one offline file, the **Basemap**. A fresh instal
 - `bin/deploy.sh` creates an empty placeholder only if no file exists. A redeploy never overwrites your map.
 - `scripts/push-basemap.sh <file> [--host <ssh-alias>]` replaces it safely from your own machine: it verifies the file, checks free space, swaps it in atomically, restarts the dashboard, and confirms it serves. It needs the `pmtiles` CLI locally. The smoke procedure is in [`scripts/README.md`](../scripts/README.md).
 
-To build a Basemap, see the [dashboard's offline-map guide](https://github.com/renewvan/apps/blob/main/apps/dashboard/docs/offline-map.md).
+To build a Basemap, see the [dashboard's offline-map guide](https://github.com/renewvan/apps/blob/main/dashboard/docs/offline-map.md).
 
 ## HTTPS on the LAN
 
