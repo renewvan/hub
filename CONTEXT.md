@@ -18,6 +18,10 @@ _Avoid_: Message bus, broker (when the campervan-specific bus is meant, not MQTT
 A non-retained publish on a `<field>/set` topic that asks the owner of an entity or setting to change it (a **Relay**'s `set`, a **Heater** mode, the **Primary battery**, the display brightness). It is sent now or not at all: a client that is not connected drops it instead of queueing it, because a heater or relay command that arrives minutes late is unsafe. Its effect is read back from the retained state, never assumed. In **Demo mode** a client sends only kiosk, **Primary battery** and Demo-switch Commands.
 _Avoid_: Action, request, "set message".
 
+**Live van**:
+The van as a client shows it, derived from the retained state of the **Renewvan bus** in one place: only complete **Entity** instances, the **Primary battery** resolved, the router chosen, and the trust rules applied (an **Entity** whose **Driver** is offline reads as unknown or not controllable, never as its last retained value). Every screen of the dashboard and the mobile app reads the Live van, not raw retained records.
+_Avoid_: Van state, van model, snapshot; "van" alone (the dashboard's van is its drawing and colour).
+
 **Renewvan hub**:
 The Docker Compose stack running on the Pi that forms the connective core of the platform: the Mosquitto broker (Renewvan bus), pinned driver containers, and plugins. From a user's perspective, "Renewvan hub connected" means the dashboard has an active MQTT-over-WebSocket connection to this stack. From an operator's perspective, "the hub" refers to the Pi-side compose deployment managed by this repo.
 Besides the broker, the stack holds the history path: InfluxDB and Grafana publish on loopback only, the dashboard reads history through Caddy's same-origin `/influx` proxy (read-only token held server-side, `docs/adr/0024-history-reaches-browsers-through-a-caddy-influx-proxy.md`), and the logger and Grafana each use their own bucket-scoped token. The kiosk browser and display bridge run as the unprivileged `renewvan-kiosk` user (`docs/reference.md` "Kiosk user and plugin ownership").
