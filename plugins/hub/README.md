@@ -42,6 +42,10 @@ Publishes the Pi's own local-network address and the hub's version to the Renewv
 
 Published every 30 seconds, so a broker restart that lost retained state heals within one poll.
 
+### Shared settings
+
+The five settings below share one lifecycle, implemented once in `shared_setting.py`: a retained state topic `renewvan/hub/<name>`, an unretained command topic `…/set`, a default that is published but never persisted, a file in `/var/lib/renewvan-hub/<name>.json` (override with `<NAME>_PATH`) replaced atomically, and a shape check. `hub_status.py` only declares each one: its name, its schema, its default and, for the maps, how a command merges into the state. The check is compiled from the schema file itself (the plugin's venv has no `jsonschema`, so `shared_setting.py` implements the few keywords the hub schemas use and refuses any other); `bin/deploy.sh` ships the `schema/hub-*.schema.json` files to `/opt/renewvan/plugins/hub/schema/`, and `test_shared_setting.py` proves the check judges every example as `jsonschema` does.
+
 ### `renewvan/hub/primary-battery`
 
 One battery bank can be published by two Drivers (for example driver-venus and driver-wattcycle), so which _instance_ is the headline battery is a setting, and it is shared: every client (dashboard on the kiosk, a phone, a laptop) reads the same value from this topic.
