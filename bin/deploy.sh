@@ -394,6 +394,11 @@ if [[ -f /etc/renewvan/mosquitto/mosquitto.conf.changed ]]; then
 else
   docker kill -s HUP renewvan-mosquitto >/dev/null
 fi
+# The hub plugin was (re)started by its install.sh above, under the ACL as it was then, and publishes its
+# retained state topics only on connect: one the old ACL did not allow (a new topic shipped with its ACL
+# line in this deploy) was dropped silently, and a reload does not reconnect anyone. Reconnect it now.
+echo "==> Restarting the hub plugin under the reloaded ACL"
+sudo -n systemctl restart renewvan-hub || echo "WARN: could not restart renewvan-hub; its retained state waits for its next reconnect" >&2
 # A node refused with rc=5 does not retry, and a driver reads its config.ini only at start: restart every
 # client whose credential file ensure-secrets just changed (compose clients are recreated by up -d above,
 # their environment changed). The list is rewritten on each ensure-secrets run.

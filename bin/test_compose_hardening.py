@@ -270,6 +270,14 @@ class BrokerAccountsTest(unittest.TestCase):
         self.assertIn("md5sum docker/caddy/Caddyfile", deploy)
         self.assertIn("docker compose restart caddy", deploy)
 
+    def test_deploy_restarts_the_hub_plugin_after_the_broker_reload(self):
+        # Its retained topics go out only on connect: one published under the old ACL is dropped,
+        # so it reconnects after the reload (hub/winter-mode was lost this way on its first deploy).
+        deploy = (ROOT / "bin" / "deploy.sh").read_text()
+        reload = deploy.index("docker kill -s HUP renewvan-mosquitto")
+        restart = deploy.index("systemctl restart renewvan-hub", reload)
+        self.assertGreater(restart, reload)
+
     def test_deploy_restarts_clients_whose_credential_file_changed(self):
         deploy = (ROOT / "bin" / "deploy.sh").read_text()
         self.assertIn(".env.changed-clients", deploy)
