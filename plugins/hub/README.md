@@ -17,6 +17,10 @@ Publishes the Pi's own local-network address and the hub's version to the Renewv
 | `renewvan/hub/relay-group-list/set` | no       | client → plugin |
 | `renewvan/hub/relay-order`          | yes      | plugin → bus    |
 | `renewvan/hub/relay-order/set`      | no       | client → plugin |
+| `renewvan/hub/winter-mode`          | yes      | plugin → bus    |
+| `renewvan/hub/winter-mode/set`      | no       | client → plugin |
+| `renewvan/<driver>/winter-mode/set` | no       | plugin → board  |
+| `renewvan/<driver>/winter-mode`     | yes      | board → plugin  |
 
 ### `renewvan/hub/status`
 
@@ -148,6 +152,25 @@ A client replaces the whole array by publishing the same payload, unretained, to
 - **Shape only.** A relay missing from the array sorts after the listed ones; an id that is not on the bus is ignored by a consumer. A command that is not a JSON array of valid, distinct ids (or has more than 512) is ignored and logged; an unwritable file means the command is not applied.
 - One array for every card: a card orders its own relays by their position in it, so moving a relay inside one card never disturbs another.
 
+### Winter mode
+
+Start winter mode (`renewvan/hub/winter-mode/set`, `true` only) shuts the hub down cleanly, then the
+Hub power board cuts its power ([ADR 0033](../../docs/adr/0033-winter-mode-and-hub-power.md),
+`winter_mode.py`):
+
+1. Refused, with `false` republished so the client gets an answer, in Demo mode, while any heater's
+   `phase` is not `off`, or unless exactly one Driver info announces `hub_power`.
+2. The plugin sends that board `renewvan/<driver>/winter-mode/set` `true` and waits 10 s for the
+   board's **live** `true` on `renewvan/<driver>/winter-mode` (a retained one could be left from an
+   earlier winter).
+3. Confirmed: it publishes `renewvan/hub/winter-mode` `true` and runs `systemctl poweroff` a second
+   later. Not confirmed: it publishes `false` and stays up, because a halted Pi on a Hub power relay
+   that is still on could not be woken.
+
+The state is `false` on every start. Power-off runs as the service user, allowed by
+`/etc/polkit-1/rules.d/50-renewvan-hub-power-off.rules` (that user and nobody else), which
+`install.sh` writes from `50-renewvan-hub-power-off.rules`.
+
 ## Setup
 
 `bin/deploy.sh` installs and restarts the plugin on every deploy. No authentication step.
@@ -183,10 +206,12 @@ mosquitto_pub -h <pi> -t renewvan/hub/relay-groups/set -m '{"id":"relay-x8-01","
 mosquitto_pub -h <pi> -t renewvan/hub/icons/set -m '{"key":"tank/fresh","icon":"Droplet"}'
 mosquitto_pub -h <pi> -t renewvan/hub/primary-battery/set -m '"auto"'
 journalctl -u renewvan-hub -n 20
+# Winter mode's polkit rule: "yes" for the service user (does NOT power off, only asks polkit)
+pkcheck --action-id org.freedesktop.login1.power-off --process $$ && echo yes
 ```
 
 ## Tests
 
 ```sh
-cd plugins/hub && python3 -m unittest test_hub_status -v   # or: pytest plugins/hub
+cd plugins/hub && python3 -m unittest test_hub_status test_winter_mode -v   # or: pytest plugins/hub
 ```

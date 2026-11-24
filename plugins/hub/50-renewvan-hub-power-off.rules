@@ -1,0 +1,13 @@
+// Winter mode (docs/adr/0033-winter-mode-and-hub-power.md): lets the hub plugin's service user, and
+// nobody else, power the Pi off through logind (`systemctl poweroff`), once the Hub power board has
+// confirmed it will cut the power. The -multiple-sessions action is the one logind asks for while the
+// kiosk user is logged in. Installed by plugins/hub/install.sh with @SERVICE_USER@ filled in.
+polkit.addRule(function (action, subject) {
+  if (
+    subject.user === "@SERVICE_USER@" &&
+    (action.id === "org.freedesktop.login1.power-off" ||
+      action.id === "org.freedesktop.login1.power-off-multiple-sessions")
+  ) {
+    return polkit.Result.YES;
+  }
+});
