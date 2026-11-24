@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://renewvan.dev/schema/tank.schema.json",
   "title": "tank",
-  "description": "v0.1 device-model entity: a fluid reservoir monitored by a resistive level sensor. Published under renewvan/tank/<id>/<property>. Field additions since v0.1: alarm_state, temperature_c, last_inspected_date (v0.2); fill_rate_lpm, drain_rate_lpm, last_full_date, last_empty_date (v0.3); volume_since_full_l, volume_since_empty_l, level_pct_smoothed (v0.4), and last_inspected_date/last_full_date/last_empty_date renamed to last_inspected_at/last_full_at/last_empty_at with full ISO-8601 timestamps (v0.4, breaking); alarm_direction, alarm_threshold_pct, alarm_restore_pct (v0.5) -- retained/static identity fields, published once at startup alongside fluid_type/capacity_l, present under the same condition as alarm_state (a tank with alarm configured); level_pct_smoothed removed (v0.6, breaking, see docs/adr/0005); fill_rate_lpm, drain_rate_lpm removed (v0.7, breaking, see docs/adr/0006) -- unused instantaneous flow-rate fields, no consumer ever displayed them, superseded by volume_since_full_l/volume_since_empty_l for the dashboard's pace-based telemetry.",
+  "description": "v0.1 device-model entity: a fluid reservoir monitored by a level sensor (a Sender, a Voltage sensor or Level probes). Published under renewvan/tank/<id>/<property>. Field additions since v0.1: alarm_state, temperature_c, last_inspected_date (v0.2); fill_rate_lpm, drain_rate_lpm, last_full_date, last_empty_date (v0.3); volume_since_full_l, volume_since_empty_l, level_pct_smoothed (v0.4), and last_inspected_date/last_full_date/last_empty_date renamed to last_inspected_at/last_full_at/last_empty_at with full ISO-8601 timestamps (v0.4, breaking); alarm_direction, alarm_threshold_pct, alarm_restore_pct (v0.5) -- retained/static identity fields, published once at startup alongside fluid_type/capacity_l, present under the same condition as alarm_state (a tank with alarm configured); level_pct_smoothed removed (v0.6, breaking, see docs/adr/0005); fill_rate_lpm, drain_rate_lpm removed (v0.7, breaking, see docs/adr/0006) -- unused instantaneous flow-rate fields, no consumer ever displayed them, superseded by volume_since_full_l/volume_since_empty_l for the dashboard's pace-based telemetry; level_marks_pct (v0.8, see docs/adr/0033) -- the Level marks of a tank read by Level probes, whose level_pct is then a Stepped level.",
   "type": "object",
   "properties": {
     "driver": {
@@ -26,7 +26,19 @@
     "level_pct": {
       "type": "number",
       "minimum": 0,
-      "maximum": 100
+      "maximum": 100,
+      "description": "Fill percentage. Continuous for a Sender or Voltage sensor. When level_marks_pct is present the tank is read by Level probes and level_pct is a Stepped level: 0 or exactly one of level_marks_pct, a lower bound ('at least this full'), never an estimate. See docs/adr/0033."
+    },
+    "level_marks_pct": {
+      "type": "array",
+      "items": {
+        "type": "number",
+        "exclusiveMinimum": 0,
+        "maximum": 100
+      },
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "Optional, retained. Present only for a tank read by Level probes: the Level marks (volume %, after shape correction), ascending, one per probe. Its presence means level_pct is a Stepped level (0 or one of these values) and volume_since_full_l/volume_since_empty_l are always 0. Absent for a Sender or Voltage sensor. Published once at startup as a JSON array on renewvan/tank/<id>/level_marks_pct (v0.8, see docs/adr/0033)."
     },
     "status": {
       "type": "string",
@@ -35,12 +47,12 @@
     "volume_since_full_l": {
       "type": "number",
       "minimum": 0,
-      "description": "Net liters moved since level_pct last committed a last_full_at latch. 0 if the tank has never latched full. Unconditional live field."
+      "description": "Net liters moved since level_pct last committed a last_full_at latch. 0 if the tank has never latched full. Unconditional live field. Always 0 when level_marks_pct is present (steps between Level marks are not a measured volume)."
     },
     "volume_since_empty_l": {
       "type": "number",
       "minimum": 0,
-      "description": "Net liters moved since level_pct last committed a last_empty_at latch. 0 if the tank has never latched empty. Unconditional live field."
+      "description": "Net liters moved since level_pct last committed a last_empty_at latch. 0 if the tank has never latched empty. Unconditional live field. Always 0 when level_marks_pct is present (steps between Level marks are not a measured volume)."
     },
     "alarm_state": {
       "type": "string",
