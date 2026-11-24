@@ -1,0 +1,7 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://renewvan.dev/schema/driver-winter-mode.schema.json",
+  "title": "driver-winter-mode",
+  "description": "Payload for a relay board's own Winter mode topics (docs/adr/0033-winter-mode-and-hub-power.md), only on the board whose Driver info announces hub_power. Sent unretained by the hub plugin alone to renewvan/<driver>/winter-mode/set (command), true only; any other board, and any other payload, ignores it. On it the board stores its Winter mode flag in flash, starts its fixed power-cut delay (about 90 s, set in the firmware, never on the wire) and publishes retained true to renewvan/<driver>/winter-mode (state): that publish is the board's confirmation, and the hub plugin powers the Pi off only after it. The board publishes false on a boot without the flag and after a Hub wake clears it. Once sent, the delay cannot be cancelled.",
+  "type": "boolean"
+}

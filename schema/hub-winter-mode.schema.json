@@ -1,0 +1,7 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://renewvan.dev/schema/hub-winter-mode.schema.json",
+  "title": "hub-winter-mode",
+  "description": "Payload for the Winter mode topics (docs/adr/0033-winter-mode-and-hub-power.md). Published retained by the hub plugin to renewvan/hub/winter-mode (state): false on every start, true once the Hub power board has confirmed its own Winter mode (renewvan/<driver>/winter-mode true, driver-winter-mode.schema.json), immediately before the plugin powers the Pi off; back to false when the board does not confirm in time and the plugin aborts. Sent unretained by a client to renewvan/hub/winter-mode/set (command, Start winter mode), true only: the plugin ignores false, because Winter mode ends with Hub wake, never with a command over the bus. The plugin refuses the command while the heater is not off, while no Driver info or more than one announces hub_power, and in Demo mode. A client remembers true while the hub is unreachable and forgets it only when it reaches the bus again and reads false.",
+  "type": "boolean"
+}
