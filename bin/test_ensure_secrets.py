@@ -7,6 +7,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import broker_clients
+
 SCRIPT = Path(__file__).with_name("ensure-secrets.sh")
 
 SECRET_NAMES = (
@@ -203,14 +205,9 @@ class EnsureSecretsTest(Harness):
         self.assertNotEqual(r.returncode, 0)
 
 
-CLIENTS = (
-    "tank gps temperature tilt wattcycle autoterm vedirect logger venus router demo "
-    "kiosk tailscale hub esp32-front esp32-rear command reader"
-).split()
-
-
-def client_var(key):
-    return f"MQTT_{key.upper().replace('-', '_')}_PASSWORD"
+# every registry client plus the two boards the harness's .env lists
+CLIENTS = [c.key for c in broker_clients.load()[0]] + ["esp32-front", "esp32-rear"]
+client_var = broker_clients.password_var
 
 
 BROKER_ACCOUNTS = SCRIPT.with_name("broker-accounts.sh")
