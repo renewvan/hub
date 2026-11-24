@@ -19,8 +19,12 @@ A non-retained publish on a `<field>/set` topic that asks the owner of an entity
 _Avoid_: Action, request, "set message".
 
 **Live van**:
-The van as a client shows it, derived from the retained state of the **Renewvan bus** in one place: only complete **Entity** instances, the **Primary battery** resolved, the router chosen, and the trust rules applied (an **Entity** whose **Driver** is offline reads as unknown or not controllable, never as its last retained value). Every screen of the dashboard and the mobile app reads the Live van, not raw retained records.
+The van as a client shows it, derived from the retained state of the **Renewvan bus** in one place: every **Entity** instance the bus knows, each either reporting or **Silent**, with totals and the power flow drawn only from reporting ones, the **Primary battery** resolved, the router chosen, and the trust rules applied (an **Entity** whose **Driver** is offline reads as unknown or not controllable, never as its last retained value). Every screen of the dashboard and the mobile app reads the Live van, not raw retained records.
 _Avoid_: Van state, van model, snapshot; "van" alone (the dashboard's van is its drawing and colour).
+
+**Silent**:
+An **Entity** instance the bus knows (its identity is retained) but whose live values are absent: its **Driver** cleared them because the device stopped answering, as an AC charger does without shore power. A Silent instance is still shown, as off or not reporting, never dropped and never read as zero. When its **Driver** is offline the instance is unknown instead: the **Driver**, not the device, is what went away.
+_Avoid_: Offline (that is the **Driver**'s health word), missing, disconnected, incomplete.
 
 **Renewvan hub**:
 The Docker Compose stack running on the Pi that forms the connective core of the platform: the Mosquitto broker (Renewvan bus), pinned driver containers, and plugins. From a user's perspective, "Renewvan hub connected" means the dashboard has an active MQTT-over-WebSocket connection to this stack. From an operator's perspective, "the hub" refers to the Pi-side compose deployment managed by this repo.
