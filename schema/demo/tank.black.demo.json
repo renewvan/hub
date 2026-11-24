@@ -1,0 +1,25 @@
+{
+  "entity": "tank",
+  "id": "black",
+  "description": "black_water tank read by one Level probe at the full mark: dry, then wet (alarm), then dry again after emptying",
+  "loop_s": 120,
+  "initial": {
+    "driver": "tank",
+    "name": "Black Water Tank",
+    "fluid_type": "black_water",
+    "capacity_l": 20,
+    "level_pct": 0,
+    "level_marks_pct": [100],
+    "status": "ok",
+    "volume_since_full_l": 0,
+    "volume_since_empty_l": 0,
+    "alarm_direction": "high",
+    "alarm_threshold_pct": 90,
+    "alarm_restore_pct": 80,
+    "alarm_state": "ok"
+  },
+  "timeline": [
+    { "t": 60, "set": { "level_pct": 100, "alarm_state": "alarm" } },
+    { "t": 100, "set": { "level_pct": 0, "alarm_state": "ok" } }
+  ]
+}
