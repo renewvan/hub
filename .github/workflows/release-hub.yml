@@ -1,0 +1,41 @@
+name: Release hub
+run-name: Release hub ${{ inputs.version && (startsWith(inputs.version, 'v') && inputs.version || format('v{0}', inputs.version)) || format('{0} bump', inputs.bump) }}${{ inputs.prerelease && ' (pre-release)' || '' }}
+
+# Tags the hub itself (the compose stack + schema + plugins). The hub ships no image and no
+# firmware: kind: stack means the tag and the GitHub release are the whole release. The Pi's
+# version stamp (bin/deploy.sh's `git describe`) reads these tags and publishes them on
+# renewvan/hub/status. The process lives in this repo's reusable release.yml
+# (docs/adr/0015-one-release-process-via-reusable-workflows.md); this file only says what the
+# hub ships.
+# Start a release from the Actions tab or `gh workflow run release-hub.yml -f bump=minor`.
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Which part of the latest release's version to increment
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+      version:
+        description: 'Explicit version (e.g. 0.20.0 or 0.20.0-beta.1); overrides "bump"'
+        type: string
+        required: false
+      prerelease:
+        description: 'Pre-release: a tag from a feature branch, main stays untouched'
+        type: boolean
+        default: false
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release.yml
+    with:
+      kind: stack
+      bump: ${{ inputs.bump }}
+      version: ${{ inputs.version }}
+      prerelease: ${{ inputs.prerelease }}
