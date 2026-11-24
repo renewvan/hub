@@ -77,6 +77,9 @@ relay ids (ADR 0028):
 Default []. A relay missing from the array sorts after the listed ones. The plugin does not know
 which relays exist, so it only checks the shape of the array.
 
+Winter mode: Start winter mode shuts the hub down cleanly once the Hub power board has confirmed it
+will cut the power (ADR 0033). See winter_mode.py for its topics, refusals and order.
+
 Configuration via environment (or /etc/renewvan/hub.env):
   MQTT_HOST              default: localhost
   MQTT_PORT              default: 1883
@@ -105,6 +108,7 @@ from pathlib import Path
 import paho.mqtt.client as mqtt
 
 from shared_setting import SharedSetting, read_schema, set_entry
+from winter_mode import WinterMode
 
 MQTT_HOST = os.environ.get("MQTT_HOST", "localhost")
 MQTT_PORT = int(os.environ.get("MQTT_PORT", "1883"))
@@ -142,6 +146,8 @@ RELAY_ORDER = SharedSetting("relay-order", read_schema("hub-relay-order"), [])
 
 SETTINGS = (PRIMARY_BATTERY, ICONS, RELAY_GROUPS, RELAY_GROUP_LIST, RELAY_ORDER)
 _BY_SET_TOPIC = {setting.set_topic: setting for setting in SETTINGS}
+
+WINTER_MODE = WinterMode()
 
 # Written by bin/deploy.sh after it syncs this directory; absent on a checkout.
 VERSION_FILE = Path(__file__).resolve().parent / "VERSION"
@@ -194,12 +200,15 @@ def on_connect(client: mqtt.Client, userdata, flags, rc, properties=None):
     log.info("Connected to MQTT broker %s:%d", MQTT_HOST, MQTT_PORT)
     for setting in SETTINGS:
         setting.connect(client)
+    WINTER_MODE.connect(client)
 
 
 def on_message(client: mqtt.Client, userdata, msg):
     setting = _BY_SET_TOPIC.get(msg.topic)
     if setting is not None:
         setting.command(client, msg.payload)
+    else:
+        WINTER_MODE.message(client, msg)
 
 
 def on_disconnect(client: mqtt.Client, userdata, flags, rc=None, properties=None):

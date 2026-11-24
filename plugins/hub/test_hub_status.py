@@ -47,6 +47,7 @@ def _stub_paho() -> None:
 _stub_paho()
 
 import hub_status  # noqa: E402
+import winter_mode  # noqa: E402
 from shared_setting import SharedSetting  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[2]
@@ -254,11 +255,24 @@ class SettingsWiringTests(_Settings):
 
     def test_connect_subscribes_and_publishes_every_setting_retained(self):
         hub_status.on_connect(self.client, None, {}, 0)
-        self.assertEqual(self.client.subscribed, [s.set_topic for s in hub_status.SETTINGS])
+        settings = len(hub_status.SETTINGS)
+        self.assertEqual(
+            self.client.subscribed[:settings], [s.set_topic for s in hub_status.SETTINGS]
+        )
         self.assertEqual(
             [(p[0], p[2]) for p in self.client.published],
-            [(s.topic, True) for s in hub_status.SETTINGS],
+            [(s.topic, True) for s in hub_status.SETTINGS] + [(winter_mode.STATE_TOPIC, True)],
         )
+
+    def test_connect_also_starts_winter_mode(self):
+        hub_status.on_connect(self.client, None, {}, 0)
+        self.assertIn(winter_mode.SET_TOPIC, self.client.subscribed)
+        self.assertIn((winter_mode.STATE_TOPIC, "false", True), self.client.published)
+
+    def test_start_winter_mode_reaches_winter_mode(self):
+        with mock.patch.object(hub_status.WINTER_MODE, "message") as message:
+            hub_status.on_message(self.client, None, _msg(winter_mode.SET_TOPIC, True))
+        message.assert_called_once()
 
     def test_failed_connect_publishes_and_subscribes_nothing(self):
         hub_status.on_connect(self.client, None, {}, 5)
@@ -297,11 +311,24 @@ class SettingsWiringTests(_Settings):
         spec.loader.exec_module(broker_clients)
         writes = {c.key: c.writes for c in broker_clients.load()[0]}
         self.assertEqual(
-            writes["hub"], [hub_status.TOPIC_STATUS, *(s.topic for s in hub_status.SETTINGS)]
+            writes["hub"],
+            [
+                hub_status.TOPIC_STATUS,
+                *(s.topic for s in hub_status.SETTINGS),
+                winter_mode.STATE_TOPIC,
+                winter_mode.BOARD_SET_FILTER,
+            ],
         )
         self.assertEqual(
             [t for t in writes["command"] if t.startswith("renewvan/hub/")],
-            [s.set_topic for s in hub_status.SETTINGS],
+            [*(s.set_topic for s in hub_status.SETTINGS), winter_mode.SET_TOPIC],
+        )
+        # Only the hub plugin may tell a board to cut Hub power (ADR 0033).
+        self.assertFalse(
+            any(
+                t.endswith("/winter-mode/set") and t != winter_mode.SET_TOPIC
+                for t in writes["command"]
+            )
         )
 
     def test_deploy_ships_the_schemas_the_settings_are_checked_against(self):
