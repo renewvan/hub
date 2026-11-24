@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://renewvan.dev/schema/hub-fleet.schema.json",
+  "title": "hub-fleet",
+  "description": "Payload published retained by the hub plugin to renewvan/hub/fleet: which Drivers the van has (every Driver with retained info, sorted) and the bus contract version. A consumer that connects cannot tell when the retained replay ends, so it settles once it has seen the retained info of every Driver the fleet names (a missing one after a timeout is a hub plugin that is down or older than this topic, not a removed Driver), instead of waiting a fixed time. A Driver leaves the list when its info is cleared (bin/remove_driver.py), which is the removal signal: 'gone', not 'offline'. `contract` versions the bus contract as one number — the entity schemas, the Driver info/health conventions and the hub topics — bumped when the contract changes in a way a consumer must know about; a consumer built for a lower contract than it sees knows it is behind. Updated on every change, and on every (re)connect a short settle window after the retained replay is collected, so a broker that lost retained state heals without ever overwriting a good fleet with an empty one mid-replay. The Demo namespace is not listed: demo Driver infos sit one segment deeper (renewvan/demo/<driver>/info) and driver-demo already knows its fleet from the fleet file. See docs/adr/0035-driver-removal-and-the-fleet-topic.md.",
+  "type": "object",
+  "required": ["contract", "drivers"],
+  "additionalProperties": false,
+  "properties": {
+    "contract": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The bus contract version. 1 since the first fleet topic; bumped by a hub release when the contract changes in a way a consumer must know about."
+    },
+    "drivers": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^(?!driver-)(?!demo$)(?!hub$)[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+      },
+      "description": "The keys of every Driver with retained info, sorted. Same slug rule as driver-info.schema.json, plus 'hub' refused (renewvan/hub/# is the hub plugin's own namespace). Empty when no Driver has published info yet."
+    }
+  }
+}
