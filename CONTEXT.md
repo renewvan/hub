@@ -141,7 +141,7 @@ A Pi-host process (systemd service `renewvan-hub`) in `plugins/hub/` that also o
 _Avoid_: "hub device", "router IP" (the router entity has no address; this is the Pi's), "broker address" (what a client happens to connect to, which can be a Tailscale name or a proxy, not the Pi's LAN address).
 
 **Winter mode**:
-The van parked with the hub deliberately powered down, waiting for a **Hub wake**. Entered from any client by **Start winter mode**, which shuts the Pi down cleanly before the relay board cuts its power, never by a bare relay switch-off. Every client that sees it remembers it while the hub is gone, and it ends only when a client reaches the bus again and the hub no longer reports it. A hub that is merely unreachable (no signal, router down, power lost) is not in Winter mode. See `docs/adr/0033-winter-mode-and-hub-power.md`.
+The van parked with the hub deliberately powered down, waiting for a **Hub wake**. Entered from any client by **Start winter mode**, which shuts the Pi down cleanly before the relay board cuts its power, and only once that board has confirmed it will; never by a bare relay switch-off. Every client that sees it remembers it while the hub is gone, and it ends only when a client reaches the bus again and the hub no longer reports it. A hub that is merely unreachable (no signal, router down, power lost) is not in Winter mode. See `docs/adr/0033-winter-mode-and-hub-power.md`.
 _Avoid_: Sleep, hub sleep (the **Kiosk plugin**'s display sleep), standby, parked mode, "Wake van" (the van's other loads are not woken).
 
 **Hub power**:

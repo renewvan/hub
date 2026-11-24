@@ -6,6 +6,8 @@
   "type": "object",
   "required": ["driver", "product", "source", "publishes", "version"],
   "additionalProperties": false,
+  "if": { "required": ["hub_power"] },
+  "then": { "properties": { "publishes": { "contains": { "const": "relay" } } } },
   "properties": {
     "driver": {
       "type": "string",
@@ -73,6 +75,11 @@
       "pattern": "^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$",
       "not": { "const": "0.0.0.0" },
       "description": "Optional. The Board's own current IPv4 address in dotted-quad form, e.g. the address DHCP gave an ESP32. Published only by a Driver that knows its own address; omitted, never '0.0.0.0' or a placeholder, when it has none yet. As of the moment info was published: info is republished on every connect, so the value is as fresh as the Driver's last (re)connect."
+    },
+    "hub_power": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+      "description": "Optional. The relay id (relay.schema.json definitions/id) of this Driver's Hub power channel: the one relay that powers the hub, chosen when the board is flashed (docs/adr/0033-winter-mode-and-hub-power.md). Only on a Driver that publishes relay, and only for a relay whose driver is this Driver. Omitted when the board has none. At most one Driver in a van announces it: two are a setup error, and clients then offer no Winter mode. Consumers show that relay reserved (no on/off switch), and the board refuses a plain set false on it."
     }
   }
 }

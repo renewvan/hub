@@ -1,0 +1,13 @@
+{
+  "driver": "esp32-front",
+  "product": "ESP32 16-channel relay board",
+  "source": "ESP32 relay outputs",
+  "publishes": ["relay"],
+  "manufacturer": "renewvan",
+  "homepage": "https://github.com/renewvan/driver-esp32",
+  "version": "v0.5.0",
+  "board_serial": "AA:BB:CC:DD:EE:FF",
+  "variant": "esp32-16x-relay",
+  "ip": "192.168.10.60",
+  "hub_power": "Front_01"
+}
