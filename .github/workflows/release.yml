@@ -11,6 +11,9 @@
 #                   The repo lists its variants with `python3 scripts/variants.py list` (a JSON array
 #                   of names); each one is built from firmware/<variant>.yaml with
 #                   manifests/<variant>.json, all stamped with the same tag.
+#   kind: stack     tag and GitHub release only, nothing built — for a repo whose artifact is the
+#                   checkout itself (the hub's compose stack + schema + plugins, rsynced to the Pi
+#                   by bin/deploy.sh, whose `git describe` stamp then reads these tags).
 #
 # Stable releases are cut from `main`; a pre-release from whichever branch it is dispatched on
 # (tests gate it, `main` and `:latest` stay untouched). Neither pushes a commit to a branch: the
@@ -23,7 +26,7 @@ on:
   workflow_call:
     inputs:
       kind:
-        description: "image | firmware"
+        description: "image | firmware | stack (tag + release only, nothing built)"
         type: string
         required: true
       bump:
