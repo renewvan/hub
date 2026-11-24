@@ -1,5 +1,5 @@
 [Unit]
-Description=renewvan hub MQTT bridge (Pi local IP, version, primary battery)
+Description=renewvan hub MQTT bridge (Pi local IP, version, shared settings, Winter mode)
 Documentation=https://github.com/renewvan/hub/blob/main/plugins/hub/README.md
 After=network-online.target docker.service
 Wants=network-online.target

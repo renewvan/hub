@@ -36,6 +36,15 @@ if [[ -z "${SERVICE_USER}" || "${SERVICE_USER}" == "root" ]]; then
   exit 1
 fi
 sed "s|@SERVICE_USER@|${SERVICE_USER}|" "${PLUGIN_DIR}/${SERVICE_FILE}" > "/etc/systemd/system/${SERVICE_FILE}"
+
+# Winter mode powers the Pi off as the service user: polkit allows that user only (ADR 0033).
+# polkitd reads rules.d on change, so no restart is needed.
+POLKIT_RULE="50-renewvan-hub-power-off.rules"
+install -d -m 755 /etc/polkit-1/rules.d
+sed "s|@SERVICE_USER@|${SERVICE_USER}|" "${PLUGIN_DIR}/${POLKIT_RULE}" > "/etc/polkit-1/rules.d/${POLKIT_RULE}"
+chmod 644 "/etc/polkit-1/rules.d/${POLKIT_RULE}"
+echo "==> polkit rule: ${SERVICE_USER} may power the Pi off (Winter mode)"
+
 systemctl daemon-reload
 systemctl enable "${SERVICE_FILE%.service}"
 # restart, not enable --now alone: that leaves a running service on its old script
