@@ -37,7 +37,7 @@ echo "==> Syncing compose artifacts to ${HOST}:${REMOTE_DIR}"
 ssh "${HOST}" "mkdir -p ${REMOTE_DIR} && sudo mkdir -p /opt/renewvan/plugins/kiosk /opt/renewvan/plugins/tailscale /opt/renewvan/plugins/hub /opt/renewvan/venvs"
 rsync -az docker-compose.yml docker-compose.lan.yml "${HOST}:${REMOTE_DIR}/"
 ssh "${HOST}" "mkdir -p ${REMOTE_DIR}/bin"
-rsync -az bin/vedirect-gate.sh bin/ensure-secrets.sh bin/broker-accounts.sh bin/rotate-secret.sh bin/validate-broker-config.sh bin/check-broker-auth.sh bin/cutover-broker-acl.sh bin/check-exposure.sh "${HOST}:${REMOTE_DIR}/bin/"
+rsync -az bin/vedirect-gate.sh bin/ensure-secrets.sh bin/broker-accounts.sh bin/broker-clients.conf bin/rotate-secret.sh bin/validate-broker-config.sh bin/check-broker-auth.sh bin/cutover-broker-acl.sh bin/check-exposure.sh "${HOST}:${REMOTE_DIR}/bin/"
 # docker/ includes docker/caddy/Caddyfile, which caddy bind-mounts: the hub owns it, so no app checkout is
 # needed. A Pi deployed before that still has /opt/renewvan/dashboard/ (or /opt/renewvan/apps/) holding an
 # old copy; nothing reads it any more, delete it by hand.
@@ -50,6 +50,10 @@ PLUGIN_RSYNC=(rsync -az --delete --rsync-path="sudo rsync")
 "${PLUGIN_RSYNC[@]}" --exclude='.venv' plugins/kiosk/ "${HOST}:/opt/renewvan/plugins/kiosk/"
 "${PLUGIN_RSYNC[@]}" plugins/tailscale/ "${HOST}:/opt/renewvan/plugins/tailscale/"
 "${PLUGIN_RSYNC[@]}" plugins/hub/ "${HOST}:/opt/renewvan/plugins/hub/"
+# The hub plugin checks its shared settings against the schema files themselves (plugins/hub/shared_setting.py):
+# ship them beside it, after the --delete above.
+ssh "${HOST}" "sudo mkdir -p /opt/renewvan/plugins/hub/schema"
+"${PLUGIN_RSYNC[@]}" schema/hub-*.schema.json "${HOST}:/opt/renewvan/plugins/hub/schema/"
 # (--chown is not portable to macOS rsync, so ownership is fixed on the Pi.) The plugin and venv roots
 # themselves are re-owned too: a Pi that predates the kiosk split still has them admin-owned.
 ssh "${HOST}" "sudo chown -R root:root /opt/renewvan/plugins /opt/renewvan/venvs && sudo chmod -R go-w /opt/renewvan/plugins /opt/renewvan/venvs"

@@ -88,67 +88,60 @@ Configuration via environment (or /etc/renewvan/hub.env):
   RELAY_GROUPS_PATH      default: /var/lib/renewvan-hub/relay-groups.json
   RELAY_GROUP_LIST_PATH  default: /var/lib/renewvan-hub/relay-group-list.json
   RELAY_ORDER_PATH       default: /var/lib/renewvan-hub/relay-order.json
+  HUB_SCHEMA_DIR         default: schema/ beside this script (bin/deploy.sh ships the
+                         hub-*.schema.json files there), else the repo's schema/
+
+Each setting is a declaration (SETTINGS below) of shared_setting.SharedSetting, which owns the
+topics, the atomic persistence, the default and the shape check compiled from the schema file.
 """
 
 import json
 import logging
 import os
-import re
 import socket
 import time
 from pathlib import Path
 
 import paho.mqtt.client as mqtt
 
+from shared_setting import SharedSetting, read_schema, set_entry
+
 MQTT_HOST = os.environ.get("MQTT_HOST", "localhost")
 MQTT_PORT = int(os.environ.get("MQTT_PORT", "1883"))
 MQTT_USERNAME = os.environ.get("MQTT_USERNAME", "")
 MQTT_PASSWORD = os.environ.get("MQTT_PASSWORD", "")
 POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", "30"))
-# renewvan-hub.service declares StateDirectory=renewvan-hub, so systemd creates
-# /var/lib/renewvan-hub owned by the service user.
-PRIMARY_BATTERY_PATH = Path(
-    os.environ.get("PRIMARY_BATTERY_PATH", "/var/lib/renewvan-hub/primary-battery.json")
-)
-ICONS_PATH = Path(os.environ.get("ICONS_PATH", "/var/lib/renewvan-hub/icons.json"))
-RELAY_GROUPS_PATH = Path(
-    os.environ.get("RELAY_GROUPS_PATH", "/var/lib/renewvan-hub/relay-groups.json")
-)
-RELAY_GROUP_LIST_PATH = Path(
-    os.environ.get("RELAY_GROUP_LIST_PATH", "/var/lib/renewvan-hub/relay-group-list.json")
-)
-RELAY_ORDER_PATH = Path(
-    os.environ.get("RELAY_ORDER_PATH", "/var/lib/renewvan-hub/relay-order.json")
-)
 
 TOPIC_STATUS = "renewvan/hub/status"
-TOPIC_PRIMARY_BATTERY = "renewvan/hub/primary-battery"
-TOPIC_PRIMARY_BATTERY_SET = "renewvan/hub/primary-battery/set"
-TOPIC_ICONS = "renewvan/hub/icons"
-TOPIC_ICONS_SET = "renewvan/hub/icons/set"
-TOPIC_RELAY_GROUPS = "renewvan/hub/relay-groups"
-TOPIC_RELAY_GROUPS_SET = "renewvan/hub/relay-groups/set"
-TOPIC_RELAY_GROUP_LIST = "renewvan/hub/relay-group-list"
-TOPIC_RELAY_GROUP_LIST_SET = "renewvan/hub/relay-group-list/set"
-TOPIC_RELAY_ORDER = "renewvan/hub/relay-order"
-TOPIC_RELAY_ORDER_SET = "renewvan/hub/relay-order/set"
 
-# '<entity>/<id>' and a lucide component name: the same patterns as
-# schema/hub-icons.schema.json.
-ICON_KEY_RE = re.compile(r"^[a-z][a-z0-9]*/[^/#+\s]+$")
-ICON_NAME_RE = re.compile(r"^[A-Z][A-Za-z0-9]{0,63}$")
-
-# A relay id and a group name: the same rules as schema/hub-relay-groups.schema.json. A group
-# name is 1-32 characters with no leading or trailing whitespace (fullmatch: `$` would accept a
-# trailing newline).
-RELAY_ID_RE = re.compile(r"[^/#+\s]+")
-RELAY_GROUP_RE = re.compile(r"\S(.*\S)?")
-RELAY_GROUP_MAX = 32
-RELAY_GROUP_LIST_MAX = 16
-RELAY_ORDER_MAX = 512
 DEFAULT_RELAY_GROUP_LIST = ["Lights", "Appliances", "USB", "Water", "Heating"]
 
-DEFAULT_PRIMARY_BATTERY = "auto"
+# The shared settings, each a declaration: its name (renewvan/hub/<name>, .../set and the file
+# <NAME>_PATH, by default /var/lib/renewvan-hub/<name>.json, created by the unit's StateDirectory=),
+# the schema of its state, its default, and how a command merges into the state (none: a command
+# is the whole new state). The checks are compiled from the schema files themselves.
+PRIMARY_BATTERY = SharedSetting("primary-battery", read_schema("hub-primary-battery"), "auto")
+ICONS = SharedSetting(
+    "icons",
+    read_schema("hub-icons"),
+    {},
+    command_schema=read_schema("hub-icon-set"),
+    merge=set_entry("key", "icon"),
+)
+RELAY_GROUPS = SharedSetting(
+    "relay-groups",
+    read_schema("hub-relay-groups"),
+    {},
+    command_schema=read_schema("hub-relay-group-set"),
+    merge=set_entry("id", "group"),
+)
+RELAY_GROUP_LIST = SharedSetting(
+    "relay-group-list", read_schema("hub-relay-group-list"), DEFAULT_RELAY_GROUP_LIST
+)
+RELAY_ORDER = SharedSetting("relay-order", read_schema("hub-relay-order"), [])
+
+SETTINGS = (PRIMARY_BATTERY, ICONS, RELAY_GROUPS, RELAY_GROUP_LIST, RELAY_ORDER)
+_BY_SET_TOPIC = {setting.set_topic: setting for setting in SETTINGS}
 
 # Written by bin/deploy.sh after it syncs this directory; absent on a checkout.
 VERSION_FILE = Path(__file__).resolve().parent / "VERSION"
@@ -194,421 +187,19 @@ def hub_status() -> dict:
     }
 
 
-def parse_primary_battery(raw: bytes) -> str | None:
-    """The instance id (or "auto") in a primary-battery payload, None when invalid.
-
-    Valid is a JSON string that is not empty: the same contract as
-    schema/hub-primary-battery.schema.json. Whether the id names a live
-    instance is the consumer's call, not this plugin's.
-    """
-    try:
-        value = json.loads(raw.decode())
-    except (UnicodeDecodeError, ValueError):
-        return None
-    if not isinstance(value, str) or not value:
-        return None
-    return value
-
-
-def load_primary_battery() -> str:
-    """The persisted primary battery, or "auto" when nothing valid is stored."""
-    try:
-        raw = PRIMARY_BATTERY_PATH.read_bytes()
-    except FileNotFoundError:
-        return DEFAULT_PRIMARY_BATTERY
-    except OSError as exc:
-        log.error(
-            "Cannot read %s: %s — using %r", PRIMARY_BATTERY_PATH, exc, DEFAULT_PRIMARY_BATTERY
-        )
-        return DEFAULT_PRIMARY_BATTERY
-    value = parse_primary_battery(raw)
-    if value is None:
-        log.warning("Ignoring invalid %s — using %r", PRIMARY_BATTERY_PATH, DEFAULT_PRIMARY_BATTERY)
-        return DEFAULT_PRIMARY_BATTERY
-    return value
-
-
-def _write_atomic(path: Path, text: str) -> None:
-    """Replace `path` with `text` atomically: a crash mid-write never leaves a torn file."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".tmp")
-    with open(tmp, "w", encoding="utf-8") as f:
-        f.write(text)
-        f.flush()
-        os.fsync(f.fileno())
-    os.replace(tmp, path)
-
-
-def save_primary_battery(value: str) -> None:
-    _write_atomic(PRIMARY_BATTERY_PATH, json.dumps(value))
-
-
-def publish_primary_battery(client: mqtt.Client, value: str) -> None:
-    client.publish(TOPIC_PRIMARY_BATTERY, json.dumps(value), qos=1, retain=True)
-
-
-def parse_icon_command(raw: bytes) -> tuple[str, str | None] | None:
-    """The (key, icon) of an icons command, None when invalid. icon None clears the entry.
-
-    Valid is the contract of schema/hub-icon-set.schema.json: exactly `key` and `icon`,
-    a '<entity>/<id>' key and a lucide component name or null.
-    """
-    try:
-        value = json.loads(raw.decode())
-    except (UnicodeDecodeError, ValueError):
-        return None
-    if not isinstance(value, dict) or set(value) != {"key", "icon"}:
-        return None
-    key, icon = value["key"], value["icon"]
-    if not isinstance(key, str) or ICON_KEY_RE.fullmatch(key) is None:
-        return None
-    if icon is not None and (not isinstance(icon, str) or ICON_NAME_RE.fullmatch(icon) is None):
-        return None
-    return key, icon
-
-
-def load_icons() -> dict[str, str]:
-    """The persisted icons map, or {} when nothing valid is stored.
-
-    An entry of the wrong shape is dropped on its own: one bad entry never costs the rest.
-    """
-    try:
-        raw = ICONS_PATH.read_bytes()
-    except FileNotFoundError:
-        return {}
-    except OSError as exc:
-        log.error("Cannot read %s: %s — using no icons", ICONS_PATH, exc)
-        return {}
-    try:
-        value = json.loads(raw.decode())
-    except (UnicodeDecodeError, ValueError):
-        value = None
-    if not isinstance(value, dict):
-        log.warning("Ignoring invalid %s — using no icons", ICONS_PATH)
-        return {}
-    return {
-        key: icon
-        for key, icon in value.items()
-        if ICON_KEY_RE.fullmatch(key) is not None
-        and isinstance(icon, str)
-        and ICON_NAME_RE.fullmatch(icon) is not None
-    }
-
-
-def save_icons(icons: dict[str, str]) -> None:
-    _write_atomic(ICONS_PATH, json.dumps(icons))
-
-
-def publish_icons(client: mqtt.Client, icons: dict[str, str]) -> None:
-    client.publish(TOPIC_ICONS, json.dumps(icons), qos=1, retain=True)
-
-
-def valid_relay_group(value: object) -> bool:
-    return (
-        isinstance(value, str)
-        and len(value) <= RELAY_GROUP_MAX
-        and RELAY_GROUP_RE.fullmatch(value) is not None
-    )
-
-
-def valid_relay_group_list(value: object) -> bool:
-    """A JSON array of at most RELAY_GROUP_LIST_MAX valid, distinct names (it may be empty)."""
-    return (
-        isinstance(value, list)
-        and len(value) <= RELAY_GROUP_LIST_MAX
-        and all(valid_relay_group(name) for name in value)
-        and len(set(value)) == len(value)
-    )
-
-
-def parse_relay_group_list(raw: bytes) -> list[str] | None:
-    """The names in a relay-group-list payload, None when invalid."""
-    try:
-        value = json.loads(raw.decode())
-    except (UnicodeDecodeError, ValueError):
-        return None
-    return value if valid_relay_group_list(value) else None
-
-
-def load_relay_group_list() -> list[str]:
-    """The persisted group list, or the stock list when nothing valid is stored."""
-    try:
-        raw = RELAY_GROUP_LIST_PATH.read_bytes()
-    except FileNotFoundError:
-        return list(DEFAULT_RELAY_GROUP_LIST)
-    except OSError as exc:
-        log.error("Cannot read %s: %s — using the stock groups", RELAY_GROUP_LIST_PATH, exc)
-        return list(DEFAULT_RELAY_GROUP_LIST)
-    names = parse_relay_group_list(raw)
-    if names is None:
-        log.warning("Ignoring invalid %s — using the stock groups", RELAY_GROUP_LIST_PATH)
-        return list(DEFAULT_RELAY_GROUP_LIST)
-    return names
-
-
-def save_relay_group_list(names: list[str]) -> None:
-    _write_atomic(RELAY_GROUP_LIST_PATH, json.dumps(names))
-
-
-def publish_relay_group_list(client: mqtt.Client, names: list[str]) -> None:
-    client.publish(TOPIC_RELAY_GROUP_LIST, json.dumps(names), qos=1, retain=True)
-
-
-def parse_relay_order(raw: bytes) -> list[str] | None:
-    """The relay ids in a relay-order payload, None when invalid (schema/hub-relay-order)."""
-    try:
-        value = json.loads(raw.decode())
-    except (UnicodeDecodeError, ValueError):
-        return None
-    if (
-        not isinstance(value, list)
-        or len(value) > RELAY_ORDER_MAX
-        or not all(isinstance(i, str) and RELAY_ID_RE.fullmatch(i) for i in value)
-        or len(set(value)) != len(value)
-    ):
-        return None
-    return value
-
-
-def load_relay_order() -> list[str]:
-    """The persisted relay order, or [] when nothing valid is stored."""
-    try:
-        raw = RELAY_ORDER_PATH.read_bytes()
-    except FileNotFoundError:
-        return []
-    except OSError as exc:
-        log.error("Cannot read %s: %s — using no relay order", RELAY_ORDER_PATH, exc)
-        return []
-    order = parse_relay_order(raw)
-    if order is None:
-        log.warning("Ignoring invalid %s — using no relay order", RELAY_ORDER_PATH)
-        return []
-    return order
-
-
-def save_relay_order(order: list[str]) -> None:
-    _write_atomic(RELAY_ORDER_PATH, json.dumps(order))
-
-
-def publish_relay_order(client: mqtt.Client, order: list[str]) -> None:
-    client.publish(TOPIC_RELAY_ORDER, json.dumps(order), qos=1, retain=True)
-
-
-def parse_relay_group_command(raw: bytes) -> tuple[str, str | None] | None:
-    """The (id, group) of a relay-groups command, None when invalid. group None clears the entry.
-
-    Valid is the contract of schema/hub-relay-group-set.schema.json: exactly `id` and `group`,
-    a relay id and a group name or null.
-    """
-    try:
-        value = json.loads(raw.decode())
-    except (UnicodeDecodeError, ValueError):
-        return None
-    if not isinstance(value, dict) or set(value) != {"id", "group"}:
-        return None
-    relay_id, group = value["id"], value["group"]
-    if not isinstance(relay_id, str) or RELAY_ID_RE.fullmatch(relay_id) is None:
-        return None
-    if group is not None and not valid_relay_group(group):
-        return None
-    return relay_id, group
-
-
-def load_relay_groups() -> dict[str, str]:
-    """The persisted relay groups map, or {} when nothing valid is stored.
-
-    An entry of the wrong shape is dropped on its own: one bad entry never costs the rest.
-    """
-    try:
-        raw = RELAY_GROUPS_PATH.read_bytes()
-    except FileNotFoundError:
-        return {}
-    except OSError as exc:
-        log.error("Cannot read %s: %s — using no relay groups", RELAY_GROUPS_PATH, exc)
-        return {}
-    try:
-        value = json.loads(raw.decode())
-    except (UnicodeDecodeError, ValueError):
-        value = None
-    if not isinstance(value, dict):
-        log.warning("Ignoring invalid %s — using no relay groups", RELAY_GROUPS_PATH)
-        return {}
-    return {
-        relay_id: group
-        for relay_id, group in value.items()
-        if RELAY_ID_RE.fullmatch(relay_id) is not None and valid_relay_group(group)
-    }
-
-
-def save_relay_groups(groups: dict[str, str]) -> None:
-    _write_atomic(RELAY_GROUPS_PATH, json.dumps(groups))
-
-
-def publish_relay_groups(client: mqtt.Client, groups: dict[str, str]) -> None:
-    client.publish(TOPIC_RELAY_GROUPS, json.dumps(groups), qos=1, retain=True)
-
-
 def on_connect(client: mqtt.Client, userdata, flags, rc, properties=None):
     if rc != 0:
         log.error("MQTT connect failed (rc=%s) — will retry", rc)
         return
     log.info("Connected to MQTT broker %s:%d", MQTT_HOST, MQTT_PORT)
-
-    client.subscribe(TOPIC_PRIMARY_BATTERY_SET, qos=1)
-    value = load_primary_battery()
-    publish_primary_battery(client, value)
-    log.info("Published primary battery: %s", value)
-
-    client.subscribe(TOPIC_ICONS_SET, qos=1)
-    icons = load_icons()
-    publish_icons(client, icons)
-    log.info("Published %d entity icon(s)", len(icons))
-
-    client.subscribe(TOPIC_RELAY_GROUPS_SET, qos=1)
-    groups = load_relay_groups()
-    publish_relay_groups(client, groups)
-    log.info("Published %d relay group assignment(s)", len(groups))
-
-    client.subscribe(TOPIC_RELAY_GROUP_LIST_SET, qos=1)
-    names = load_relay_group_list()
-    publish_relay_group_list(client, names)
-    log.info("Published %d relay group(s)", len(names))
-
-    client.subscribe(TOPIC_RELAY_ORDER_SET, qos=1)
-    order = load_relay_order()
-    publish_relay_order(client, order)
-    log.info("Published a relay order of %d relay(s)", len(order))
-
-
-def on_icons_message(client: mqtt.Client, msg) -> None:
-    command = parse_icon_command(msg.payload)
-    if command is None:
-        log.warning(
-            'Ignoring invalid icons command %r (want {"key": "<entity>/<id>", "icon": name|null})',
-            msg.payload,
-        )
-        return
-    key, icon = command
-    icons = load_icons()
-    if icon is None:
-        icons.pop(key, None)
-    else:
-        icons[key] = icon
-    try:
-        save_icons(icons)
-    except OSError as exc:
-        # Publishing a map that would silently revert on restart is worse than
-        # visibly not applying it.
-        log.error("Cannot persist icons to %s: %s — not applied", ICONS_PATH, exc)
-        return
-    publish_icons(client, icons)
-    log.info("Icon for %s set to %s", key, icon)
-
-
-def on_relay_groups_message(client: mqtt.Client, msg) -> None:
-    command = parse_relay_group_command(msg.payload)
-    if command is None:
-        log.warning(
-            "Ignoring invalid relay-groups command %r "
-            '(want {"id": "<relay id>", "group": name|null})',
-            msg.payload,
-        )
-        return
-    relay_id, group = command
-    groups = load_relay_groups()
-    if group is None:
-        groups.pop(relay_id, None)
-    else:
-        groups[relay_id] = group
-    try:
-        save_relay_groups(groups)
-    except OSError as exc:
-        # Publishing a map that would silently revert on restart is worse than
-        # visibly not applying it.
-        log.error("Cannot persist relay groups to %s: %s — not applied", RELAY_GROUPS_PATH, exc)
-        return
-    publish_relay_groups(client, groups)
-    log.info("Relay %s group set to %s", relay_id, group)
-
-
-def on_relay_group_list_message(client: mqtt.Client, msg) -> None:
-    names = parse_relay_group_list(msg.payload)
-    if names is None:
-        log.warning(
-            "Ignoring invalid relay-group-list command %r "
-            "(want a JSON array of up to %d distinct names)",
-            msg.payload,
-            RELAY_GROUP_LIST_MAX,
-        )
-        return
-    try:
-        save_relay_group_list(names)
-    except OSError as exc:
-        # Publishing a list that would silently revert on restart is worse than
-        # visibly not applying it.
-        log.error("Cannot persist relay groups to %s: %s — not applied", RELAY_GROUP_LIST_PATH, exc)
-        return
-    publish_relay_group_list(client, names)
-    log.info("Relay group list set to %s", names)
-
-
-def on_relay_order_message(client: mqtt.Client, msg) -> None:
-    order = parse_relay_order(msg.payload)
-    if order is None:
-        log.warning(
-            "Ignoring invalid relay-order command %r "
-            "(want a JSON array of up to %d distinct relay ids)",
-            msg.payload,
-            RELAY_ORDER_MAX,
-        )
-        return
-    try:
-        save_relay_order(order)
-    except OSError as exc:
-        # Publishing an order that would silently revert on restart is worse than
-        # visibly not applying it.
-        log.error("Cannot persist relay order to %s: %s — not applied", RELAY_ORDER_PATH, exc)
-        return
-    publish_relay_order(client, order)
-    log.info("Relay order set (%d relay(s))", len(order))
+    for setting in SETTINGS:
+        setting.connect(client)
 
 
 def on_message(client: mqtt.Client, userdata, msg):
-    if msg.topic == TOPIC_RELAY_ORDER_SET:
-        on_relay_order_message(client, msg)
-        return
-    if msg.topic == TOPIC_RELAY_GROUP_LIST_SET:
-        on_relay_group_list_message(client, msg)
-        return
-    if msg.topic == TOPIC_ICONS_SET:
-        on_icons_message(client, msg)
-        return
-    if msg.topic == TOPIC_RELAY_GROUPS_SET:
-        on_relay_groups_message(client, msg)
-        return
-    if msg.topic != TOPIC_PRIMARY_BATTERY_SET:
-        return
-    value = parse_primary_battery(msg.payload)
-    if value is None:
-        log.warning(
-            "Ignoring invalid primary-battery command %r (want a non-empty JSON string)",
-            msg.payload,
-        )
-        return
-    try:
-        save_primary_battery(value)
-    except OSError as exc:
-        # Publishing a value that would silently revert on restart is worse than
-        # visibly not applying it.
-        log.error(
-            "Cannot persist primary battery %r to %s: %s — not applied",
-            value,
-            PRIMARY_BATTERY_PATH,
-            exc,
-        )
-        return
-    publish_primary_battery(client, value)
-    log.info("Primary battery set to %s", value)
+    setting = _BY_SET_TOPIC.get(msg.topic)
+    if setting is not None:
+        setting.command(client, msg.payload)
 
 
 def on_disconnect(client: mqtt.Client, userdata, flags, rc=None, properties=None):

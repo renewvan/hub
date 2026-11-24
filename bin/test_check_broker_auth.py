@@ -197,7 +197,7 @@ class CutoverTest(unittest.TestCase):
         self.dir = Path(tmp.name)
         self.bin = self.dir / "bin"
         self.bin.mkdir()
-        for name in ("cutover-broker-acl.sh", "broker-accounts.sh"):
+        for name in ("cutover-broker-acl.sh", "broker-accounts.sh", "broker-clients.conf"):
             shutil.copy(BIN / name, self.bin / name)
         self.log = self.dir / "log"
         self.log.write_text("")

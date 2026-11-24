@@ -2,44 +2,44 @@
 # Sourced by bin/ensure-secrets.sh and bin/rotate-secret.sh (never run directly): the broker account
 # model of docs/adr/0025-broker-has-per-client-accounts-and-anonymous-read-only.md.
 #
-# One Mosquitto account per client. The username is the client key; the password lives in .env as
-# MQTT_<KEY>_PASSWORD. From .env this file derives everything else: the Mosquitto password file and
-# ACL in ${RENEWVAN_ETC}/mosquitto/, the five drivers' config.ini [mqtt] section, and the host
-# plugins' env files. Callers define ENV_FILE first.
-#
-# ADR 0025 sketches `pattern write renewvan/%u/#` for every driver, but a driver's entity topics are
-# renewvan/<entity>/..., not renewvan/<driver>/... (wattcycle, venus and vedirect write `battery`,
-# autoterm writes `heater`), and autoterm, vedirect and the hub plugin are clients too. So each
-# account lists the namespaces it really writes (client_writes below).
+# One Mosquitto account per client. The clients, their credential channel and the topics each may write are
+# data, in bin/broker-clients.conf (BROKER_CLIENTS_FILE overrides it). The username is the client key; the
+# password lives in .env as MQTT_<KEY>_PASSWORD. From the registry and .env this file derives everything
+# else: the Mosquitto password file and ACL in ${RENEWVAN_ETC}/mosquitto/, the drivers' config.ini [mqtt]
+# section, and the host plugins' env files. Callers define ENV_FILE first.
 
 RENEWVAN_ETC="${RENEWVAN_ETC:-/etc/renewvan}"
 BROKER_GID="${BROKER_GID:-1883}" # the eclipse-mosquitto image's mosquitto group
 BROKER_CONTAINER="${BROKER_CONTAINER:-renewvan-mosquitto}"
 LOGIN_USER_NAME="renewvan"
 
-# key:kind:target[:unit]. kind = config.ini (the driver reads /etc/renewvan/<key>/config.ini, not the
-# environment), compose (MQTT_USERNAME/PASSWORD from compose; target is the service), or envfile (a host
-# plugin's /etc/renewvan/<target>; unit is its systemd service). `command` is the dashboard's public
-# account; esp32-<name> board accounts (below) are flashed, never written from the Pi; `reader` is the read-only login for people and tools
-# (MQTT Explorer, a dev dashboard) and for bin/check-broker-auth.sh: it has no process to restart.
-BROKER_CLIENTS=(
-  "tank:config.ini:driver-tank"
-  "gps:config.ini:driver-gps"
-  "temperature:config.ini:driver-temperature"
-  "tilt:config.ini:driver-tilt"
-  "wattcycle:config.ini:driver-wattcycle"
-  "autoterm:config.ini:driver-autoterm"
-  "vedirect:config.ini:driver-vedirect"
-  "logger:compose:logger"
-  "venus:compose:driver-venus"
-  "router:compose:driver-router"
-  "demo:compose:driver-demo"
-  "kiosk:envfile:kiosk.env:renewvan-kiosk"
-  "tailscale:envfile:tailscale.env:renewvan-tailscale"
-  "hub:envfile:hub.env:renewvan-hub"
-  "command:compose:dashboard"
-  "reader:reader:"
-)
+# The registry, loaded once when this file is sourced (the source fails on a missing or malformed one):
+# BROKER_CLIENTS holds one key:kind:target[:unit] spec per `client` line, BROKER_WRITES one "<key> <filter>"
+# per `write` line, both in file order. The kinds are described in the registry.
+BROKER_CLIENTS_FILE="${BROKER_CLIENTS_FILE:-$(dirname "${BASH_SOURCE[0]}")/broker-clients.conf}"
+BROKER_CLIENTS=()
+BROKER_WRITES=()
+load_broker_clients() {
+  local record key a b c extra
+  [[ -f "${BROKER_CLIENTS_FILE}" ]] || {
+    echo "ERROR: broker client registry ${BROKER_CLIENTS_FILE} not found" >&2
+    return 1
+  }
+  while read -r record key a b c extra; do
+    case "${record}" in
+      "" | "#"*) ;;
+      client) [[ -n "${a}" && -z "${extra}" ]] || break; BROKER_CLIENTS+=("${key}:${a}:${b}${c:+:${c}}") ;;
+      write) [[ -n "${a}" && -z "${b}" ]] || break; BROKER_WRITES+=("${key} ${a}") ;;
+      *) break ;;
+    esac
+    record=""
+  done < <(cat "${BROKER_CLIENTS_FILE}"; echo) # the echo: a last line without a newline still counts
+  [[ -z "${record}" ]] || {
+    echo "ERROR: ${BROKER_CLIENTS_FILE}: not a client or write line: ${record} ${key} ${a} ${b} ${c}" >&2
+    return 1
+  }
+}
+load_broker_clients || return 1
 
 # Board accounts (ADR 0027, hub#162): one account per ESP32 board, named by its Driver key esp32-<name>.
 # The boards are the space-separated <name>s in BROKER_ESP32_BOARDS in .env (the same name chosen when the
@@ -100,37 +100,19 @@ client_spec() { # <key> -> the full spec line
 # MQTT_<KEY>_PASSWORD (a hyphen in a board key becomes an underscore)
 client_var() { printf 'MQTT_%s_PASSWORD' "$(printf '%s' "$1" | tr '[:lower:]-' '[:upper:]_')"; }
 
-# Topic filters each account may write. Everyone reads renewvan/# (global rule), so no read lines here.
+# Topic filters an account may write, from the registry's `write` lines; a board key esp32-<name> gets the
+# `esp32-<name>` lines with <name> filled in. Everyone reads renewvan/# (global rule), so no read lines.
 client_writes() {
-  case "$1" in
-    tank | gps | temperature | tilt | router | logger | tailscale) echo "renewvan/$1/#" ;;
-    wattcycle) printf '%s\n' "renewvan/wattcycle/#" "renewvan/battery/#" ;;
-    venus | vedirect) printf '%s\n' "renewvan/$1/#" "renewvan/battery/#" "renewvan/solar/#" "renewvan/charger/#" ;;
-    # The driver's own info/health (also its last will) are under renewvan/autoterm/ (checked in the pinned
-    # image, driver-autoterm v0.2.3: publisher.py), plus per-heater telemetry (four segments). The
-    # five-segment .../<prop>/set command topics are deliberately not covered: the driver only subscribes to
-    # them, and they belong to `command` (ADR 0021). Re-check these against the pinned image, not a checkout,
-    # when the driver-autoterm pin changes.
-    autoterm) printf '%s\n' "renewvan/autoterm/info" "renewvan/autoterm/health" "renewvan/heater/+/+" ;;
-    # Everything demo publishes except renewvan/demo/enabled/set, which only `command` may write.
-    demo) printf '%s\n' "renewvan/demo/enabled" "renewvan/demo/health" "renewvan/demo/+/info" "renewvan/demo/+/+/+" ;;
-    # State topics only (four segments); the five-segment .../set topics belong to `command`.
-    kiosk) echo "renewvan/kiosk/display/+" ;;
-    hub) printf '%s\n' "renewvan/hub/status" "renewvan/hub/primary-battery" "renewvan/hub/icons" \
-      "renewvan/hub/relay-groups" "renewvan/hub/relay-group-list" \
-      "renewvan/hub/relay-order" ;;
-    # A board: its own Driver namespace (info, health, last will) plus relay state, name and driver, never
-    # relay/+/set. Relay ids are opaque (ADR 0027), so those three are not scoped to the board's own ids: see
-    # "Relay ownership" in the ADR 0027 addendum.
-    esp32-*) printf '%s\n' "renewvan/$1/#" "renewvan/relay/+/state" "renewvan/relay/+/name" "renewvan/relay/+/driver" ;;
-    # Only the command topics, never state or health.
-    command)
-      printf '%s\n' "renewvan/relay/+/set" "renewvan/relay/+/name/set" "renewvan/kiosk/display/+/set" \
-        "renewvan/heater/+/set" "renewvan/heater/+/+/set" "renewvan/demo/enabled/set" \
-        "renewvan/hub/primary-battery/set" "renewvan/hub/icons/set" "renewvan/hub/relay-groups/set" \
-        "renewvan/hub/relay-group-list/set" "renewvan/hub/relay-order/set"
-      ;;
-  esac
+  local line key topic name=""
+  is_board_key "$1" && name="${1#esp32-}"
+  for line in ${BROKER_WRITES[@]+"${BROKER_WRITES[@]}"}; do
+    key="${line%% *}" topic="${line#* }"
+    if [[ "${key}" == "$1" ]]; then
+      printf '%s\n' "${topic}"
+    elif [[ -n "${name}" && "${key}" == "esp32-<name>" ]]; then
+      printf '%s\n' "${topic//<name>/${name}}"
+    fi
+  done
 }
 
 # Print the ACL. A `pattern` line applies to every client, authenticated or not; a `topic` line before the

@@ -9,6 +9,8 @@ from pathlib import Path
 
 import yaml
 
+import broker_clients
+
 ROOT = Path(__file__).resolve().parent.parent
 COMPOSE = yaml.safe_load((ROOT / "docker-compose.yml").read_text())
 SERVICES = COMPOSE["services"]
@@ -122,60 +124,87 @@ class CredentialsTest(unittest.TestCase):
 
 
 class BrokerAccountsTest(unittest.TestCase):
-    """ADR 0025: each client connects with its own account, never one shared credential."""
+    """ADR 0025: each client connects with its own account, never one shared credential. The
+    clients are bin/broker-clients.conf; what compose, .env.example and the plugins say is
+    derived from it here."""
 
-    COMPOSE_CLIENTS = {
-        "driver-autoterm": "autoterm",
-        "driver-demo": "demo",
-        "driver-gps": "gps",
-        "driver-router": "router",
-        "driver-tank": "tank",
-        "driver-temperature": "temperature",
-        "driver-tilt": "tilt",
-        "driver-vedirect": "vedirect",
-        "logger": "logger",
-    }
+    CLIENTS, _ = broker_clients.load()
+    # a client whose credential reaches its compose service, by service
+    BY_SERVICE = {c.target: c for c in CLIENTS if c.kind in ("config.ini", "compose")}
 
-    def test_commented_out_driver_venus_keeps_its_own_account(self):
-        # driver-venus ships commented out in docker-compose.yml (kept for vans with Venus OS), so
-        # it is not in COMPOSE_CLIENTS; uncommented, it must still use its own account, and the
-        # account stays provisioned so enabling it needs no secrets work.
+    @staticmethod
+    def account_env(key):
+        var = broker_clients.password_var(key)
+        return f"${{{var}:+{key}}}", f"${{{var}:-}}"
+
+    def test_every_service_that_connects_uses_its_own_account(self):
+        connecting = {
+            name
+            for name in SERVICES
+            if {"MQTT_HOST", "VITE_MQTT_WS_URL"} & env_of(name).keys()
+            or any(k.endswith("MQTT_USERNAME") for k in env_of(name))
+        }
+        self.assertIn("logger", connecting)  # the check finds something
+        for service in connecting:
+            client = self.BY_SERVICE.get(service)
+            self.assertIsNotNone(client, f"{service} connects but is no client's target")
+            env = env_of(service)
+            prefix = "VITE_" if "VITE_MQTT_WS_URL" in env else ""
+            user, password = self.account_env(client.key)
+            self.assertEqual(env[f"{prefix}MQTT_USERNAME"], user, service)
+            self.assertEqual(env[f"{prefix}MQTT_PASSWORD"], password, service)
+
+    def test_every_compose_client_has_its_account_in_compose(self):
+        # driver-venus ships commented out (kept for vans with Venus OS): uncommented, it must
+        # still use its own account, and the account stays provisioned so enabling it needs no
+        # secrets work.
         text = (ROOT / "docker-compose.yml").read_text()
-        self.assertNotIn("driver-venus", SERVICES)
-        self.assertIn("  # driver-venus:", text)
-        self.assertIn("#     MQTT_USERNAME: ${MQTT_VENUS_PASSWORD:+venus}", text)
-        self.assertIn("#     MQTT_PASSWORD: ${MQTT_VENUS_PASSWORD:-}", text)
-        accounts = (ROOT / "bin" / "broker-accounts.sh").read_text()
-        self.assertIn('"venus:compose:driver-venus"', accounts)
-        self.assertRegex(ENV_EXAMPLE, r"(?m)^MQTT_VENUS_PASSWORD=$")
+        for client in self.CLIENTS:
+            if client.kind != "compose":
+                continue
+            user, password = self.account_env(client.key)
+            if client.target in SERVICES:
+                prefix = "VITE_" if client.target == "dashboard" else ""
+                env = env_of(client.target)
+                self.assertEqual(env[f"{prefix}MQTT_USERNAME"], user, client.key)
+                self.assertEqual(env[f"{prefix}MQTT_PASSWORD"], password, client.key)
+            else:
+                self.assertIn(f"  # {client.target}:", text, client.key)
+                self.assertIn(f"#     MQTT_USERNAME: {user}", text, client.key)
+                self.assertIn(f"#     MQTT_PASSWORD: {password}", text, client.key)
+
+    def test_dashboard_uses_the_command_account(self):
+        self.assertEqual(self.BY_SERVICE["dashboard"].key, "command")
+
+    def test_env_example_lists_one_password_per_client_in_registry_order(self):
+        listed = re.findall(r"(?m)^(MQTT_[A-Z0-9_]+_PASSWORD)=$", ENV_EXAMPLE)
+        self.assertEqual(listed, [c.var for c in self.CLIENTS])
+        # and the comment above them names the same clients
+        names = re.search(
+            r"one per client \(([^)]*), plus one esp32-<name> per board\)", ENV_EXAMPLE
+        )
+        self.assertIsNotNone(names)
+        named = [n.strip(" #\n") for n in names.group(1).split(",")]
+        self.assertEqual(named, [c.key.upper() for c in self.CLIENTS])
+        self.assertRegex(ENV_EXAMPLE, r"(?m)^BROKER_ESP32_BOARDS=$")  # board accounts, hub#162
+
+    def test_host_plugins_read_their_registry_env_file(self):
+        for client in self.CLIENTS:
+            if client.kind != "envfile":
+                continue
+            units = list((ROOT / "plugins").glob(f"*/{client.unit}.service"))
+            self.assertEqual(len(units), 1, client.unit)
+            self.assertIn(
+                f"EnvironmentFile=-/etc/renewvan/{client.target}\n",
+                units[0].read_text(),
+                client.key,
+            )
 
     def test_no_shared_broker_credential_remains(self):
         text = (ROOT / "docker-compose.yml").read_text()
         self.assertNotIn("RENEWVAN_USERNAME", text)
         self.assertNotIn("RENEWVAN_PASSWORD", text)
         self.assertNotIn("RENEWVAN_USERNAME", ENV_EXAMPLE)
-
-    def test_each_compose_client_gets_its_own_account(self):
-        for service, key in self.COMPOSE_CLIENTS.items():
-            env = env_of(service)
-            var = f"MQTT_{key.upper()}_PASSWORD"
-            self.assertEqual(env["MQTT_USERNAME"], f"${{{var}:+{key}}}", service)
-            self.assertEqual(env["MQTT_PASSWORD"], f"${{{var}:-}}", service)
-            self.assertRegex(ENV_EXAMPLE, rf"(?m)^{var}=$")
-
-    def test_dashboard_uses_the_command_account(self):
-        env = env_of("dashboard")
-        self.assertEqual(env["VITE_MQTT_USERNAME"], "${MQTT_COMMAND_PASSWORD:+command}")
-        self.assertEqual(env["VITE_MQTT_PASSWORD"], "${MQTT_COMMAND_PASSWORD:-}")
-
-    def test_config_ini_drivers_and_plugins_are_covered_by_ensure_secrets(self):
-        accounts = (ROOT / "bin" / "broker-accounts.sh").read_text()
-        for key in ("wattcycle", "kiosk", "tailscale", "hub", "command"):
-            self.assertIn(f'"{key}:', accounts)
-        self.assertIn("BROKER_ESP32_BOARDS", accounts)  # board accounts esp32-<name>, hub#162
-        self.assertRegex(ENV_EXAMPLE, r"(?m)^BROKER_ESP32_BOARDS=$")
-        for service, key in self.COMPOSE_CLIENTS.items():
-            self.assertIn(f'"{key}:', accounts)
 
     def test_login_service_gets_the_login_and_the_kiosk_bypasses_it(self):
         env = env_of("login")
