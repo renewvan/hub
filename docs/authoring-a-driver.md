@@ -55,7 +55,7 @@ Two retained topics, both three segments (so neither looks like an entity topic 
 
 Rules:
 
-- **On every connect, publish info first, then `online`.** A consumer that sees `online` then always finds info already retained, and republishing on reconnect heals a broker that lost its retained state.
+- **On every connect, publish info first, before any entity topic and before `online`.** A consumer that sees `online` then always finds info already retained, the fleet (`renewvan/hub/fleet`, ADR 0035) only lists Drivers with retained info, and republishing on reconnect heals a broker that lost its retained state.
 - **Leave info retained when you go offline.** Do not clear it on shutdown or from the last will. That retained info is what lets a consumer say "offline, last seen vX".
 - Info validates against `driver-info.schema.json`: the manifest fields, a required non-empty `version`, an optional non-empty `board_serial`, an optional `ip`, and an optional informational non-empty `variant` (the firmware kind; consumers must not branch on it, ADR 0027), with no other properties.
 - **Name yourself on every entity instance.** Publish `renewvan/<entity>/<id>/driver` (retained, a JSON string equal to your key, the `<driver>` segment above) at the same moment as the instance's other retained identity fields: on startup, on every (re)connect, and when a dynamic instance is first discovered. It is optional on the wire (except on `relay`, where it is required and has no fallback, ADR 0027) and a consumer tolerates it being absent on the other entities (it then attributes the instance to every Driver whose info `publishes` that entity), but it is how two Drivers publishing the same entity stay distinguishable. Optionally publish a human label as `renewvan/<entity>/<id>/name` (retained, non-empty string). See `docs/adr/0019-entity-instances-name-their-driver-and-shared-primary-battery.md`.
@@ -106,6 +106,10 @@ A new `schema/<entity>.schema.json` must also be added to the `publishes` enum i
 ## Adding a driver for an existing entity
 
 An external developer adding a driver for an entity that already has a schema (for example a Renogy solar charger publishing `solar`) does **not** ship a demo and does not touch `schema/demo/`. The driver only complies with the entity schema: required properties only, optionals may be absent, a stable id derived from the source, retained JSON values, and an LWT health topic. If the source exposes something the entity cannot represent, the path is a hub schema PR (with its demo update), never ad-hoc topics.
+
+## Removing a driver
+
+Stopping and uninstalling a Driver leaves it on the bus: info, health and entity topics are retained by design (ADR 0011), so it keeps showing as offline on every client. To take it off the bus for good, run `python3 bin/remove_driver.py <key>` on the Pi after the uninstall. It clears the Driver's namespace and every instance that names it in the retained `driver` property — which is why publishing that property matters: instances without it cannot be attributed, and the tool lists them instead of clearing them. The hub plugin drops the Driver from `renewvan/hub/fleet` the moment its info is cleared. See [adr/0035-driver-removal-and-the-fleet-topic.md](adr/0035-driver-removal-and-the-fleet-topic.md).
 
 ## Definition of done
 

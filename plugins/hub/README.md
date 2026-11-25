@@ -17,6 +17,7 @@ Publishes the Pi's own local-network address and the hub's version to the Renewv
 | `renewvan/hub/relay-group-list/set` | no       | client → plugin |
 | `renewvan/hub/relay-order`          | yes      | plugin → bus    |
 | `renewvan/hub/relay-order/set`      | no       | client → plugin |
+| `renewvan/hub/fleet`                | yes      | plugin → bus    |
 | `renewvan/hub/winter-mode`          | yes      | plugin → bus    |
 | `renewvan/hub/winter-mode/set`      | no       | client → plugin |
 | `renewvan/<driver>/winter-mode/set` | no       | plugin → board  |
@@ -45,6 +46,18 @@ Publishes the Pi's own local-network address and the hub's version to the Renewv
 `version` is never read from a file you edit. `bin/deploy.sh` writes it to `/opt/renewvan/plugins/hub/VERSION` after syncing the plugin, because the Pi has no `.git`. A tagged clean checkout reads `v0.4.0`; commits past a tag read `v0.4.0-3-g6a77a25`; an untagged tree reads a bare commit hash; uncommitted changes append `-dirty`. A Pi deployed before this existed, or a plugin run from a checkout, publishes `dev`. Same convention as a Driver's `version` (`docs/authoring-a-driver.md`).
 
 Published every 30 seconds, so a broker restart that lost retained state heals within one poll.
+
+### `renewvan/hub/fleet`
+
+Which Drivers the van has, and the bus contract version, so a consumer can settle after the retained replay instead of guessing: it knows to expect the info of every Driver the fleet names, and a Driver absent from the fleet is not installed (its info was cleared by `bin/remove_driver.py` — the removal signal). `contract` versions the bus contract as one number, so an old consumer can tell the van is ahead of it ([ADR 0035](../../docs/adr/0035-driver-removal-and-the-fleet-topic.md), `fleet.py`).
+
+**Payload** (JSON, `schema/hub-fleet.schema.json`): `contract` (integer ≥ 1) and `drivers` (sorted Driver keys; the reserved keys `demo` and `hub` never appear).
+
+```json
+{ "contract": 1, "drivers": ["esp32-front", "tank", "venus"] }
+```
+
+The plugin subscribes to `renewvan/+/info`, rebuilds the set from the retained replay on every (re)connect, publishes a moment after the replay has been collected (never an empty fleet before it), and republishes on every change — a live empty payload on an info topic drops the Driver at once. The Demo namespace is out of scope: demo Driver infos sit one segment deeper (`renewvan/demo/<driver>/info`).
 
 ### Shared settings
 
@@ -202,6 +215,7 @@ mosquitto_sub -h <pi> -t renewvan/hub/primary-battery -C 1
 mosquitto_sub -h <pi> -t renewvan/hub/icons -C 1
 mosquitto_sub -h <pi> -t renewvan/hub/relay-groups -C 1
 mosquitto_sub -h <pi> -t renewvan/hub/relay-group-list -C 1
+mosquitto_sub -h <pi> -t renewvan/hub/fleet -C 1
 mosquitto_pub -h <pi> -t renewvan/hub/relay-groups/set -m '{"id":"relay-x8-01","group":"Lights"}'
 mosquitto_pub -h <pi> -t renewvan/hub/icons/set -m '{"key":"tank/fresh","icon":"Droplet"}'
 mosquitto_pub -h <pi> -t renewvan/hub/primary-battery/set -m '"auto"'
@@ -213,5 +227,5 @@ pkcheck --action-id org.freedesktop.login1.power-off --process $$ && echo yes
 ## Tests
 
 ```sh
-cd plugins/hub && python3 -m unittest test_hub_status test_winter_mode -v   # or: pytest plugins/hub
+cd plugins/hub && python3 -m unittest test_hub_status test_winter_mode test_fleet -v   # or: pytest plugins/hub
 ```

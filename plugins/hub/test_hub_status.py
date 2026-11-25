@@ -48,6 +48,7 @@ _stub_paho()
 
 import hub_status  # noqa: E402
 import winter_mode  # noqa: E402
+import fleet  # noqa: E402
 from shared_setting import SharedSetting  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[2]
@@ -315,6 +316,7 @@ class SettingsWiringTests(_Settings):
             [
                 hub_status.TOPIC_STATUS,
                 *(s.topic for s in hub_status.SETTINGS),
+                fleet.TOPIC,
                 winter_mode.STATE_TOPIC,
                 winter_mode.BOARD_SET_FILTER,
             ],

@@ -80,6 +80,13 @@ which relays exist, so it only checks the shape of the array.
 Winter mode: Start winter mode shuts the hub down cleanly once the Hub power board has confirmed it
 will cut the power (ADR 0033). See winter_mode.py for its topics, refusals and order.
 
+Fleet: which Drivers the van has, and the bus contract version, as one retained topic maintained
+from the Drivers' info topics, so a consumer can settle after the retained replay instead of
+guessing (ADR 0035). See fleet.py:
+
+  renewvan/hub/fleet  (retained)  {"contract": 1, "drivers": ["tank", "venus", ...]}
+                                  (schema/hub-fleet.schema.json)
+
 Configuration via environment (or /etc/renewvan/hub.env):
   MQTT_HOST              default: localhost
   MQTT_PORT              default: 1883
@@ -109,6 +116,7 @@ import paho.mqtt.client as mqtt
 
 from shared_setting import SharedSetting, read_schema, set_entry
 from winter_mode import WinterMode
+from fleet import Fleet
 
 MQTT_HOST = os.environ.get("MQTT_HOST", "localhost")
 MQTT_PORT = int(os.environ.get("MQTT_PORT", "1883"))
@@ -148,6 +156,7 @@ SETTINGS = (PRIMARY_BATTERY, ICONS, RELAY_GROUPS, RELAY_GROUP_LIST, RELAY_ORDER)
 _BY_SET_TOPIC = {setting.set_topic: setting for setting in SETTINGS}
 
 WINTER_MODE = WinterMode()
+FLEET = Fleet()
 
 # Written by bin/deploy.sh after it syncs this directory; absent on a checkout.
 VERSION_FILE = Path(__file__).resolve().parent / "VERSION"
@@ -201,13 +210,14 @@ def on_connect(client: mqtt.Client, userdata, flags, rc, properties=None):
     for setting in SETTINGS:
         setting.connect(client)
     WINTER_MODE.connect(client)
+    FLEET.connect(client)
 
 
 def on_message(client: mqtt.Client, userdata, msg):
     setting = _BY_SET_TOPIC.get(msg.topic)
     if setting is not None:
         setting.command(client, msg.payload)
-    else:
+    elif not FLEET.message(client, msg):
         WINTER_MODE.message(client, msg)
 
 

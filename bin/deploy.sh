@@ -37,7 +37,7 @@ echo "==> Syncing compose artifacts to ${HOST}:${REMOTE_DIR}"
 ssh "${HOST}" "mkdir -p ${REMOTE_DIR} && sudo mkdir -p /opt/renewvan/plugins/kiosk /opt/renewvan/plugins/tailscale /opt/renewvan/plugins/hub /opt/renewvan/venvs"
 rsync -az docker-compose.yml docker-compose.lan.yml "${HOST}:${REMOTE_DIR}/"
 ssh "${HOST}" "mkdir -p ${REMOTE_DIR}/bin"
-rsync -az bin/vedirect-gate.sh bin/ensure-secrets.sh bin/broker-accounts.sh bin/broker-clients.conf bin/rotate-secret.sh bin/validate-broker-config.sh bin/check-broker-auth.sh bin/cutover-broker-acl.sh bin/check-exposure.sh "${HOST}:${REMOTE_DIR}/bin/"
+rsync -az bin/vedirect-gate.sh bin/ensure-secrets.sh bin/broker-accounts.sh bin/broker-clients.conf bin/rotate-secret.sh bin/validate-broker-config.sh bin/check-broker-auth.sh bin/cutover-broker-acl.sh bin/check-exposure.sh bin/remove_driver.py "${HOST}:${REMOTE_DIR}/bin/"
 # docker/ includes docker/caddy/Caddyfile, which caddy bind-mounts: the hub owns it, so no app checkout is
 # needed. A Pi deployed before that still has /opt/renewvan/dashboard/ (or /opt/renewvan/apps/) holding an
 # old copy; nothing reads it any more, delete it by hand.
